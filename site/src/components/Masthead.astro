@@ -1,11 +1,10 @@
 ---
 // The document header - a standards masthead, not a product nav.
 const nav = [
-	{ label: 'Abstract', href: '#abstract' },
-	{ label: 'Blocks', href: '#blocks' },
-	{ label: 'The stamp', href: '#stamp' },
-	{ label: 'Constraints', href: '#constraints' },
-	{ label: 'Implement', href: '#implement' },
+	{ label: 'Overview', href: '/' },
+	{ label: 'Specification', href: '/spec/' },
+	{ label: 'Playground', href: '/playground/' },
+	{ label: 'Repository', href: 'https://github.com/anvil-md/anvil' },
 ]
 ---
 
@@ -40,12 +39,6 @@ const nav = [
 		</nav>
 
 		<div class="flex items-center gap-2">
-			<a
-				href="https://github.com/anvil-md/anvil"
-				class="hidden border border-rule px-2.5 py-1 font-mono text-xs text-ink-soft transition-colors hover:border-accent hover:text-accent-ink sm:inline-block"
-			>
-				GitHub
-			</a>
 			<button
 				id="theme-toggle"
 				type="button"

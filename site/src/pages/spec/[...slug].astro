@@ -1,0 +1,75 @@
+---
+import DocsLayout from '@/layouts/DocsLayout.astro'
+import { getCollection, render } from 'astro:content'
+
+export async function getStaticPaths() {
+	const sections = (await getCollection('spec')).sort((a, b) => a.data.section - b.data.section)
+	return sections.map((entry, i) => ({
+		params: { slug: entry.id },
+		props: {
+			entry,
+			prev: sections[i - 1],
+			next: sections[i + 1],
+			total: sections.length,
+		},
+	}))
+}
+
+const { entry, prev, next, total } = Astro.props
+const { Content } = await render(entry)
+---
+
+<DocsLayout
+	title={`${entry.data.title} - ANVIL specification`}
+	description={entry.data.summary}
+	current={entry.id}
+>
+	<article class="max-w-3xl py-10 sm:py-14">
+		<header class="border-b border-rule pb-7">
+			<p class="clause-label mb-4">
+				Specification &nbsp;&middot;&nbsp; Section {entry.data.section} of {total - 1}
+			</p>
+			<h1 class="font-serif text-3xl leading-[1.15] tracking-[-0.01em] text-ink sm:text-[2.1rem]">
+				{entry.data.title}
+			</h1>
+			<p class="mt-4 max-w-2xl leading-relaxed text-ink-soft">{entry.data.summary}</p>
+		</header>
+
+		<div class="doc-prose mt-9">
+			<Content />
+		</div>
+
+		<nav class="mt-16 grid gap-4 border-t border-rule-strong pt-6 sm:grid-cols-2">
+			{
+				prev ? (
+					<a href={`/spec/${prev.id}/`} class="group border border-rule p-4 transition-colors hover:border-accent">
+						<p class="clause-label transition-colors group-hover:text-accent-ink">
+							&larr; &sect;{prev.data.section}
+						</p>
+						<p class="mt-1.5 text-sm text-ink">{prev.data.title}</p>
+					</a>
+				) : (
+					<a href="/spec/" class="group border border-rule p-4 transition-colors hover:border-accent">
+						<p class="clause-label transition-colors group-hover:text-accent-ink">
+							&larr; Contents
+						</p>
+						<p class="mt-1.5 text-sm text-ink">All sections</p>
+					</a>
+				)
+			}
+			{
+				next && (
+					<a
+						href={`/spec/${next.id}/`}
+						class="group border border-rule p-4 transition-colors hover:border-accent sm:text-right"
+					>
+						<p class="clause-label transition-colors group-hover:text-accent-ink">
+							&sect;{next.data.section} &rarr;
+						</p>
+						<p class="mt-1.5 text-sm text-ink">{next.data.title}</p>
+					</a>
+				)
+			}
+		</nav>
+	</article>
+</DocsLayout>

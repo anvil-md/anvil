@@ -1,0 +1,58 @@
+---
+import { getCollection } from 'astro:content'
+
+interface Props {
+	current?: string
+}
+const { current } = Astro.props
+const sections = (await getCollection('spec')).sort((a, b) => a.data.section - b.data.section)
+---
+
+<nav aria-label="Specification contents" class="sticky top-28 w-52 shrink-0">
+	<p class="clause-label mb-3">Contents</p>
+	<ol class="space-y-px">
+		{
+			sections.map((s) => {
+				const active = current === s.id
+				return (
+					<li>
+						<a
+							href={`/spec/${s.id}/`}
+							class:list={[
+								'flex gap-2.5 border-l py-1.5 pl-3 text-[0.8rem] leading-snug transition-colors',
+								active
+									? 'border-accent font-medium text-ink'
+									: 'border-rule text-ink-soft hover:border-rule-strong hover:text-ink',
+							]}
+						>
+							<span class="w-4 shrink-0 font-mono text-[0.68rem] text-ink-faint tabular-nums">
+								{s.data.section}
+							</span>
+							<span class="min-w-0">{s.data.nav}</span>
+						</a>
+					</li>
+				)
+			})
+		}
+	</ol>
+
+	<p class="clause-label mt-8 mb-3">Reference</p>
+	<ul class="space-y-px">
+		<li>
+			<a
+				href="https://github.com/anvil-md/anvil"
+				class="flex border-l border-rule py-1.5 pl-3 text-[0.8rem] text-ink-soft transition-colors hover:border-rule-strong hover:text-ink"
+			>
+				Repository
+			</a>
+		</li>
+		<li>
+			<a
+				href="/"
+				class="flex border-l border-rule py-1.5 pl-3 text-[0.8rem] text-ink-soft transition-colors hover:border-rule-strong hover:text-ink"
+			>
+				Overview
+			</a>
+		</li>
+	</ul>
+</nav>

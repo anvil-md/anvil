@@ -1,0 +1,26 @@
+---
+import Masthead from '@/components/Masthead.astro'
+import Sidebar from '@/components/Sidebar.astro'
+import SiteFooter from '@/components/SiteFooter.astro'
+import BaseLayout from '@/layouts/BaseLayout.astro'
+
+interface Props {
+	title: string
+	description?: string
+	current?: string
+}
+const { title, description, current } = Astro.props
+---
+
+<BaseLayout title={title} description={description}>
+	<Masthead />
+	<div class="mx-auto max-w-6xl gap-10 px-5 lg:flex lg:px-6">
+		<div class="hidden py-10 lg:block">
+			<Sidebar current={current} />
+		</div>
+		<main class="min-w-0 flex-1">
+			<slot />
+		</main>
+	</div>
+	<SiteFooter />
+</BaseLayout>

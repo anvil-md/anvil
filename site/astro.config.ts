@@ -3,6 +3,40 @@ import { defineConfig } from 'astro/config'
 
 const assetPrefix = 'lib'
 
+/** Hex approximations of the oklch design tokens in global.css. */
+const tokens = (c: { comment: string; accent: string; ink: string }) => [
+	{
+		scope: ['comment', 'punctuation.definition.comment'],
+		settings: { foreground: c.comment, fontStyle: 'italic' },
+	},
+	{
+		scope: ['keyword', 'keyword.control', 'storage', 'storage.type', 'entity.name.tag'],
+		settings: { foreground: c.accent },
+	},
+	{
+		scope: ['string', 'string.quoted', 'punctuation.definition.string', 'meta.attribute'],
+		settings: { foreground: c.ink },
+	},
+	{ scope: ['constant.numeric', 'constant.language.boolean'], settings: { foreground: c.ink } },
+	{ scope: ['entity.name.function', 'support.function'], settings: { foreground: c.ink } },
+]
+
+const anvilLight = {
+	name: 'anvil-light',
+	type: 'light' as const,
+	fg: '#4a4b53',
+	bg: '#f1f0ed',
+	settings: tokens({ comment: '#9296a0', accent: '#1f5aa8', ink: '#1b1c22' }),
+}
+
+const anvilDark = {
+	name: 'anvil-dark',
+	type: 'dark' as const,
+	fg: '#b0b2bc',
+	bg: '#24252a',
+	settings: tokens({ comment: '#7d7f89', accent: '#7cb3f5', ink: '#eef0f4' }),
+}
+
 export default defineConfig({
 	site: 'https://anvil-md.frst.dev',
 	output: 'static',
@@ -13,7 +47,23 @@ export default defineConfig({
 	compressHTML: false,
 
 	build: { inlineStylesheets: 'always' },
-	prefetch: false,
+	prefetch: { defaultStrategy: 'tap', prefetchAll: true },
+	trailingSlash: 'always',
+
+	markdown: {
+		// Restrained highlighting on the brand palette: keywords carry the slate
+		// accent, strings and numbers sit at ink, comments recede. No rainbow -
+		// a spec listing should read like print. Two themes so it follows the
+		// light/dark toggle. `anvil` is aliased to yaml, whose key:value +
+		// #comment shape is the closest match to an ANVIL fence.
+		syntaxHighlight: 'shiki',
+		shikiConfig: {
+			themes: { light: anvilLight, dark: anvilDark },
+			defaultColor: false,
+			langAlias: { anvil: 'yaml' },
+			wrap: false,
+		},
+	},
 
 	vite: {
 		plugins: [tailwindcss()],

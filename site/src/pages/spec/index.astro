@@ -1,0 +1,78 @@
+---
+import DocsLayout from '@/layouts/DocsLayout.astro'
+import { getCollection } from 'astro:content'
+
+const sections = (await getCollection('spec')).sort((a, b) => a.data.section - b.data.section)
+---
+
+<DocsLayout
+	title="Specification - ANVIL"
+	description="The ANVIL specification, v1 working draft: the grammar, the ten blocks, the stamp wire format and lifecycle, the security posture, and conformance."
+>
+	<div class="max-w-3xl py-10 sm:py-14">
+		<header>
+			<p class="clause-label mb-5">Specification &middot; v1 working draft</p>
+			<h1 class="font-serif text-3xl leading-[1.15] tracking-[-0.01em] text-ink sm:text-4xl">
+				ANVIL
+			</h1>
+			<p class="mt-5 max-w-2xl text-[1.02rem] leading-relaxed text-ink-soft">
+				A tiny DSL an agent writes inside a fenced code block, which a host renders as real UI
+				inline in the conversation. {sections.length} sections: the grammar, every block, the
+				stamp wire format and its lifecycle, the security posture, and what conformance means.
+				Nothing here requires a particular framework, a runtime service, or trust in the host.
+			</p>
+		</header>
+
+		<ol class="rule-tick mt-10 pt-2">
+			{
+				sections.map((s) => (
+					<li>
+						<a
+							href={`/spec/${s.id}/`}
+							class="group flex gap-5 border-b border-rule py-5 transition-colors"
+						>
+							<span class="w-10 shrink-0 pt-0.5 font-mono text-sm text-ink-faint tabular-nums transition-colors group-hover:text-accent-ink">
+								&sect;{s.data.section}
+							</span>
+							<span class="min-w-0">
+								<span class="block font-medium text-ink transition-colors group-hover:text-accent-ink">
+									{s.data.title}
+								</span>
+								<span class="mt-1 block text-sm leading-relaxed text-ink-soft">
+									{s.data.summary}
+								</span>
+							</span>
+						</a>
+					</li>
+				))
+			}
+		</ol>
+
+		<div class="mt-10 grid gap-4 sm:grid-cols-3">
+			<a
+				href="/playground/"
+				class="group border border-rule p-4 transition-colors hover:border-accent"
+			>
+				<p class="clause-label transition-colors group-hover:text-accent-ink">Playground</p>
+				<p class="mt-2 text-sm leading-relaxed text-ink-soft">
+					Paste ANVIL source, watch it render. Runs entirely in the browser.
+				</p>
+			</a>
+			<a href="/" class="group border border-rule p-4 transition-colors hover:border-accent">
+				<p class="clause-label transition-colors group-hover:text-accent-ink">Overview</p>
+				<p class="mt-2 text-sm leading-relaxed text-ink-soft">
+					The short version: two halves, ten blocks, and why a block freezes.
+				</p>
+			</a>
+			<a
+				href="https://github.com/anvil-md/anvil"
+				class="group border border-rule p-4 transition-colors hover:border-accent"
+			>
+				<p class="clause-label transition-colors group-hover:text-accent-ink">Implementation</p>
+				<p class="mt-2 text-sm leading-relaxed text-ink-soft">
+					The parser and HTML renderer this site is built on, and their tests.
+				</p>
+			</a>
+		</div>
+	</div>
+</DocsLayout>

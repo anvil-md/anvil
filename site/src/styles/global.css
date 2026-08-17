@@ -293,3 +293,145 @@
 .anvil-prompt {
 	font-weight: 600;
 }
+
+/* ── Rendered specification prose ─────────────────────────────
+   The spec sections are markdown rendered into .doc-prose. Reads
+   like a printed standard: serif section heads, hairline tables,
+   recessed monochrome listings, en-dash bullets. */
+.doc-prose h2 {
+	font-family: var(--font-serif);
+	font-size: 1.5rem;
+	line-height: 1.25;
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	margin-top: 2.6em;
+	padding-top: 1.4em;
+	border-top: 1px solid var(--rule);
+}
+.doc-prose h3 {
+	font-size: 1.02rem;
+	font-weight: 600;
+	margin-top: 2.2em;
+}
+.doc-prose h4 {
+	font-family: var(--font-mono);
+	font-size: 0.78rem;
+	font-weight: 600;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	color: var(--ink-soft);
+	margin-top: 2em;
+}
+.doc-prose h2 + *,
+.doc-prose h3 + *,
+.doc-prose h4 + * {
+	margin-top: 0.7em;
+}
+.doc-prose > h2:first-child,
+.doc-prose > h3:first-child {
+	margin-top: 0;
+	padding-top: 0;
+	border-top: 0;
+}
+.doc-prose ul,
+.doc-prose ol {
+	padding-left: 1.4rem;
+}
+.doc-prose li + li {
+	margin-top: 0.45em;
+}
+.doc-prose li > ul,
+.doc-prose li > ol {
+	margin-top: 0.45em;
+}
+.doc-prose ul > li {
+	list-style: none;
+	position: relative;
+}
+.doc-prose ul > li::before {
+	content: "\2013";
+	position: absolute;
+	left: -1.25rem;
+	color: var(--ink-faint);
+}
+.doc-prose ol {
+	list-style: decimal;
+}
+.doc-prose ol > li::marker {
+	color: var(--ink-faint);
+	font-family: var(--font-mono);
+	font-size: 0.85em;
+}
+.doc-prose blockquote {
+	border-left: 2px solid var(--rule-strong);
+	padding-left: 1.1rem;
+	color: var(--ink-soft);
+}
+.doc-prose hr {
+	border: 0;
+	border-top: 1px solid var(--rule-strong);
+	margin: 2.6em 0;
+}
+.doc-prose pre {
+	background: var(--paper-sunk);
+	border: 1px solid var(--rule);
+	border-radius: var(--radius);
+	padding: 1rem 1.15rem;
+	overflow-x: auto;
+	line-height: 1.6;
+	margin-top: 1.3em;
+}
+.doc-prose pre code {
+	background: none;
+	border: 0;
+	padding: 0;
+	font-size: 0.78rem;
+	color: var(--ink-soft);
+}
+/* Shiki dual-theme (defaultColor:false): light vars by default, dark under
+   html.dark. Background stays our recessed panel, not the theme's. */
+/* biome-ignore lint/complexity/noImportantStyles: shiki emits an inline
+   background on .astro-code; only !important beats an inline style, and the
+   listing must sit on our recessed panel rather than the theme's colour */
+.doc-prose .astro-code {
+	background: transparent !important;
+}
+.doc-prose .astro-code,
+.doc-prose .astro-code span {
+	color: var(--shiki-light);
+	font-style: var(--shiki-light-font-style);
+}
+html.dark .doc-prose .astro-code,
+html.dark .doc-prose .astro-code span {
+	color: var(--shiki-dark);
+	font-style: var(--shiki-dark-font-style);
+}
+.doc-prose table {
+	display: block;
+	width: 100%;
+	overflow-x: auto;
+	border-collapse: collapse;
+	font-size: 0.85rem;
+	line-height: 1.55;
+	margin-top: 1.4em;
+}
+.doc-prose th {
+	font-family: var(--font-mono);
+	font-size: 0.68rem;
+	font-weight: 500;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--ink-faint);
+	text-align: left;
+	padding: 0.5rem 1rem 0.5rem 0;
+	border-bottom: 1px solid var(--rule-strong);
+}
+.doc-prose td {
+	padding: 0.55rem 1rem 0.55rem 0;
+	border-bottom: 1px solid var(--rule);
+	vertical-align: top;
+}
+.doc-prose td:last-child,
+.doc-prose th:last-child {
+	padding-right: 0;
+}
