@@ -390,10 +390,10 @@
 }
 /* Shiki dual-theme (defaultColor:false): light vars by default, dark under
    html.dark. Background stays our recessed panel, not the theme's. */
-/* biome-ignore lint/complexity/noImportantStyles: shiki emits an inline
-   background on .astro-code; only !important beats an inline style, and the
-   listing must sit on our recessed panel rather than the theme's colour */
 .doc-prose .astro-code {
+	/* biome-ignore lint/complexity/noImportantStyles: shiki emits an inline
+	   background on .astro-code; only !important beats an inline style, and the
+	   listing must sit on our recessed panel rather than the theme's colour */
 	background: transparent !important;
 }
 .doc-prose .astro-code,
@@ -434,4 +434,181 @@ html.dark .doc-prose .astro-code span {
 .doc-prose td:last-child,
 .doc-prose th:last-child {
 	padding-right: 0;
+}
+
+/* ── Playground ───────────────────────────────────────────────
+   A live parse surface built out of the furniture already on the
+   page: the textarea is a .src-well you can type into, the preset
+   buttons are the same hairline chips as the masthead's, and the
+   report is a .doc-table. Nothing here floats, rounds or glows.
+   The accent appears exactly twice - active preset, focused input
+   - and both times it is state, not decoration.                 */
+
+/* The document input. A recessed well, square, mono, no resize
+   handle chrome beyond the vertical grip. */
+.pg-input {
+	display: block;
+	width: 100%;
+	min-height: 20rem;
+	resize: vertical;
+	background: var(--paper-sunk);
+	border: 1px solid var(--rule);
+	border-radius: var(--radius);
+	padding: 0.9rem 1.1rem;
+	font-family: var(--font-mono);
+	font-size: 0.78rem;
+	line-height: 1.65;
+	color: var(--ink);
+	tab-size: 2;
+	/* pre, not pre-wrap: ANVIL rows are column-aligned and a soft wrap
+	   makes a long option row look like a malformed one. */
+	white-space: pre;
+	overflow: auto;
+}
+.pg-input::placeholder {
+	color: var(--ink-faint);
+}
+.pg-input:focus {
+	outline: none;
+	border-color: var(--accent);
+}
+@media (min-width: 1024px) {
+	.pg-input {
+		min-height: 26rem;
+	}
+}
+
+/* Preset chips. Same shape as the masthead's GitHub button. */
+.pg-preset {
+	border: 1px solid var(--rule);
+	border-radius: var(--radius);
+	background: transparent;
+	color: var(--ink-soft);
+	font-family: var(--font-mono);
+	font-size: 0.7rem;
+	letter-spacing: 0.02em;
+	padding: 0.3rem 0.6rem;
+	cursor: pointer;
+	transition:
+		border-color 0.15s,
+		color 0.15s;
+}
+.pg-preset:hover {
+	border-color: var(--rule-strong);
+	color: var(--ink);
+}
+.pg-preset[aria-pressed="true"] {
+	border-color: var(--accent);
+	color: var(--accent-ink);
+}
+
+/* Streaming toggle. A stamped tick box, not a pill switch. */
+.pg-switch {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	font-family: var(--font-mono);
+	font-size: 0.7rem;
+	color: var(--ink-soft);
+	cursor: pointer;
+	user-select: none;
+}
+.pg-check {
+	appearance: none;
+	-webkit-appearance: none;
+	width: 0.9rem;
+	height: 0.9rem;
+	margin: 0;
+	display: inline-grid;
+	place-content: center;
+	border: 1px solid var(--rule-strong);
+	border-radius: var(--radius);
+	background: var(--paper);
+	cursor: pointer;
+	transition:
+		border-color 0.15s,
+		background-color 0.15s;
+}
+.pg-check:checked {
+	border-color: var(--accent);
+	background: var(--accent);
+}
+.pg-check:checked::after {
+	content: "";
+	width: 0.25rem;
+	height: 0.5rem;
+	border: solid var(--paper);
+	border-width: 0 1.5px 1.5px 0;
+	transform: translateY(-1px) rotate(45deg);
+}
+.pg-check:focus-visible {
+	outline: 1px solid var(--accent);
+	outline-offset: 2px;
+}
+
+/* Output pane. Holds its own ground so the column does not collapse
+   to nothing while the source is empty. */
+.pg-out {
+	min-height: 8rem;
+}
+
+/* Parse report. Warn keeps the same semantic amber the blocks use -
+   binding it to the brand accent is what turns a warning into a
+   decoration. */
+.pg-report {
+	--pg-warn: oklch(0.56 0.1 75);
+}
+.dark .pg-report {
+	--pg-warn: oklch(0.78 0.12 75);
+}
+.pg-id,
+.pg-kind {
+	font-family: var(--font-mono);
+	font-size: 0.75rem;
+	white-space: nowrap;
+}
+.pg-id {
+	color: var(--ink-faint);
+}
+.pg-kind {
+	color: var(--ink);
+}
+.pg-derived {
+	margin-left: 0.5rem;
+	font-size: 0.62rem;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	color: var(--ink-faint);
+	border: 1px solid var(--rule);
+	border-radius: var(--radius);
+	padding: 0.05rem 0.25rem;
+}
+.pg-warns {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+.pg-warn {
+	font-family: var(--font-mono);
+	font-size: 0.72rem;
+	line-height: 1.55;
+	color: var(--pg-warn);
+}
+.pg-warn + .pg-warn {
+	margin-top: 0.25rem;
+}
+/* A leading tick, so a warning row is scannable without colour. */
+.pg-warn::before {
+	content: "! ";
+	font-weight: 600;
+}
+.pg-ok {
+	font-family: var(--font-mono);
+	font-size: 0.72rem;
+	color: var(--ink-faint);
+}
+.pg-empty {
+	font-family: var(--font-mono);
+	font-size: 0.75rem;
+	color: var(--ink-faint);
 }

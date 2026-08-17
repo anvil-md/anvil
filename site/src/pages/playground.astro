@@ -1,0 +1,194 @@
+---
+import Masthead from '@/components/Masthead.astro'
+import SiteFooter from '@/components/SiteFooter.astro'
+import BaseLayout from '@/layouts/BaseLayout.astro'
+import { DEFAULT_SOURCE, PRESETS, summarise } from '@/scripts/playground'
+import { parseAnvil } from '@anvil-md/parser'
+import { renderAnvilFence } from '@anvil-md/render-html'
+
+/**
+ * The first paint is produced at build time by the same two functions the
+ * client calls, from the same source string. So the page is a working document
+ * with JavaScript off, and the script replaces it with something identical.
+ */
+const initialHtml = renderAnvilFence(DEFAULT_SOURCE, true)
+const initialDoc = parseAnvil(DEFAULT_SOURCE, { partial: false })
+const initialStatus = summarise(initialDoc, true)
+
+const WIRE = `<span class="cmt">// the playground is these three lines, in a keyup handler</span>
+out.innerHTML = renderAnvilFence(textarea.value, fenceIsClosed)
+<span class="kind">const</span> doc = parseAnvil(textarea.value, { partial: !fenceIsClosed })
+<span class="cmt">// doc.blocks[n].warnings is what the report below is reading</span>`
+---
+
+<BaseLayout
+	title="ANVIL playground - parse and render in the browser"
+	description="Paste ANVIL source and watch the reference parser and renderer draw it, live, entirely client-side. Parse warnings and streaming behaviour included."
+>
+	<Masthead />
+
+	<main class="mx-auto max-w-5xl px-5 pb-24 lg:px-6">
+		<!-- ── Heading ──────────────────────────────────────────────── -->
+		<section class="py-12 sm:py-14">
+			<p class="clause-label mb-6">Appendix &nbsp;&middot;&nbsp; Playground</p>
+
+			<h1
+				class="max-w-3xl font-serif text-3xl leading-[1.12] tracking-[-0.01em] text-ink sm:text-4xl"
+			>
+				Type it. <span class="text-accent-ink">Watch it parse.</span>
+			</h1>
+
+			<p class="mt-6 max-w-2xl text-lg leading-relaxed text-ink-soft">
+				The left pane is an ANVIL fence. The right pane is what the reference renderer makes of it,
+				redrawn as you type. Underneath, every complaint the parser had.
+			</p>
+
+			<dl
+				class="mt-8 grid max-w-2xl grid-cols-[auto_1fr] gap-x-6 gap-y-2.5 border-t border-rule pt-6 font-mono text-xs"
+			>
+				<dt class="text-ink-faint">RUNS IN</dt>
+				<dd class="text-ink-soft">
+					This tab. No request leaves the page, and nothing you type is stored.
+				</dd>
+				<dt class="text-ink-faint">USING</dt>
+				<dd class="text-ink-soft">
+					@anvil-md/parser and @anvil-md/render-html, unmodified, from source.
+				</dd>
+				<dt class="text-ink-faint">DISPLAY</dt>
+				<dd class="text-ink-soft">
+					Controls are inert by design - this draws a block, it does not run one.
+				</dd>
+			</dl>
+		</section>
+
+		<!-- ── Workbench ────────────────────────────────────────────── -->
+		<section class="rule-tick pt-10 pb-12">
+			<div class="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
+				<div>
+					<p class="clause-label mb-2.5">Examples</p>
+					<div class="flex flex-wrap gap-1.5">
+						{
+							PRESETS.map((p) => (
+								<button
+									type="button"
+									class="pg-preset"
+									data-preset={p.id}
+									aria-pressed="false"
+								>
+									{p.label}
+								</button>
+							))
+						}
+					</div>
+				</div>
+
+				<div class="flex items-center gap-5">
+					<label class="pg-switch" for="pg-streaming">
+						<input type="checkbox" id="pg-streaming" class="pg-check" />
+						<span>streaming</span>
+					</label>
+					<button type="button" id="pg-reset" class="pg-preset">reset</button>
+				</div>
+			</div>
+
+			<p class="mt-3 max-w-2xl text-xs leading-relaxed text-ink-faint">
+				<span class="font-mono">streaming</span> passes <span class="font-mono">false</span> as the
+				second argument to <span class="font-mono">renderAnvilFence</span>, which is the state a
+				fence is in while the model is still typing it: rendered, visibly provisional, and never
+				answerable.
+			</p>
+
+			<div class="src-pair mt-7 grid gap-5 lg:grid-cols-2">
+				<div>
+					<p class="clause-label mb-2">Source</p>
+					<textarea
+						id="pg-source"
+						class="pg-input"
+						spellcheck="false"
+						autocomplete="off"
+						autocapitalize="off"
+						autocorrect="off"
+						aria-label="ANVIL source">{DEFAULT_SOURCE}</textarea
+					>
+				</div>
+				<div>
+					<p class="clause-label mb-2">Rendered</p>
+					<div id="pg-output" class="pg-out" set:html={initialHtml} />
+				</div>
+			</div>
+		</section>
+
+		<!-- ── Parse report ─────────────────────────────────────────── -->
+		<section class="rule-tick pt-10 pb-12">
+			<p class="clause-label mb-5">Parse report</p>
+			<h2 class="max-w-2xl font-serif text-2xl leading-tight text-ink">
+				The parser never throws. It complains.
+			</h2>
+			<p class="mt-4 max-w-2xl text-ink-soft">
+				A fence arrives token by token, so every prefix of every block is a real input. Malformed
+				input degrades to a renderable block plus a warning - try the
+				<span class="font-mono text-sm">malformed</span> example above.
+			</p>
+
+			<p id="pg-status" class="mt-7 font-mono text-xs text-ink-faint">{initialStatus}</p>
+
+			<div id="pg-report" class="pg-report mt-3 max-w-3xl">
+				<table class="doc-table">
+					<thead>
+						<tr><th>Block</th><th>Kind</th><th>Diagnostics</th></tr>
+					</thead>
+					<tbody>
+						{
+							initialDoc.blocks.map((b) => (
+								<tr>
+									<td class="pg-id">
+										{b.id}
+										{b.derivedId && <span class="pg-derived">derived</span>}
+									</td>
+									<td class="pg-kind">@{b.kind}</td>
+									<td>
+										{b.warnings.length ? (
+											<ul class="pg-warns">
+												{b.warnings.map((w) => (
+													<li class="pg-warn">{w}</li>
+												))}
+											</ul>
+										) : (
+											<span class="pg-ok">accepted, no warnings</span>
+										)}
+									</td>
+								</tr>
+							))
+						}
+					</tbody>
+				</table>
+			</div>
+		</section>
+
+		<!-- ── How ──────────────────────────────────────────────────── -->
+		<section class="rule-tick pt-10 pb-12">
+			<p class="clause-label mb-5">Wiring</p>
+			<h2 class="max-w-2xl font-serif text-2xl leading-tight text-ink">
+				Nothing on this page is special.
+			</h2>
+
+			<pre class="src-well mt-6 max-w-2xl"><code set:html={WIRE} /></pre>
+
+			<div class="doc-prose mt-6 max-w-2xl">
+				<p>
+					Both packages are zero-dependency and DOM-free, so they run in a browser tab, in a Worker,
+					or in whatever renders your transcript. The blocks above were drawn at build time by the
+					same call, from the same string, which is why the page works with JavaScript off.
+					<a href="/" class="doc-link">Back to the specification</a>.
+				</p>
+			</div>
+		</section>
+	</main>
+
+	<SiteFooter />
+</BaseLayout>
+
+<script>
+	import { mount } from '@/scripts/playground'
+	mount()
+</script>
