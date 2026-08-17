@@ -1,0 +1,26 @@
+{
+  "name": "@anvil-md/parser",
+  "version": "0.1.0",
+  "description": "Parser for ANVIL, a tiny DSL that turns a fenced code block into an interactive UI block. Zero dependencies, total by contract.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anvil-md/anvil.git",
+    "directory": "packages/parser"
+  },
+  "homepage": "https://anvil-md.frst.dev",
+  "bugs": "https://github.com/anvil-md/anvil/issues",
+  "keywords": ["anvil", "dsl", "parser", "markdown", "llm", "agent", "chat", "ui"],
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": ["src", "README.md"],
+  "sideEffects": false,
+  "scripts": {
+    "test": "bun test"
+  }
+}

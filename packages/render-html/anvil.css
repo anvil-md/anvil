@@ -1,0 +1,459 @@
+/* @anvil-md/render-html -- baseline stylesheet.
+ *
+ * Self-contained: drop it in and blocks render correctly with no host theme.
+ * Everything is driven by --anvil-* custom properties scoped to .anvil-doc, so
+ * nothing leaks into the surrounding page and a host can restyle the whole
+ * thing by redefining tokens:
+ *
+ *   .anvil-doc { --anvil-accent: #c0392a; --anvil-radius: 4px; }
+ *
+ * Dark mode follows prefers-color-scheme, and can be forced from an ancestor
+ * carrying [data-theme="dark"] or .dark.
+ *
+ * NOTE ON COLOUR MIXING: every color-mix() here interpolates toward
+ * `transparent` in sRGB, never toward a second hued token. Mixing two tokens
+ * that sit far apart on the hue wheel interpolates ACROSS the wheel and lands
+ * on a third hue that is neither -- an amber accent mixed with a blue-grey
+ * border comes out teal, and a "warn" note silently reads as an info box.
+ */
+
+.anvil-doc {
+  --anvil-fg: #17171a;
+  --anvil-muted-fg: #6b6b74;
+  --anvil-bg: #ffffff;
+  --anvil-surface: #f4f4f5;
+  --anvil-border: #e0e0e3;
+  --anvil-accent: #b45309;
+  --anvil-danger: #c0392a;
+  --anvil-primary: #2563eb;
+
+  --anvil-radius: 10px;
+  --anvil-radius-sm: 7px;
+  --anvil-gap: 0.5rem;
+  --anvil-font: inherit;
+  --anvil-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--anvil-gap);
+  margin: 0.6rem 0;
+  font-family: var(--anvil-font);
+  color: var(--anvil-fg);
+}
+
+@media (prefers-color-scheme: dark) {
+  .anvil-doc {
+    --anvil-fg: #e9e9ec;
+    --anvil-muted-fg: #9a9aa4;
+    --anvil-bg: #0f0f11;
+    --anvil-surface: #1b1b1f;
+    --anvil-border: #2e2e35;
+    --anvil-accent: #f0b429;
+    --anvil-danger: #ff6b57;
+    --anvil-primary: #6ea8fe;
+  }
+}
+
+[data-theme='dark'] .anvil-doc,
+.dark .anvil-doc {
+  --anvil-fg: #e9e9ec;
+  --anvil-muted-fg: #9a9aa4;
+  --anvil-bg: #0f0f11;
+  --anvil-surface: #1b1b1f;
+  --anvil-border: #2e2e35;
+  --anvil-accent: #f0b429;
+  --anvil-danger: #ff6b57;
+  --anvil-primary: #6ea8fe;
+}
+
+/* ── frame ─────────────────────────────────────────────────────────────── */
+
+.anvil-block {
+  border: 1px solid var(--anvil-border);
+  border-radius: var(--anvil-radius);
+  background: var(--anvil-bg);
+  padding: 0.75rem 0.85rem 0.5rem;
+}
+
+.anvil-prompt {
+  display: flex;
+  gap: 0.45rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.anvil-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--anvil-muted-fg);
+  flex: none;
+}
+
+.anvil-prompt .anvil-icon {
+  margin-top: 0.14em;
+}
+
+/* em-sized so the icon tracks its type scale; currentColor so it inherits tone */
+.anvil-svg {
+  width: 1.05em;
+  height: 1.05em;
+  flex: none;
+}
+
+.anvil-subtext {
+  margin-top: 0.2rem;
+  font-size: 0.82em;
+  color: var(--anvil-muted-fg);
+  line-height: 1.45;
+}
+
+.anvil-foot {
+  margin-top: 0.5rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--anvil-border);
+  font-family: var(--anvil-mono);
+  font-size: 0.68em;
+  color: var(--anvil-muted-fg);
+  text-align: right;
+  letter-spacing: 0.04em;
+}
+
+/* ── choice ────────────────────────────────────────────────────────────── */
+
+.anvil-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 0.6rem;
+}
+
+.anvil-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: var(--anvil-radius-sm);
+  background: var(--anvil-surface);
+  color: inherit;
+  font: inherit;
+  min-height: 36px;
+}
+
+.anvil-row-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.anvil-row-danger {
+  border-color: color-mix(in srgb, var(--anvil-danger) 45%, transparent);
+}
+
+.anvil-key {
+  flex: none;
+  min-width: 1.35em;
+  font-family: var(--anvil-mono);
+  font-size: 0.72em;
+  color: var(--anvil-muted-fg);
+  text-align: center;
+}
+
+.anvil-mark {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border: 1px solid var(--anvil-border);
+  border-radius: 3px;
+}
+
+.anvil-label {
+  font-weight: 500;
+}
+
+.anvil-hint {
+  font-size: 0.8em;
+  color: var(--anvil-muted-fg);
+}
+
+/* ── gallery ───────────────────────────────────────────────────────────── */
+
+.anvil-grid {
+  display: grid;
+  gap: var(--anvil-gap);
+  margin-top: 0.6rem;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+
+.anvil-grid-swatch,
+.anvil-grid-card {
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+}
+
+.anvil-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.5rem;
+  border: 1px solid var(--anvil-border);
+  border-radius: 9px;
+  background: var(--anvil-surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.anvil-card-foot {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+/* fixed ratio so the transcript does not reflow when the image arrives */
+.anvil-img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 6px;
+  background: var(--anvil-bg);
+}
+
+.anvil-img-missing {
+  border: 1px dashed var(--anvil-border);
+}
+
+.anvil-swatch {
+  display: flex;
+  height: 42px;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.anvil-swatch i {
+  flex: 1;
+}
+
+.anvil-swatch-empty {
+  background: var(--anvil-bg);
+  border: 1px dashed var(--anvil-border);
+}
+
+.anvil-type {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+
+/* ── input ─────────────────────────────────────────────────────────────── */
+
+.anvil-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--anvil-gap);
+  margin-top: 0.6rem;
+}
+
+.anvil-field-label {
+  display: flex;
+  gap: 0.45rem;
+  align-items: baseline;
+  font-size: 0.8em;
+  color: var(--anvil-muted-fg);
+  margin-bottom: 0.2rem;
+}
+
+.anvil-optional {
+  font-size: 0.9em;
+  opacity: 0.7;
+}
+
+.anvil-input {
+  width: 100%;
+  padding: 0.36rem 0.5rem;
+  border: 1px solid var(--anvil-border);
+  border-radius: var(--anvil-radius-sm);
+  background: var(--anvil-bg);
+  color: inherit;
+  font: inherit;
+  font-size: 0.9em;
+  resize: vertical;
+}
+
+.anvil-field-mono .anvil-input {
+  font-family: var(--anvil-mono);
+}
+
+.anvil-switch {
+  display: inline-block;
+  width: 30px;
+  height: 17px;
+  border-radius: 999px;
+  background: var(--anvil-border);
+  position: relative;
+}
+
+.anvil-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--anvil-bg);
+}
+
+/* ── scale ─────────────────────────────────────────────────────────────── */
+
+.anvil-dials {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 0.7rem;
+}
+
+.anvil-dial {
+  display: grid;
+  grid-template-columns: minmax(52px, auto) 1fr minmax(52px, auto);
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.82em;
+}
+
+.anvil-pole {
+  color: var(--anvil-muted-fg);
+}
+
+.anvil-pole-right {
+  text-align: right;
+}
+
+.anvil-track {
+  position: relative;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--anvil-border);
+}
+
+.anvil-knob {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--anvil-primary);
+  transform: translate(-50%, -50%);
+}
+
+/* ── actions, notes, chrome ────────────────────────────────────────────── */
+
+.anvil-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.6rem;
+}
+
+.anvil-submit {
+  padding: 0.32rem 0.8rem;
+  border: 1px solid var(--anvil-border);
+  border-radius: var(--anvil-radius-sm);
+  background: var(--anvil-surface);
+  color: inherit;
+  font: inherit;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+/* Full border + tint, never a left accent stripe -- the stripe is the tell of
+   every default markdown callout and reads as boilerplate. */
+.anvil-note {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+  border: 1px solid var(--anvil-border);
+  border-radius: 9px;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.9em;
+  line-height: 1.5;
+}
+
+.anvil-note-body {
+  min-width: 0;
+}
+
+.anvil-note p {
+  margin: 0;
+}
+
+.anvil-note p + p {
+  margin-top: 0.35rem;
+}
+
+.anvil-note .anvil-icon {
+  margin-top: 0.18em;
+  color: inherit;
+}
+
+.anvil-note-info {
+  background: var(--anvil-surface);
+}
+
+.anvil-note-warn {
+  background: color-mix(in srgb, var(--anvil-accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--anvil-accent) 45%, transparent);
+}
+
+.anvil-note-warn .anvil-icon {
+  color: var(--anvil-accent);
+}
+
+.anvil-note-danger {
+  background: color-mix(in srgb, var(--anvil-danger) 10%, transparent);
+  border-color: color-mix(in srgb, var(--anvil-danger) 45%, transparent);
+}
+
+.anvil-note-danger .anvil-icon {
+  color: var(--anvil-danger);
+}
+
+.anvil-warn,
+.anvil-empty {
+  margin-top: 0.5rem;
+  font-size: 0.78em;
+  color: var(--anvil-muted-fg);
+  font-style: italic;
+}
+
+.anvil-fallback pre {
+  margin: 0;
+  overflow-x: auto;
+}
+
+/* A fence still streaming: visibly provisional, and never answerable. */
+.anvil-doc-streaming .anvil-block {
+  border-style: dashed;
+}
+
+/* Disabled controls are NOT dimmed. This package renders a block for display,
+   so it should look like the real thing rather than like a broken form. */
+.anvil-doc :disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+@media (max-width: 480px) {
+  .anvil-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+  .anvil-row {
+    min-height: 44px;
+  }
+}

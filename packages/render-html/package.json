@@ -1,0 +1,30 @@
+{
+  "name": "@anvil-md/render-html",
+  "version": "0.1.0",
+  "description": "Render an ANVIL fence to an HTML string. Framework-agnostic, display only.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anvil-md/anvil.git",
+    "directory": "packages/render-html"
+  },
+  "homepage": "https://anvil-md.frst.dev",
+  "bugs": "https://github.com/anvil-md/anvil/issues",
+  "keywords": ["anvil", "dsl", "renderer", "html", "markdown", "llm", "agent", "chat", "ui"],
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./anvil.css": "./anvil.css"
+  },
+  "files": ["src", "anvil.css", "README.md"],
+  "sideEffects": ["*.css"],
+  "dependencies": {
+    "@anvil-md/parser": "workspace:*"
+  },
+  "scripts": {
+    "test": "bun test"
+  }
+}
