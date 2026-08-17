@@ -1,0 +1,14 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "anvil-md",
+	// Duplo account.
+	"account_id": "e6bd4c9e08862c4b3c8ddacbbef253b1",
+	"compatibility_date": "2026-08-18",
+	// Static assets only - no worker script, so requests never hit compute.
+	"assets": {
+		"directory": "./dist",
+		"not_found_handling": "404-page"
+	},
+	"routes": [{ "pattern": "anvil-md.frst.dev", "custom_domain": true }],
+	"workers_dev": true
+}

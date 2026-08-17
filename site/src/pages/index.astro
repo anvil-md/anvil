@@ -1,0 +1,385 @@
+---
+import Masthead from '@/components/Masthead.astro'
+import BaseLayout from '@/layouts/BaseLayout.astro'
+import { renderAnvilFence } from '@anvil-md/render-html'
+
+/**
+ * Every ANVIL block below is rendered HERE, at build time, by the real renderer
+ * in ../../packages/render-html. Nothing on this page is a screenshot.
+ */
+const block = (src: string): string => renderAnvilFence(src.trim(), true)
+
+const esc = (s: string) =>
+	s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+/**
+ * Monochrome listing. The leading sigil is the grammar, so it carries the one
+ * accent; the block kind sits at full ink; everything else recedes. No rainbow.
+ */
+const listing = (src: string): string =>
+	esc(src.trim())
+		.split('\n')
+		.map((line) => {
+			const m = line.match(/^(\s*)([@?:\-_%>#])(.*)$/)
+			if (!m) return line
+			const [, ws, sigil, rest] = m
+			if (sigil === '#') return `${ws}<span class="cmt">${sigil}${rest}</span>`
+			if (sigil === '@') {
+				const k = rest.match(/^(\w+)(.*)$/)
+				return k
+					? `${ws}<span class="sig">@</span><span class="kind">${k[1]}</span>${k[2]}`
+					: `${ws}<span class="sig">@</span>${rest}`
+			}
+			return `${ws}<span class="sig">${sigil}</span>${rest}`
+		})
+		.join('\n')
+
+const CHOICE = `@choice id=deploy-target
+? Where should I ship this?
+: Staging is wiped nightly. Nothing there is permanent.
+- prod   | Production  | live traffic, no undo
+- stage  | Staging     | safe, wiped nightly
+- !scrap | Start over  | we bin the existing build
+- hold   | Nowhere yet | keep it on the shelf`
+
+const PALETTE = `@gallery id=palette render=swatch select=one
+? Which palette?
+- ink  | Ink and paper | warm, printed | swatch=#111111,#f5f2ea,#c8452d
+- deep | Deep water    | cold, gridded | swatch=#0b2540,#1d7a8c,#e8f1f2
+- volt | Volt          | loud, black   | swatch=#0a0a0a,#e6ff00,#8a8a8a`
+
+const TONE = `@scale id=tone steps=5
+? Set the dials
+% formal | Formal | Playful | 2
+% dense  | Dense  | Airy    | 1
+% quiet  | Quiet  | Loud    | 5`
+
+const COMPANY = `@input id=company submit="That's us"
+? Who are you?
+_ legal*  | text   | Legal name      | Acme Ltd
+_ site    | url    | Current website | https://...
+_ token   | secret | API key
+_ nda     | bool   | We need an NDA first`
+
+const NOTE = `@note tone=warn
+> Staging shares the production database.
+> Migrations you run there are real.`
+
+/* Braces in an .astro template are expression syntax, so this lives here. */
+const WIRE_SNIPPET = `<span class="cmt">// wherever you render an agent's markdown</span>
+renderer.code = ({ text, lang, raw }) =&gt; {
+  <span class="kind">if</span> (lang === 'anvil') {
+    <span class="kind">return</span> renderAnvilFence(text, fenceIsClosed(raw))
+  }
+}`
+
+const laws = [
+	'A click stamps the block, forever. There is no unstamp verb, in the language, in the API, or in the database.',
+	'The stamp lives on the server, keyed by block id. What the client holds is a cache, and it is allowed to be wrong.',
+	'One stamp per block id. The second is refused, not queued and not overwritten.',
+	'A stamped block still renders in full - the answer, the rejected options, who, and when. Never collapsed to text.',
+	'To change an answer, the agent asks again in a new block. History is append-only.',
+]
+
+const constraints = [
+	{
+		t: 'The parser never throws',
+		d: 'An LLM emits a fence token by token, so every prefix of every fence is a real input a renderer will see. A thrown parse error inside a page renderer takes down far more than one block. Malformed input degrades with a visible warning instead.',
+	},
+	{
+		t: 'Inert while streaming',
+		d: 'A block whose last option has not arrived renders visibly provisional and cannot be answered. Otherwise someone answers a question they have not finished reading.',
+	},
+	{
+		t: 'Ids come from content',
+		d: 'A block with no id= gets one hashed from its body, never from its position - streaming can reorder, and a positional id lands the answer on the wrong block.',
+	},
+	{
+		t: 'Height cannot change',
+		d: 'A block occupies the same space stamped as it did open. One that shrinks three screens up yanks the scroll position out from under the reader.',
+	},
+	{
+		t: 'Attributes are allowlisted',
+		d: 'swatch, font and img land in style and src, where escaping is not sufficient. Hex only, conservative family names, http(s) only. A value that fails is dropped, not escaped.',
+	},
+	{
+		t: 'Answers are untrusted',
+		d: 'A stamp is free text somebody typed, sitting next to the agent’s own markdown and reading like it. It has to reach the model framed as data, not as instructions.',
+	},
+]
+---
+
+<BaseLayout title="ANVIL - ask inline, ask once">
+	<Masthead />
+
+	<main class="mx-auto max-w-5xl px-5 pb-24 lg:px-6">
+		<!-- ── Abstract ─────────────────────────────────────────────── -->
+		<section id="abstract" class="py-14 sm:py-16">
+			<p class="clause-label mb-6">Overview &nbsp;&middot;&nbsp; Abstract</p>
+
+			<h1 class="max-w-3xl font-serif text-4xl leading-[1.1] tracking-[-0.01em] text-ink sm:text-5xl">
+				Ask inline.<br />Ask <span class="text-accent-ink">once</span>.
+			</h1>
+
+			<p class="mt-7 max-w-2xl text-lg leading-relaxed text-ink-soft">
+				A tiny DSL an agent writes inside a fenced code block, mid-sentence. It renders as
+				<span class="font-medium text-ink">real UI</span>, at the point in the conversation where
+				the question was asked. The human clicks. The answer comes back as structured text, and
+				the block freezes.
+			</p>
+
+			<p class="mt-5 max-w-2xl font-mono text-sm leading-relaxed text-ink-faint">
+				No tool call. No widget runtime. No event bus into the agent loop.
+			</p>
+
+			<!-- Document-identity block, RFC-style. -->
+			<dl
+				class="mt-10 grid max-w-2xl grid-cols-[auto_1fr] gap-x-6 gap-y-2.5 border-t border-rule pt-6 font-mono text-xs"
+			>
+				<dt class="text-ink-faint">STATUS</dt>
+				<dd class="text-ink-soft">Specification v1, working draft. Free to implement.</dd>
+				<dt class="text-ink-faint">TERM</dt>
+				<dd class="text-ink-soft">Agent-Native Visual Interaction Language</dd>
+				<dt class="text-ink-faint">LICENCE</dt>
+				<dd class="text-ink-soft">MIT &middot; reference implementation included</dd>
+				<dt class="text-ink-faint">SEE ALSO</dt>
+				<dd>
+					The <a href="https://github.com/anvil-md/anvil/blob/main/SPEC.md" class="doc-link"
+						>full specification</a
+					>, the <a href="https://github.com/anvil-md/anvil" class="doc-link">repository</a>.
+				</dd>
+			</dl>
+		</section>
+
+		<!-- ── 1. The two halves ────────────────────────────────────── -->
+		<section id="halves" class="rule-tick pt-12 pb-14">
+			<p class="clause-label mb-5">1 &nbsp;&middot;&nbsp; The two halves</p>
+			<h2 class="max-w-2xl font-serif text-2xl leading-tight text-ink sm:text-3xl">
+				Markdown going down, structured text coming up.
+			</h2>
+
+			<div class="doc-prose mt-6 max-w-2xl">
+				<p>The agent writes this, in the middle of an ordinary message:</p>
+			</div>
+
+			<div class="src-pair mt-5 grid gap-5 lg:grid-cols-2">
+				<div>
+					<p class="clause-label mb-2">Source</p>
+					<pre class="src-well"><code set:html={listing(CHOICE)} /></pre>
+				</div>
+				<div>
+					<p class="clause-label mb-2">Rendered</p>
+					<div set:html={block(CHOICE)} />
+				</div>
+			</div>
+
+			<div class="doc-prose mt-8 max-w-2xl">
+				<p>
+					The human clicks one row. It stamps. The model then receives an ordinary user turn:
+				</p>
+			</div>
+
+			<pre class="src-well mt-4 max-w-2xl"><code>&lt;<span class="kind">stamp</span> block="deploy-target" kind="choice" value="stage" label="Staging"&gt;
+I picked Staging.
+&lt;/<span class="kind">stamp</span>&gt;</code></pre>
+
+			<div class="doc-prose mt-6 max-w-2xl">
+				<p>
+					<strong>That tag is the entire integration.</strong> The attributes are the truth; the
+					sentence is the courtesy, so the transcript still reads like a conversation months later
+					and a model that ignores the tag still gets the gist.
+				</p>
+			</div>
+		</section>
+
+		<!-- ── 2. Blocks ────────────────────────────────────────────── -->
+		<section id="blocks" class="rule-tick pt-12 pb-14">
+			<p class="clause-label mb-5">2 &nbsp;&middot;&nbsp; Vocabulary</p>
+			<h2 class="max-w-2xl font-serif text-2xl leading-tight text-ink sm:text-3xl">
+				Ten blocks, closed on purpose.
+			</h2>
+			<p class="mt-4 max-w-2xl text-ink-soft">
+				Everything below is rendered on this page by the reference implementation, from source.
+			</p>
+
+			<table class="doc-table mt-8 max-w-2xl">
+				<thead>
+					<tr><th>Group</th><th>Blocks</th></tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td class="font-mono text-ink-faint">ASK</td>
+						<td class="font-mono"
+							>@choice @gallery @input @upload<br />@link @scale @order</td
+						>
+					</tr>
+					<tr>
+						<td class="font-mono text-ink-faint">SHOW</td>
+						<td class="font-mono">@note @code @example</td>
+					</tr>
+					<tr>
+						<td class="font-mono text-ink-faint">CONTROL</td>
+						<td class="font-mono">@void</td>
+					</tr>
+				</tbody>
+			</table>
+
+			<div class="doc-prose mt-10 max-w-2xl">
+				<p>
+					Ask the aesthetic questions visually. Six swatches beat six adjectives, every time.
+				</p>
+			</div>
+			<div class="src-pair mt-4 grid gap-5 lg:grid-cols-2">
+				<pre class="src-well"><code set:html={listing(PALETTE)} /></pre>
+				<div set:html={block(PALETTE)} />
+			</div>
+
+			<div class="doc-prose mt-10 max-w-2xl">
+				<p>Some answers are a dial, not a pick. &ldquo;How formal&rdquo; was never multiple choice.</p>
+			</div>
+			<div class="src-pair mt-4 grid gap-5 lg:grid-cols-2">
+				<pre class="src-well"><code set:html={listing(TONE)} /></pre>
+				<div set:html={block(TONE)} />
+			</div>
+
+			<div class="doc-prose mt-10 max-w-2xl">
+				<p>
+					Typed fields, when you genuinely need words. Eight types, and <code>secret</code> is
+					masked everywhere - in the control, in the record, and in the tag that reaches the model.
+				</p>
+			</div>
+			<div class="src-pair mt-4 grid gap-5 lg:grid-cols-2">
+				<pre class="src-well"><code set:html={listing(COMPANY)} /></pre>
+				<div set:html={block(COMPANY)} />
+			</div>
+
+			<div class="doc-prose mt-10 max-w-2xl">
+				<p>And prose, for the things that are not questions at all.</p>
+			</div>
+			<div class="src-pair mt-4 grid gap-5 lg:grid-cols-2">
+				<pre class="src-well"><code set:html={listing(NOTE)} /></pre>
+				<div set:html={block(NOTE)} />
+			</div>
+		</section>
+
+		<!-- ── 3. The stamp ─────────────────────────────────────────── -->
+		<section id="stamp" class="rule-tick pt-12 pb-14">
+			<p class="clause-label mb-5">3 &nbsp;&middot;&nbsp; The stamp</p>
+			<h2 class="max-w-2xl font-serif text-2xl leading-tight text-ink sm:text-3xl">
+				Answered once, then frozen.
+			</h2>
+
+			<blockquote class="mt-6 max-w-2xl border-l-2 border-rule-strong pl-5 text-ink-soft">
+				A conversation transcript is an append-only record of things that happened.<br />
+				A widget that can be re-answered turns that record into a lie.
+			</blockquote>
+
+			<p class="mt-6 max-w-2xl text-ink-soft">
+				Every rule in the specification falls out of that sentence. Five of them are normative:
+			</p>
+
+			<ol class="mt-6 max-w-2xl">
+				{
+					laws.map((law, i) => (
+						<li class="grid grid-cols-[auto_1fr] gap-x-5 border-t border-rule py-3.5">
+							<span class="font-mono text-xs text-ink-faint">
+								{String(i + 1).padStart(2, '0')}
+							</span>
+							<span class="text-sm leading-relaxed text-ink-soft">{law}</span>
+						</li>
+					))
+				}
+			</ol>
+
+			<p class="mt-6 max-w-2xl text-sm text-ink-faint">
+				A stamped block keeps its rejected options on screen. They are part of the record: they
+				show what the human was choosing <em>between</em>.
+			</p>
+		</section>
+
+		<!-- ── 4. Constraints ───────────────────────────────────────── -->
+		<section id="constraints" class="rule-tick pt-12 pb-14">
+			<p class="clause-label mb-5">4 &nbsp;&middot;&nbsp; Constraints</p>
+			<h2 class="max-w-2xl font-serif text-2xl leading-tight text-ink sm:text-3xl">
+				What the specification is careful about.
+			</h2>
+			<p class="mt-4 max-w-2xl text-ink-soft">
+				Most of these exist because someone got them wrong first.
+			</p>
+
+			<dl class="mt-8 max-w-3xl">
+				{
+					constraints.map((c) => (
+						<div class="grid gap-x-8 gap-y-1 border-t border-rule py-4 sm:grid-cols-[14rem_1fr]">
+							<dt class="font-mono text-xs tracking-wide text-ink">{c.t}</dt>
+							<dd class="text-sm leading-relaxed text-ink-soft">{c.d}</dd>
+						</div>
+					))
+				}
+			</dl>
+		</section>
+
+		<!-- ── 5. Implement ─────────────────────────────────────────── -->
+		<section id="implement" class="rule-tick pt-12 pb-14">
+			<p class="clause-label mb-5">5 &nbsp;&middot;&nbsp; Implement</p>
+			<h2 class="max-w-2xl font-serif text-2xl leading-tight text-ink sm:text-3xl">
+				Two packages, one of them with no dependencies.
+			</h2>
+
+			<table class="doc-table mt-8 max-w-3xl">
+				<thead>
+					<tr><th>Package</th><th>What</th><th>State</th></tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td class="font-mono text-ink">@anvil-md/parser</td>
+						<td>Document model and parser. Zero dependencies, no DOM.</td>
+						<td class="font-mono text-xs text-ink-faint">STABLE</td>
+					</tr>
+					<tr>
+						<td class="font-mono text-ink">@anvil-md/render-html</td>
+						<td>Fence to HTML string, plus a themeable baseline stylesheet.</td>
+						<td class="font-mono text-xs text-ink-faint">DISPLAY ONLY</td>
+					</tr>
+				</tbody>
+			</table>
+
+			<pre class="src-well mt-6 max-w-2xl"><code>bun add @anvil-md/parser @anvil-md/render-html</code></pre>
+
+			<pre class="src-well mt-3 max-w-2xl"><code set:html={WIRE_SNIPPET} /></pre>
+
+			<div class="doc-prose mt-6 max-w-2xl">
+				<p>
+					<strong>Display only</strong> means the emitted controls carry <code>disabled</code>:
+					this draws a block, it does not run one. Stamping needs server-held state, idempotency
+					and a permission model, none of which belong in a rendering package. Sections 6 and 7 of
+					the specification are the contract if you are building it.
+				</p>
+			</div>
+		</section>
+
+		<!-- ── Colophon ─────────────────────────────────────────────── -->
+		<footer class="rule-tick pt-10">
+			<div
+				class="grid max-w-3xl grid-cols-[auto_1fr] gap-x-6 gap-y-2.5 font-mono text-xs text-ink-soft"
+			>
+				<span class="text-ink-faint">SPEC</span>
+				<span>
+					<a href="https://github.com/anvil-md/anvil/blob/main/SPEC.md" class="doc-link">SPEC.md</a
+					> &middot; grammar, ten blocks, the stamp wire format, conformance
+				</span>
+				<span class="text-ink-faint">CODE</span>
+				<span>
+					<a href="https://github.com/anvil-md/anvil" class="doc-link">github.com/anvil-md/anvil</a>
+				</span>
+				<span class="text-ink-faint">LICENCE</span>
+				<span>MIT. Icon geometry is Lucide, ISC.</span>
+				<span class="text-ink-faint">COLOPHON</span>
+				<span>
+					IBM Plex, self-hosted. Every block on this page rendered at build time by the reference
+					implementation.
+				</span>
+			</div>
+		</footer>
+	</main>
+</BaseLayout>

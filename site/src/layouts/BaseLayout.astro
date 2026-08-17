@@ -1,0 +1,40 @@
+---
+import '@/styles/global.css'
+
+interface Props {
+	title: string
+	description?: string
+}
+
+const {
+	title,
+	description = 'ANVIL: a tiny DSL an LLM writes inside a fenced code block, which renders as real UI inline in the conversation. Answered once, then frozen.',
+} = Astro.props
+const canonical = new URL(Astro.url.pathname, Astro.site).href
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="description" content={description} />
+		<link rel="canonical" href={canonical} />
+		<meta property="og:type" content="website" />
+		<meta property="og:title" content={title} />
+		<meta property="og:description" content={description} />
+		<meta name="theme-color" content="#fbfbfc" media="(prefers-color-scheme: light)" />
+		<meta name="theme-color" content="#2a2b2f" media="(prefers-color-scheme: dark)" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<title>{title}</title>
+		<script is:inline>
+			// Respect system, allow manual override persisted in localStorage.
+			const saved = localStorage.getItem('anvil-theme')
+			const dark = saved ? saved === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches
+			document.documentElement.classList.toggle('dark', dark)
+		</script>
+	</head>
+	<body class="min-h-screen antialiased">
+		<slot />
+	</body>
+</html>

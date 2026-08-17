@@ -1,0 +1,28 @@
+{
+	"name": "anvil-md-site",
+	"version": "0.1.0",
+	"type": "module",
+	"private": true,
+	"scripts": {
+		"dev": "astro dev --port ${PORT:-4300}",
+		"build": "astro build",
+		"preview": "astro preview --port ${PORT:-4300}",
+		"check": "astro check && biome check .",
+		"check:fix": "biome check --write .",
+		"deploy": "astro build && wrangler deploy"
+	},
+	"dependencies": {
+		"@astrojs/check": "^0.9.9",
+		"@fontsource-variable/ibm-plex-sans": "^5.2.8",
+		"@fontsource/ibm-plex-mono": "^5.2.7",
+		"@fontsource/ibm-plex-serif": "^5.2.7",
+		"@tailwindcss/vite": "^4.1.0",
+		"astro": "^5.13.0",
+		"tailwindcss": "^4.1.0",
+		"typescript": "^5.7.0"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.0.0",
+		"wrangler": "^4.0.0"
+	}
+}
