@@ -7,7 +7,11 @@
 	// Static assets only - no worker script, so requests never hit compute.
 	"assets": {
 		"directory": "./dist",
-		"not_found_handling": "404-page"
+		"not_found_handling": "404-page",
+		// Astro emits directory indexes (/spec/index.html) and is configured
+		// trailingSlash:"always". Without this, a bare /spec 404s instead of
+		// redirecting to /spec/ -- which is exactly what someone types.
+		"html_handling": "auto-trailing-slash"
 	},
 	"routes": [{ "pattern": "anvil-md.frst.dev", "custom_domain": true }],
 	"workers_dev": true
