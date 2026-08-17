@@ -1,0 +1,25 @@
+---
+import type { Cta } from '@/types'
+
+interface Props {
+	cta: Cta
+}
+
+const { cta } = Astro.props
+const external = /^https?:\/\//.test(cta.href)
+const ghost = cta.variant === 'ghost'
+---
+
+<a
+	href={cta.href}
+	target={external ? '_blank' : undefined}
+	rel={external ? 'noopener noreferrer' : undefined}
+	class:list={[
+		'op-btn inline-flex items-center justify-center px-6 py-3 text-sm tracking-tight transition-all duration-200 active:scale-[0.98]',
+		ghost
+			? 'op-btn-ghost border border-line text-fg hover:border-accent/60 hover:bg-fg/[0.03]'
+			: 'op-btn-solid bg-accent text-accent-fg hover:brightness-110',
+	]}
+>
+	{cta.label}
+</a>

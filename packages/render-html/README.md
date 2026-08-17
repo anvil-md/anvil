@@ -73,11 +73,16 @@ nothing leaks into the surrounding page:
 
 ```css
 .anvil-doc {
-  --anvil-accent: #c0392a;
   --anvil-border: #d8d8dd;
+  --anvil-primary: #c0392a;
   --anvil-radius: 4px;
 }
 ```
+
+`--anvil-warn` and `--anvil-danger` are **semantic, not brand colours**. They are
+the only thing distinguishing a warn note from an info note, so pointing them at
+a brand accent destroys the distinction. `--anvil-primary` is the decorative one;
+bind that to your accent instead.
 
 Dark mode follows `prefers-color-scheme`, and can be forced from any ancestor
 carrying `[data-theme="dark"]` or `.dark`.

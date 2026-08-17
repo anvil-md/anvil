@@ -1,0 +1,28 @@
+---
+import Cta from '@/components/sections/Cta.astro'
+import Diagram from '@/components/sections/Diagram.astro'
+import Faq from '@/components/sections/Faq.astro'
+import Features from '@/components/sections/Features.astro'
+import Prose from '@/components/sections/Prose.astro'
+import Quote from '@/components/sections/Quote.astro'
+import Stats from '@/components/sections/Stats.astro'
+import Steps from '@/components/sections/Steps.astro'
+import type { Page, Section } from '@/types'
+
+interface Props {
+	section: Section
+	/** Features and Diagram render different DOM per layout, so they need the preset. */
+	theme: Page['theme']
+}
+
+const { section, theme } = Astro.props
+---
+
+{section.kind === 'prose' && <Prose section={section} />}
+{section.kind === 'features' && <Features section={section} theme={theme} />}
+{section.kind === 'steps' && <Steps section={section} />}
+{section.kind === 'stats' && <Stats section={section} />}
+{section.kind === 'quote' && <Quote section={section} />}
+{section.kind === 'faq' && <Faq section={section} />}
+{section.kind === 'cta' && <Cta section={section} />}
+{section.kind === 'diagram' && <Diagram section={section} theme={theme} />}

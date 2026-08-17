@@ -1,0 +1,140 @@
+---
+import '@/styles/global.css'
+import { resolveTheme } from '@/lib/theme'
+import type { Page } from '@/types'
+
+interface Props {
+	page: Page
+}
+
+const { page } = Astro.props
+const theme = resolveTheme(page.theme)
+const lang = page.meta.lang ?? 'en'
+const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://example.com')
+const ogImage = page.meta.ogImage ? new URL(page.meta.ogImage, canonical) : null
+---
+
+<!doctype html>
+<html
+	lang={lang}
+	data-preset={theme.name}
+	style={`${theme.style};color-scheme:${theme.mode}`}
+>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>{page.meta.title}</title>
+		<meta name="description" content={page.meta.description} />
+		<link rel="canonical" href={canonical.href} />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="theme-color" content={theme.accent} />
+
+		<meta property="og:type" content="website" />
+		<meta property="og:title" content={page.meta.title} />
+		<meta property="og:description" content={page.meta.description} />
+		<meta property="og:url" content={canonical.href} />
+		{ogImage && <meta property="og:image" content={ogImage.href} />}
+		<meta name="twitter:card" content={ogImage ? 'summary_large_image' : 'summary'} />
+
+		{
+			/* fontLink is null for self-hosted faces (whiteboard ships Excalifont
+			   from public/fonts), so skip the Google preconnect entirely there. */
+			theme.preset.fontLink && (
+				<>
+					<link rel="preconnect" href="https://fonts.googleapis.com" />
+					<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+					<link rel="stylesheet" href={theme.preset.fontLink} />
+				</>
+			)
+		}
+	</head>
+	<body class="bg-bg text-fg">
+		{
+			/*
+			 * NO-JS FALLBACK for the whiteboard preset. The real shapes are drawn by
+			 * rough.js into a per-element SVG (src/lib/sketch.ts); this is what is on
+			 * screen until that lands, and all there is if it never does.
+			 *
+			 * feTurbulence + feDisplacementMap roughens a border declaratively, but it
+			 * moves PIXELS - displace a stroke further than it is wide and the line
+			 * tears - so it can only ever approximate. Once sketch.ts runs it sets
+			 * `data-sketch="on"` on <html> and presets.css hides every one of these.
+			 *
+			 * It is applied ONLY to border-drawing pseudo-elements, never to a box
+			 * containing text: displacing rendered text makes it smeary and
+			 * unreadable. Inlined rather than referenced as a data-URI because
+			 * Safari does not resolve filter refs from external documents.
+			 */
+			theme.name === 'whiteboard' && (
+				<svg width="0" height="0" aria-hidden="true" style="position:absolute">
+					<filter id="op-rough" x="-15%" y="-15%" width="130%" height="130%">
+						<feTurbulence type="fractalNoise" baseFrequency="0.008" numOctaves="2" seed="7" result="n" />
+						<feDisplacementMap in="SourceGraphic" in2="n" scale="1.7" xChannelSelector="R" yChannelSelector="G" />
+					</filter>
+					{/* Same geometry, different seed - that is what makes it read as the
+					    same line drawn twice rather than two different rectangles. */}
+					<filter id="op-rough-soft" x="-15%" y="-15%" width="130%" height="130%">
+						<feTurbulence type="fractalNoise" baseFrequency="0.008" numOctaves="2" seed="23" result="n" />
+						<feDisplacementMap in="SourceGraphic" in2="n" scale="1.7" xChannelSelector="R" yChannelSelector="G" />
+					</filter>
+					{/* Filter regions are a percentage of the element box, so a 3px-tall
+					    rule gets under half a pixel of room and the displacement is
+					    clipped off. Thin elements need their own enormous region. */}
+					<filter id="op-rough-line" x="-2%" y="-900%" width="104%" height="1900%">
+						<feTurbulence type="fractalNoise" baseFrequency="0.006" numOctaves="2" seed="11" result="n" />
+						<feDisplacementMap in="SourceGraphic" in2="n" scale="2.0" xChannelSelector="R" yChannelSelector="G" />
+					</filter>
+				</svg>
+			)
+		}
+		<div
+			id="progress"
+			class="fixed inset-x-0 top-0 z-50 h-0.5 origin-left scale-x-0 bg-accent"
+			aria-hidden="true"
+		>
+		</div>
+		<slot />
+
+		{/*
+		 * The whiteboard preset draws its shapes with rough.js at runtime, because
+		 * per-shape randomness is the whole of the Excalidraw look and no static
+		 * technique has it. The guard keeps that honest: the import is dynamic, so
+		 * Vite splits it into its own chunk and the other nine presets never fetch
+		 * a byte of it.
+		 */}
+		<script>
+			if (document.documentElement.dataset.preset === 'whiteboard') {
+				import('@/lib/sketch').then(m => m.init())
+			}
+		</script>
+
+		<script is:inline>
+			const bar = document.getElementById('progress')
+			const onScroll = () => {
+				const max = document.documentElement.scrollHeight - window.innerHeight
+				bar.style.transform = `scaleX(${max > 0 ? window.scrollY / max : 0})`
+			}
+			addEventListener('scroll', onScroll, { passive: true })
+			onScroll()
+
+			const links = [...document.querySelectorAll('[data-navlink]')]
+			if (links.length) {
+				const spy = new IntersectionObserver(
+					entries => {
+						for (const entry of entries) {
+							if (!entry.isIntersecting) continue
+							for (const link of links) {
+								link.dataset.active = String(link.dataset.navlink === entry.target.id)
+							}
+						}
+					},
+					{ rootMargin: '-45% 0px -50% 0px' },
+				)
+				for (const link of links) {
+					const target = document.getElementById(link.dataset.navlink)
+					if (target) spy.observe(target)
+				}
+			}
+		</script>
+	</body>
+</html>

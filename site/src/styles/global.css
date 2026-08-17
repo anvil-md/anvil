@@ -1,0 +1,248 @@
+@import "tailwindcss";
+@import "./presets.css";
+/* The real package stylesheet, straight from source -- the blocks on this page
+   are rendered by the real renderer, so they must be styled by the real CSS. */
+@import "../../../packages/render-html/anvil.css";
+
+/**
+ * Neutral base. Every palette, radius, rule weight and type decision belongs to
+ * a preset block in presets.css - these are only the fallbacks that keep the
+ * page readable if a preset forgets one.
+ *
+ * `:where(:root)` and NOT `:root`, deliberately. @import has to come first in a
+ * stylesheet, so presets.css is always loaded ABOVE this block. A plain :root
+ * ties with [data-preset='x'] on specificity (0,1,0), and the later rule wins -
+ * which meant this "fallback" silently overrode all nine preset palettes and
+ * every design rendered in the same grey. :where() has zero specificity, so any
+ * preset beats it while it still catches anything a preset leaves unset.
+ */
+:where(:root) {
+	--bg: #08080a;
+	--fg: #ececef;
+	--muted: #8b8b96;
+	--line: #1e1e23;
+	--panel: #0f0f12;
+	--radius-card: 12px;
+	--radius-pill: 999px;
+	--rule: 1px;
+	--display-tracking: -0.025em;
+	--display-weight: 600;
+	/* --accent, --accent-fg and the three font families come from BaseLayout. */
+}
+
+@theme inline {
+	--color-bg: var(--bg);
+	--color-fg: var(--fg);
+	--color-muted: var(--muted);
+	--color-line: var(--line);
+	--color-panel: var(--panel);
+	--color-accent: var(--accent);
+	--color-accent-fg: var(--accent-fg);
+
+	--font-display: var(--font-display);
+	--font-body: var(--font-body);
+	--font-mono: var(--font-mono);
+}
+
+html {
+	scroll-behavior: smooth;
+	/* Sticky nav is 3.5rem tall; keep anchored sections clear of it. */
+	scroll-padding-top: 5rem;
+	background-color: var(--bg);
+}
+
+body {
+	font-family: var(--font-body);
+	-webkit-font-smoothing: antialiased;
+	text-rendering: optimizeLegibility;
+}
+
+::selection {
+	background: var(--accent);
+	color: var(--accent-fg);
+}
+
+:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 3px;
+}
+
+/**
+ * Structural hooks. Components carry these classes and nothing decorative, so a
+ * preset can restyle the whole site without a single component edit.
+ */
+.op-display {
+	font-family: var(--font-display);
+	font-weight: var(--display-weight);
+	letter-spacing: var(--display-tracking);
+}
+
+.op-h2 {
+	font-family: var(--font-display);
+	font-weight: var(--display-weight);
+	letter-spacing: var(--display-tracking);
+}
+
+.op-card {
+	border-radius: var(--radius-card);
+}
+
+.op-btn {
+	border-radius: var(--radius-pill);
+}
+
+.op-eyebrow {
+	font-family: var(--font-mono);
+}
+
+.op-stat {
+	font-family: var(--font-display);
+	letter-spacing: var(--display-tracking);
+}
+
+.op-section {
+	border-top: var(--rule) solid var(--line);
+}
+
+/**
+ * Diagrams. Rendered at build time by lib/diagram.ts; the SVG carries no colour
+ * of its own, only the same --bg/--fg/--line/--accent/--muted custom properties
+ * every preset already sets, so one render themes itself ten ways.
+ */
+.op-figure {
+	margin: 0;
+}
+
+.op-diagram {
+	display: flex;
+	justify-content: center;
+}
+
+.op-diagram svg {
+	/* The generator's width/height are stripped in lib/diagram.ts; the viewBox
+	   carries the ratio, so the figure scales down with a narrow column instead
+	   of overflowing it. max-height stops a tall flowchart eating a phone. */
+	width: 100%;
+	height: auto;
+	max-height: 78vh;
+}
+
+/* Class + element beats the bare `text` rule inside the generated SVG's own
+   <style>, so the diagram is set in the preset's face rather than the
+   generator's default. */
+.op-diagram text {
+	font-family: var(--font-body);
+}
+
+/* Box-drawing output is a grid: it only lines up in a monospaced face, and it
+   must never wrap. Narrow screens scroll it rather than breaking it. */
+.op-diagram-ascii {
+	justify-content: flex-start;
+	overflow-x: auto;
+}
+
+/* NOT var(--font-mono), and this is not an oversight.
+   A preset's mono is a typographic choice for inline code, and the ones in use
+   - IBM Plex Mono, JetBrains Mono - have no U+2500 box-drawing glyphs. Those
+   characters fall back to a system mono whose advance is 7.5136px where Plex's
+   is 7.488px. Both fonts are monospaced; they just disagree by 0.35%. Mixing
+   them means a 50-character border row renders 0.47px wider than the
+   50-character text row above it, so nothing in the grid meets anything else.
+   Measured, not guessed.
+
+   A character grid needs one font for every glyph in it, so this asks for a
+   system mono - all of which carry the full box-drawing range at the same
+   advance as their ASCII. Ligatures and kerning are off for the same reason:
+   a grid cannot have two characters agreeing to become one. */
+.op-diagram-ascii pre {
+	font-family:
+		ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+	font-size: 0.78rem;
+	line-height: 1.25;
+	font-variant-ligatures: none;
+	font-kerning: none;
+	text-rendering: optimizeSpeed;
+	white-space: pre;
+	color: var(--fg);
+}
+
+/* There is no scroll reveal, deliberately.
+   Content used to start at opacity 0 and slide up as it came into view. It is
+   the single most generated-looking thing a page can do, it delays the words
+   the reader came for, and it makes any page that is read top-to-bottom feel
+   like a product tour. Every section is simply present. */
+
+@media (prefers-reduced-motion: reduce) {
+	html {
+		scroll-behavior: auto;
+	}
+	.op-glow {
+		/* biome-ignore lint/complexity/noImportantStyles: an accessibility
+		   preference has to beat whatever animation a preset set on this element */
+		animation: none !important;
+	}
+}
+
+/**
+ * ANVIL blocks, dressed for the `brutal` preset.
+ *
+ * This is the whole theming story from the render-html README, used in anger:
+ * the package ships neutral defaults, and a host restyles every block by
+ * redefining --anvil-* tokens. Not one line of the renderer knows this site
+ * exists.
+ */
+[data-preset="brutal"] .anvil-doc {
+	--anvil-fg: var(--fg);
+	--anvil-muted-fg: var(--muted);
+	--anvil-bg: var(--bg);
+	--anvil-surface: color-mix(in srgb, var(--fg) 6%, transparent);
+	--anvil-border: var(--fg);
+	/* --anvil-warn stays an actual warning colour. Binding it to this preset's
+	   blue accent made the warn note render as a blue info box, which is the
+	   exact failure the package comment warns about. --anvil-primary is the
+	   decorative slot, so the accent goes there. */
+	--anvil-warn: #b45309;
+	--anvil-primary: var(--accent);
+	--anvil-radius: 0px;
+	--anvil-radius-sm: 0px;
+	--anvil-mono: var(--font-mono, ui-monospace, monospace);
+}
+
+/* Brutalist: hard rules, no softness anywhere. */
+[data-preset="brutal"] .anvil-block {
+	border-width: 2px;
+}
+
+[data-preset="brutal"] .anvil-card,
+[data-preset="brutal"] .anvil-img,
+[data-preset="brutal"] .anvil-swatch,
+[data-preset="brutal"] .anvil-mark,
+[data-preset="brutal"] .anvil-input,
+[data-preset="brutal"] .anvil-submit {
+	border-radius: 0;
+}
+
+[data-preset="brutal"] .anvil-submit {
+	border-width: 2px;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+}
+
+/* Source listing shown above each live block. Deliberately quieter than the
+   block it produces -- the rendered thing is the point, the source is evidence. */
+.anvil-src {
+	overflow-x: auto;
+	padding: 0.85rem 1rem;
+	margin: 0 0 0.5rem;
+	border: 1px solid color-mix(in srgb, var(--fg) 22%, transparent);
+	background: color-mix(in srgb, var(--fg) 4%, transparent);
+	font-family: var(--font-mono);
+	font-size: 0.78rem;
+	line-height: 1.55;
+	color: var(--muted);
+	white-space: pre;
+}
+
+.anvil-src code {
+	font-family: inherit;
+}

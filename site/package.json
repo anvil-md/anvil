@@ -1,0 +1,28 @@
+{
+	"name": "anvil-md",
+	"version": "1.0.0",
+	"type": "module",
+	"private": true,
+	"description": "One-pager: ANVIL",
+	"scripts": {
+		"dev": "astro dev --host --port ${PORT:-4032}",
+		"build": "astro build",
+		"preview": "astro preview --port ${PORT:-4032}",
+		"check": "astro check && biome check .",
+		"check:fix": "biome check --write .",
+		"deploy": "./deploy.sh"
+	},
+	"dependencies": {
+		"@tailwindcss/vite": "^4.3.3",
+		"astro": "^7.2.2",
+		"beautiful-mermaid": "^1.1.3",
+		"roughjs": "^4.6.6",
+		"tailwindcss": "^4.3.3"
+	},
+	"devDependencies": {
+		"@astrojs/check": "^0.9.10",
+		"@biomejs/biome": "^2.5.8",
+		"typescript": "^6",
+		"wrangler": "^4.123.0"
+	}
+}

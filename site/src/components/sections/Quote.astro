@@ -1,0 +1,25 @@
+---
+import SectionShell from '@/components/SectionShell.astro'
+import type { Section } from '@/types'
+
+interface Props {
+	section: Extract<Section, { kind: 'quote' }>
+}
+
+const { section } = Astro.props
+---
+
+<SectionShell id={section.id} width="prose">
+	<figure>
+		<blockquote class="op-quote op-display text-2xl leading-snug text-balance sm:text-3xl">
+			{section.quote}
+		</blockquote>
+		{
+			section.attribution && (
+				<figcaption class="op-eyebrow mt-6 text-sm tracking-wide text-muted">
+					&mdash; {section.attribution}
+				</figcaption>
+			)
+		}
+	</figure>
+</SectionShell>

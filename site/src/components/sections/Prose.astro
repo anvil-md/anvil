@@ -1,0 +1,24 @@
+---
+import SectionShell from '@/components/SectionShell.astro'
+import { md } from '@/lib/md'
+import type { Section } from '@/types'
+
+interface Props {
+	section: Extract<Section, { kind: 'prose' }>
+}
+
+const { section } = Astro.props
+---
+
+<SectionShell id={section.id} title={section.title} lead={section.lead} width="prose">
+	<div class="op-prose space-y-6">
+		{
+			section.body.map(paragraph => (
+				<p
+					class="op-body text-lg leading-relaxed text-muted text-pretty"
+					set:html={md(paragraph)}
+				/>
+			))
+		}
+	</div>
+</SectionShell>

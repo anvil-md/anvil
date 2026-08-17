@@ -1,0 +1,30 @@
+---
+import Button from '@/components/Button.astro'
+import { md } from '@/lib/md'
+import type { Section } from '@/types'
+
+interface Props {
+	section: Extract<Section, { kind: 'cta' }>
+}
+
+const { section } = Astro.props
+---
+
+<section id={section.id} class="op-section scroll-mt-20 px-6 py-28 sm:py-36">
+	<div class="op-measure mx-auto max-w-3xl text-center">
+		<h2 class="op-h2 op-display text-4xl leading-tight text-balance sm:text-5xl">
+			{section.title}
+		</h2>
+		{
+			section.lead && (
+				<p
+					class="op-body mx-auto mt-5 max-w-xl text-lg leading-relaxed text-muted text-pretty"
+					set:html={md(section.lead)}
+				/>
+			)
+		}
+		<div class="mt-10 flex flex-wrap justify-center gap-3">
+			{section.ctas.map(cta => <Button cta={cta} />)}
+		</div>
+	</div>
+</section>

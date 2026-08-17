@@ -1,0 +1,49 @@
+---
+import SectionShell from '@/components/SectionShell.astro'
+import { renderDiagram } from '@/lib/diagram'
+import { md } from '@/lib/md'
+import { resolveTheme } from '@/lib/theme'
+import type { Page, Section } from '@/types'
+
+interface Props {
+	section: Extract<Section, { kind: 'diagram' }>
+	theme: Page['theme']
+}
+
+const { section, theme } = Astro.props
+const mode = resolveTheme(theme).preset.layout.diagram
+const figure = renderDiagram(section.source, mode)
+---
+
+<SectionShell id={section.id} title={section.title} lead={section.lead}>
+	<figure class="op-figure">
+		{
+			/* The SVG carries no colours of its own - it is themed by the same
+			   --bg/--fg/--line/--accent the preset already sets on <html>. `sketch`
+			   emits this too; lib/sketch.ts redraws it with rough.js in place, so
+			   this is also its no-JS fallback. */
+			figure.kind === 'svg' && (
+				<div class="op-diagram" data-diagram={mode} set:html={figure.html} />
+			)
+		}
+		{
+			/* A terminal draws diagrams with box-drawing characters, so on the
+			   presets that ARE a terminal, that is the honest rendering - not an SVG
+			   pretending to be one. Pre-wrapped, scrollable, and a real <pre> so it
+			   survives copy-paste into a comment or a README. */
+			figure.kind === 'ascii' && (
+				<div class="op-diagram op-diagram-ascii" data-diagram={mode}>
+					<pre>{figure.text}</pre>
+				</div>
+			)
+		}
+		{
+			section.caption && (
+				<figcaption
+					class="op-eyebrow op-figcaption mt-5 text-sm text-muted"
+					set:html={md(section.caption)}
+				/>
+			)
+		}
+	</figure>
+</SectionShell>

@@ -1,0 +1,17 @@
+---
+import Footer from '@/components/Footer.astro'
+import Hero from '@/components/Hero.astro'
+import Nav from '@/components/Nav.astro'
+import Section from '@/components/Section.astro'
+import BaseLayout from '@/layouts/BaseLayout.astro'
+import { page } from '@/page'
+---
+
+<BaseLayout page={page}>
+	<Nav brand={page.brand ?? page.meta.title} sections={page.sections} />
+	<main>
+		<Hero hero={page.hero} theme={page.theme} />
+		{page.sections.map(section => <Section section={section} theme={page.theme} />)}
+	</main>
+	<Footer footer={page.footer} />
+</BaseLayout>

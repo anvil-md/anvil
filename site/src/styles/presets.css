@@ -1,0 +1,1213 @@
+/**
+ * One block per design preset, keyed on <html data-preset="...">.
+ *
+ * Components only ship neutral structure plus stable `op-*` hook classes; all
+ * the character lives here. That's the seam: add a preset by adding a block,
+ * never by editing a component.
+ *
+ * Tokens every preset should set:
+ *   --bg --fg --muted --line --panel   palette
+ *   --radius-card --radius-pill        roundness
+ *   --rule                             border width for rules and cards
+ *   --display-tracking --display-weight
+ *
+ * A preset is free to outgrow this file. `whiteboard` did - it self-hosts a
+ * face, draws its shapes with rough.js at runtime and has its own ideas about
+ * motion - so it lives in presets/whiteboard.css and is imported below. Any
+ * preset that needs its own elements, texture or library should do the same
+ * rather than being squeezed into the shape of the ones above it.
+ */
+
+@import "./presets/whiteboard.css";
+/* ── Corporate ───────────────────────────────────────────────────────────
+   Professional monotone. The discipline here is subtraction: near-grey, one
+   accent used only on the primary action, tight grid, no gradients, no glow.
+   Should read like a company that ships, not a landing-page generator. */
+[data-preset="corporate"] {
+	--bg: #ffffff;
+	--fg: #14161a;
+	--muted: #5b6270;
+	--line: #e3e6ea;
+	--panel: #f7f8fa;
+	--radius-card: 6px;
+	--radius-pill: 6px;
+	--rule: 1px;
+	--display-tracking: -0.03em;
+	--display-weight: 600;
+}
+
+[data-preset="corporate"] .op-display {
+	line-height: 1.08;
+}
+
+[data-preset="corporate"] .op-eyebrow {
+	border-radius: 4px;
+	border-color: var(--line);
+	background: var(--panel);
+	color: var(--muted);
+	letter-spacing: 0.1em;
+}
+
+[data-preset="corporate"] .op-card {
+	border: var(--rule) solid var(--line);
+	border-radius: var(--radius-card);
+}
+
+[data-preset="corporate"] .op-cardgrid {
+	gap: 1rem;
+	background: transparent;
+	border: 0;
+}
+
+[data-preset="corporate"] .op-btn {
+	border-radius: var(--radius-pill);
+	font-weight: 500;
+}
+
+/* Only the primary action gets colour. Everything else is grey. */
+[data-preset="corporate"] .op-btn-ghost {
+	border-color: var(--line);
+}
+
+[data-preset="corporate"] .op-stat {
+	color: var(--fg);
+	font-weight: 600;
+}
+
+[data-preset="corporate"] .op-glow {
+	display: none;
+}
+
+/* ── Sixties ─────────────────────────────────────────────────────────────
+   Mid-century modern: Futura-ish geometry, mustard/teal/oxblood on cream,
+   hard circles, a coarse halftone, and headlines set in a confident stack. */
+[data-preset="sixties"] {
+	--bg: #f2e8d5;
+	--fg: #23201c;
+	--muted: #5d5343;
+	--line: #23201c;
+	--panel: #e6d9c0;
+	--radius-card: 0px;
+	--radius-pill: 999px;
+	--rule: 2px;
+	--display-tracking: -0.03em;
+	--display-weight: 600;
+	--teal: #175753;
+}
+
+[data-preset="sixties"] .op-display {
+	text-transform: uppercase;
+	line-height: 0.9;
+	font-weight: 600;
+}
+
+/* Coarse halftone dots, the way a 60s print job would land. */
+[data-preset="sixties"] body::before {
+	content: "";
+	position: fixed;
+	inset: 0;
+	z-index: 30;
+	pointer-events: none;
+	opacity: 0.14;
+	background-image: radial-gradient(var(--fg) 1px, transparent 1px);
+	background-size: 5px 5px;
+}
+
+[data-preset="sixties"] .op-eyebrow {
+	border-radius: 999px;
+	border-width: var(--rule);
+	border-color: var(--fg);
+	background: var(--accent);
+	color: var(--fg);
+	font-weight: 600;
+	letter-spacing: 0.14em;
+}
+
+[data-preset="sixties"] .op-section {
+	border-top-width: var(--rule);
+}
+
+[data-preset="sixties"] .op-card {
+	border: var(--rule) solid var(--line);
+	background: var(--bg);
+}
+
+[data-preset="sixties"] .op-cardgrid {
+	gap: var(--rule);
+	background: var(--line);
+	border: var(--rule) solid var(--line);
+}
+
+/* Icon chips become the era's hard circles, alternating mustard and teal. */
+[data-preset="sixties"] .op-icon {
+	border-radius: 999px;
+	border-width: var(--rule);
+	border-color: var(--fg);
+	background: var(--accent);
+}
+
+[data-preset="sixties"] .op-card:nth-child(even) .op-icon {
+	background: var(--teal);
+	color: var(--bg);
+}
+
+[data-preset="sixties"] .op-btn {
+	border-radius: 999px;
+	border: var(--rule) solid var(--fg);
+	text-transform: uppercase;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+}
+
+[data-preset="sixties"] .op-step-marker {
+	border-radius: 999px;
+	border: var(--rule) solid var(--fg);
+}
+
+[data-preset="sixties"] .op-stat {
+	color: var(--teal);
+	font-weight: 600;
+}
+
+[data-preset="sixties"] .op-glow {
+	opacity: 0.22;
+	filter: blur(0);
+	background: var(--teal);
+	border-radius: 999px;
+}
+
+/* ── Brutal ──────────────────────────────────────────────────────────────
+   Swiss brutalist: no radius, black hairlines, expanded display type set
+   tight, accent used as a flat block fill and nothing else. */
+[data-preset="brutal"] {
+	--bg: #f4f4f0;
+	--fg: #0b0b0b;
+	--muted: #55554f;
+	--line: #0b0b0b;
+	--panel: #e8e8e2;
+	--radius-card: 0px;
+	--radius-pill: 0px;
+	--rule: 2px;
+	--display-tracking: -0.04em;
+	--display-weight: 800;
+}
+
+[data-preset="brutal"] .op-display {
+	font-stretch: 125%;
+	text-transform: uppercase;
+	line-height: 0.92;
+}
+
+[data-preset="brutal"] .op-eyebrow {
+	border-radius: 0;
+	border-width: var(--rule);
+	background: var(--fg);
+	color: var(--bg);
+	font-weight: 600;
+}
+
+[data-preset="brutal"] .op-section {
+	border-top-width: var(--rule);
+}
+
+[data-preset="brutal"] .op-card {
+	border: var(--rule) solid var(--line);
+}
+
+/* Grid gaps read as rules rather than gutters. */
+[data-preset="brutal"] .op-cardgrid {
+	gap: var(--rule);
+	background: var(--line);
+	border: var(--rule) solid var(--line);
+}
+
+[data-preset="brutal"] .op-btn {
+	border-radius: 0;
+	border: var(--rule) solid var(--fg);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	font-weight: 600;
+}
+
+[data-preset="brutal"] .op-btn:active {
+	transform: translate(2px, 2px);
+}
+
+[data-preset="brutal"] .op-stat {
+	font-stretch: 125%;
+	color: var(--fg);
+}
+
+[data-preset="brutal"] .op-glow {
+	display: none;
+}
+
+/* ── Editorial ───────────────────────────────────────────────────────────
+   Magazine feature: Fraunces at real size, hairline rules, a drop cap on the
+   first paragraph, mono small caps for labels. */
+[data-preset="editorial"] {
+	--bg: #fbfaf7;
+	--fg: #17150f;
+	--muted: #665f52;
+	--line: #ded8c9;
+	--panel: #f3f0e8;
+	--radius-card: 2px;
+	--radius-pill: 2px;
+	--rule: 1px;
+	--display-tracking: -0.02em;
+	--display-weight: 400;
+}
+
+[data-preset="editorial"] .op-display {
+	font-variation-settings:
+		"SOFT" 0,
+		"WONK" 1;
+	line-height: 1.02;
+}
+
+[data-preset="editorial"] .op-eyebrow {
+	border: 0;
+	border-bottom: var(--rule) solid var(--accent);
+	border-radius: 0;
+	padding-inline: 0;
+	color: var(--accent);
+	font-variant-caps: all-small-caps;
+	letter-spacing: 0.18em;
+}
+
+/* Drop cap on the opening paragraph of the first prose section only. */
+[data-preset="editorial"] .op-prose > p:first-child::first-letter {
+	float: left;
+	margin: 0.02em 0.08em 0 0;
+	font-family: var(--font-display);
+	font-size: 3.4em;
+	font-weight: 500;
+	line-height: 0.78;
+	color: var(--accent);
+}
+
+[data-preset="editorial"] .op-card {
+	border-bottom: var(--rule) solid var(--line);
+}
+
+[data-preset="editorial"] .op-btn {
+	border-radius: 2px;
+}
+
+[data-preset="editorial"] .op-quote {
+	font-style: italic;
+}
+
+[data-preset="editorial"] .op-glow {
+	opacity: 0.06;
+}
+
+/* ── Terminal ────────────────────────────────────────────────────────────
+   Phosphor CRT: mono everywhere, scanline overlay, bracketed labels, a
+   blinking caret after the headline. */
+[data-preset="terminal"] {
+	--bg: #05070a;
+	--fg: #c8f5d4;
+	--muted: #5c8a6c;
+	--line: #17301f;
+	--panel: #0a0f0c;
+	--radius-card: 0px;
+	--radius-pill: 0px;
+	--rule: 1px;
+	--display-tracking: -0.02em;
+	--display-weight: 700;
+}
+
+/* Scanlines. Fixed overlay so it doesn't scroll with content. */
+[data-preset="terminal"] body::before {
+	content: "";
+	position: fixed;
+	inset: 0;
+	z-index: 30;
+	pointer-events: none;
+	background: repeating-linear-gradient(
+		to bottom,
+		rgb(0 0 0 / 0.22) 0px,
+		rgb(0 0 0 / 0.22) 1px,
+		transparent 1px,
+		transparent 3px
+	);
+}
+
+[data-preset="terminal"] .op-display {
+	line-height: 1.05;
+	text-shadow: 0 0 18px color-mix(in oklab, var(--accent) 45%, transparent);
+}
+
+[data-preset="terminal"] .op-display::after {
+	content: "_";
+	margin-left: 0.08em;
+	color: var(--accent);
+	animation: op-caret 1.1s steps(1) infinite;
+}
+
+@keyframes op-caret {
+	50% {
+		opacity: 0;
+	}
+}
+
+[data-preset="terminal"] .op-eyebrow {
+	border-radius: 0;
+	border-color: var(--accent);
+	color: var(--accent);
+}
+
+[data-preset="terminal"] .op-eyebrow::before {
+	content: "[ ";
+}
+
+[data-preset="terminal"] .op-eyebrow::after {
+	content: " ]";
+}
+
+[data-preset="terminal"] .op-h2::before {
+	content: "> ";
+	color: var(--accent);
+}
+
+[data-preset="terminal"] .op-btn {
+	border-radius: 0;
+	border: var(--rule) solid var(--accent);
+	text-transform: uppercase;
+	letter-spacing: 0.1em;
+}
+
+[data-preset="terminal"] .op-btn-solid {
+	box-shadow: 0 0 24px color-mix(in oklab, var(--accent) 35%, transparent);
+}
+
+[data-preset="terminal"] .op-card {
+	border: var(--rule) solid var(--line);
+}
+
+[data-preset="terminal"] .op-step-marker {
+	border-radius: 0;
+}
+
+[data-preset="terminal"] .op-glow {
+	opacity: 0.1;
+}
+
+/* ── Noir ────────────────────────────────────────────────────────────────
+   Cinematic: near-black, high-contrast Bodoni, enormous negative space, a
+   single slow-breathing glow and hairline gold rules. */
+[data-preset="noir"] {
+	--bg: #0a0908;
+	--fg: #f2ece2;
+	--muted: #857d70;
+	--line: #211d18;
+	--panel: #100e0c;
+	--radius-card: 1px;
+	--radius-pill: 999px;
+	--rule: 1px;
+	--display-tracking: -0.03em;
+	--display-weight: 500;
+}
+
+[data-preset="noir"] .op-display {
+	font-variation-settings: "opsz" 96;
+	line-height: 0.98;
+}
+
+[data-preset="noir"] .op-section {
+	padding-block: 10rem;
+}
+
+[data-preset="noir"] .op-eyebrow {
+	border: 0;
+	border-radius: 0;
+	padding-inline: 0;
+	color: var(--accent);
+	font-variant-caps: all-small-caps;
+	letter-spacing: 0.42em;
+}
+
+[data-preset="noir"] .op-h2 {
+	font-variation-settings: "opsz" 72;
+}
+
+[data-preset="noir"] .op-card {
+	border-top: var(--rule) solid var(--line);
+	background: transparent;
+}
+
+[data-preset="noir"] .op-cardgrid {
+	gap: 0;
+	background: transparent;
+	border: 0;
+}
+
+[data-preset="noir"] .op-stat {
+	font-family: var(--font-display);
+	font-variation-settings: "opsz" 96;
+	font-weight: 400;
+}
+
+[data-preset="noir"] .op-quote {
+	font-variation-settings: "opsz" 96;
+	font-style: italic;
+}
+
+[data-preset="noir"] .op-glow {
+	opacity: 0.18;
+	animation: op-breathe 11s ease-in-out infinite;
+}
+
+@keyframes op-breathe {
+	50% {
+		opacity: 0.09;
+		transform: translate(-50%, 2rem) scale(1.08);
+	}
+}
+
+/* ── Paper ───────────────────────────────────────────────────────────────
+   Letterpress: warm stock, ink serif at a readable measure, printed grain,
+   everything else stripped back to a whisper. */
+[data-preset="paper"] {
+	--bg: #f7f3ea;
+	--fg: #1b1815;
+	--muted: #6a6156;
+	--line: #d8cfbd;
+	--panel: #efe9dc;
+	--radius-card: 1px;
+	--radius-pill: 999px;
+	--rule: 1px;
+	--display-tracking: -0.015em;
+	--display-weight: 400;
+}
+
+/* Paper grain. SVG turbulence beats a tiled PNG - no request, scales free. */
+/* No grain overlay. A fractal-noise texture is a costume; the warm stock,
+   the ink-black serif and a genuinely wide margin do the letterpress work. */
+
+[data-preset="paper"] .op-display {
+	font-variation-settings: "opsz" 60;
+	line-height: 1.06;
+}
+
+[data-preset="paper"] .op-eyebrow {
+	border: 0;
+	border-radius: 0;
+	padding-inline: 0;
+	color: var(--muted);
+	font-variant-caps: all-small-caps;
+	letter-spacing: 0.24em;
+}
+
+[data-preset="paper"] .op-body {
+	font-size: 1.18rem;
+	line-height: 1.72;
+}
+
+[data-preset="paper"] .op-card {
+	border: 0;
+	border-top: var(--rule) solid var(--line);
+	background: transparent;
+}
+
+[data-preset="paper"] .op-cardgrid {
+	gap: 2.5rem;
+	background: transparent;
+	border: 0;
+}
+
+[data-preset="paper"] .op-btn-solid {
+	box-shadow: none;
+}
+
+[data-preset="paper"] .op-quote {
+	font-style: italic;
+	font-variation-settings: "opsz" 48;
+}
+
+[data-preset="paper"] .op-glow {
+	display: none;
+}
+
+/* ── Tokyo Night ─────────────────────────────────────────────────────────
+   Palette from the tokyo-style skill. Two rules make it read as Tokyo Night
+   rather than "a dark theme with a pink button":
+
+   1. CASCADING CONTRAST. #565f89 is the DARKEST chrome level, NOT body copy.
+      Using it for every paragraph is what made this both illegible (2.76:1) and
+      bland. Body is --fg/#9aa5ce, peaks are #f3f4f6, and #565f89 survives only
+      as --tn-dim on gutters and punctuation.
+   2. SYNTAX POLYCHROME. A code editor is never one accent - it's five at once.
+      Section headings, card titles, stats, steps and links each take a
+      different member of the palette, rotating the way highlighting does. */
+[data-preset="tokyonight"] {
+	--bg: #1a1b26;
+	--fg: #9aa5ce;
+	--muted: #9aa5ce;
+	--line: #2f3549;
+	--panel: #24283b;
+	--radius-card: 8px;
+	--radius-pill: 6px;
+	--rule: 1px;
+	--display-tracking: -0.02em;
+	--display-weight: 700;
+	--tn-bright: #f3f4f6;
+	--tn-primary: #c0caf5;
+	--tn-dim: #565f89;
+	--tn-purple: #bb9af7;
+	--tn-green: #9ece6a;
+	--tn-cyan: #7dcfff;
+	--tn-blue: #7aa2f7;
+	--tn-yellow: #e0af68;
+	--tn-red: #f7768e;
+}
+
+[data-preset="tokyonight"] .op-display {
+	line-height: 1.06;
+	color: var(--tn-bright);
+}
+
+[data-preset="tokyonight"] .op-body {
+	color: var(--tn-primary);
+}
+
+/* Comment-coloured, like the token it imitates. */
+[data-preset="tokyonight"] .op-eyebrow {
+	border-radius: 6px;
+	border-color: var(--line);
+	background: var(--panel);
+	color: var(--tn-purple);
+}
+
+[data-preset="tokyonight"] .op-h2 {
+	color: var(--tn-bright);
+}
+
+[data-preset="tokyonight"] .op-h2::before {
+	content: "// ";
+	color: var(--tn-dim);
+}
+
+/* A left gutter of dim rule, the way an editor puts line numbers beside prose. */
+[data-preset="tokyonight"] .op-prose {
+	border-left: 2px solid #3b4261;
+	padding-left: 3.5rem;
+}
+
+[data-preset="tokyonight"] .op-card {
+	border: var(--rule) solid var(--line);
+	border-radius: var(--radius-card);
+	background: var(--panel);
+}
+
+[data-preset="tokyonight"] .op-card:hover {
+	border-color: color-mix(in oklab, var(--accent) 55%, var(--line));
+}
+
+[data-preset="tokyonight"] .op-cardgrid {
+	gap: 1rem;
+	background: transparent;
+	border: 0;
+}
+
+/* The polychrome pass. Each card, stat and step takes a different token colour
+   so the page carries five accents at once instead of one. */
+[data-preset="tokyonight"] .op-card:nth-child(6n + 1) .op-card-title,
+[data-preset="tokyonight"] .op-statitem:nth-child(4n + 1) .op-stat {
+	color: var(--tn-cyan);
+}
+[data-preset="tokyonight"] .op-card:nth-child(6n + 2) .op-card-title,
+[data-preset="tokyonight"] .op-statitem:nth-child(4n + 2) .op-stat {
+	color: var(--tn-green);
+}
+[data-preset="tokyonight"] .op-card:nth-child(6n + 3) .op-card-title,
+[data-preset="tokyonight"] .op-statitem:nth-child(4n + 3) .op-stat {
+	color: var(--tn-purple);
+}
+[data-preset="tokyonight"] .op-card:nth-child(6n + 4) .op-card-title,
+[data-preset="tokyonight"] .op-statitem:nth-child(4n + 4) .op-stat {
+	color: var(--tn-yellow);
+}
+[data-preset="tokyonight"] .op-card:nth-child(6n + 5) .op-card-title {
+	color: var(--tn-red);
+}
+[data-preset="tokyonight"] .op-card:nth-child(6n) .op-card-title {
+	color: var(--tn-blue);
+}
+
+[data-preset="tokyonight"] .op-icon {
+	border-color: var(--line);
+	border-radius: 6px;
+	background: #1a1b26;
+	color: inherit;
+}
+
+[data-preset="tokyonight"] .op-stat {
+	font-family: var(--font-mono);
+	color: var(--tn-cyan);
+}
+
+[data-preset="tokyonight"] .op-step-marker {
+	border-radius: 4px;
+	font-family: var(--font-mono);
+}
+[data-preset="tokyonight"] li:nth-child(4n + 2) .op-step-marker {
+	background: var(--tn-green);
+}
+[data-preset="tokyonight"] li:nth-child(4n + 3) .op-step-marker {
+	background: var(--tn-purple);
+}
+[data-preset="tokyonight"] li:nth-child(4n) .op-step-marker {
+	background: var(--tn-cyan);
+}
+
+[data-preset="tokyonight"] .op-quote {
+	color: var(--tn-bright);
+}
+[data-preset="tokyonight"] .op-quote::before {
+	content: "\201C";
+	color: var(--tn-purple);
+}
+
+[data-preset="tokyonight"] summary:hover {
+	color: var(--tn-cyan);
+}
+
+[data-preset="tokyonight"] .op-btn-solid {
+	box-shadow: 0 0 36px color-mix(in oklab, var(--accent) 30%, transparent);
+}
+
+[data-preset="tokyonight"] .op-btn-ghost {
+	border-color: var(--tn-purple);
+	color: var(--tn-purple);
+}
+
+[data-preset="tokyonight"] .op-glow {
+	opacity: 0.22;
+}
+
+/* ── ANSI / BBS ──────────────────────────────────────────────────────────
+   Dial-up art. CGA sixteen on black, box-drawing frames, block shading, and
+   a hard 80-column measure so it reads like something you'd DOWNLOAD.ZIP.
+   The frames are drawn with real box characters via ::before/::after, not
+   borders - that's what makes it read as ANSI rather than "dark mode". */
+[data-preset="ansi"] {
+	--bg: #000000;
+	--fg: #ffffff;
+	--muted: #aaaaaa;
+	--line: #0000aa;
+	--panel: #00000a;
+	--radius-card: 0px;
+	--radius-pill: 0px;
+	--rule: 1px;
+	--display-tracking: 0.02em;
+	--display-weight: 700;
+	/* CGA 16 */
+	--cga-magenta: #ff55ff;
+	--cga-yellow: #ffff55;
+	--cga-white: #ffffff;
+	--cga-red: #ff5555;
+}
+
+[data-preset="ansi"] .op-display {
+	line-height: 1.1;
+	text-transform: uppercase;
+	color: var(--cga-white);
+	text-shadow: 2px 0 0 var(--cga-magenta);
+}
+
+[data-preset="ansi"] .op-eyebrow {
+	border: 0;
+	border-radius: 0;
+	padding-inline: 0;
+	color: var(--cga-yellow);
+	letter-spacing: 0.1em;
+}
+
+[data-preset="ansi"] .op-eyebrow::before {
+	content: "\2591\2592\2593 ";
+	color: var(--accent);
+}
+
+[data-preset="ansi"] .op-eyebrow::after {
+	content: " \2593\2592\2591";
+	color: var(--accent);
+}
+
+/* Section headings get a full-width shade-block rule under them. */
+[data-preset="ansi"] .op-h2 {
+	color: var(--accent);
+	text-transform: uppercase;
+}
+
+[data-preset="ansi"] .op-h2::after {
+	content: "";
+	display: block;
+	margin-top: 0.6rem;
+	height: 0.55em;
+	background-image: linear-gradient(
+		to right,
+		var(--accent) 0 12%,
+		color-mix(in srgb, var(--accent) 55%, #000) 12% 24%,
+		color-mix(in srgb, var(--accent) 25%, #000) 24% 36%,
+		transparent 36%
+	);
+}
+
+/* Cards framed in single-line box drawing. */
+[data-preset="ansi"] .op-card {
+	border: var(--rule) solid var(--line);
+	border-radius: 0;
+	background: var(--panel);
+}
+
+[data-preset="ansi"] .op-card-title {
+	color: var(--cga-yellow);
+}
+
+[data-preset="ansi"] .op-card-title::before {
+	content: "\253C\2500 ";
+	color: var(--line);
+}
+
+[data-preset="ansi"] .op-cardgrid {
+	gap: var(--rule);
+	background: var(--line);
+	border: var(--rule) solid var(--line);
+}
+
+[data-preset="ansi"] .op-icon {
+	border-radius: 0;
+	border-color: var(--line);
+	color: var(--accent);
+}
+
+[data-preset="ansi"] .op-btn {
+	border-radius: 0;
+	border: var(--rule) solid var(--accent);
+	text-transform: uppercase;
+	letter-spacing: 0.12em;
+	font-weight: 600;
+}
+
+[data-preset="ansi"] .op-btn-ghost {
+	border-color: var(--line);
+	color: var(--fg);
+}
+
+[data-preset="ansi"] .op-btn-ghost::before {
+	content: "\2190 ";
+}
+
+[data-preset="ansi"] .op-stat {
+	color: var(--cga-yellow);
+	font-family: var(--font-mono);
+}
+
+[data-preset="ansi"] .op-quote {
+	color: var(--cga-white);
+}
+
+[data-preset="ansi"] .op-quote::before {
+	content: "\2588\2593\2592\2591";
+	display: block;
+	margin-bottom: 1rem;
+	color: var(--cga-magenta);
+	letter-spacing: 0.1em;
+}
+
+[data-preset="ansi"] .op-step-marker {
+	border-radius: 0;
+	background: var(--accent);
+	color: #000;
+}
+
+/* 80 columns, centred. The measure IS the aesthetic. */
+[data-preset="ansi"] .op-measure {
+	max-width: 74ch;
+}
+
+[data-preset="ansi"] .op-glow {
+	display: none;
+}
+
+/* ── Vertical rhythm ─────────────────────────────────────────────────────
+   Density and measure are pure CSS because data-preset already sits on <html>;
+   only the components whose DOM genuinely differs (Hero, Features) take props.
+   Spacing rhythm is a big part of why two designs feel different, so these are
+   deliberately far apart rather than a 10% nudge. */
+[data-preset="brutal"] .op-section,
+[data-preset="terminal"] .op-section,
+[data-preset="tokyonight"] .op-section,
+[data-preset="ansi"] .op-section {
+	padding-block: 4.5rem;
+}
+
+[data-preset="editorial"] .op-section,
+[data-preset="paper"] .op-section {
+	padding-block: 9rem;
+}
+
+/* noir already sets its own 10rem above. */
+
+[data-preset="editorial"] .op-measure,
+[data-preset="paper"] .op-measure,
+[data-preset="noir"] .op-measure {
+	max-width: 46rem;
+}
+
+[data-preset="brutal"] .op-measure,
+[data-preset="terminal"] .op-measure,
+[data-preset="ansi"] .op-measure {
+	max-width: 78rem;
+}
+
+/* ── Layout-specific structure ───────────────────────────────────────────
+   The `rows` and `index` feature layouts need per-preset character too, or
+   they'd just be a differently-shaped generic. */
+[data-preset="brutal"] .op-row {
+	border-top-width: var(--rule);
+}
+
+[data-preset="brutal"] .op-row:last-child,
+[data-preset="ansi"] .op-row:last-child {
+	border-bottom: var(--rule) solid var(--line);
+}
+
+[data-preset="ansi"] .op-row .op-card-title::before {
+	content: "\2502 ";
+	color: var(--accent);
+}
+
+[data-preset="noir"] .op-row {
+	border-top-color: color-mix(in oklab, var(--accent) 22%, transparent);
+}
+
+[data-preset="editorial"] .op-indexnum,
+[data-preset="paper"] .op-indexnum {
+	font-variant-caps: all-small-caps;
+	color: var(--accent);
+	opacity: 1;
+}
+
+[data-preset="terminal"] .op-indexnum::before {
+	content: "[";
+}
+
+[data-preset="terminal"] .op-indexnum::after {
+	content: "]";
+}
+
+/* Banner heroes invert onto the accent slab, so tokens that reference --fg
+   would vanish. Everything inside inherits the slab's ink instead. */
+.op-hero-banner .op-eyebrow,
+.op-hero-banner .op-display,
+.op-hero-banner .op-body {
+	color: inherit;
+}
+
+[data-preset="brutal"] .op-hero-banner {
+	border-bottom: calc(var(--rule) * 2) solid var(--fg);
+}
+
+[data-preset="ansi"] .op-hero-banner {
+	background: var(--accent);
+}
+
+/* ── Tokyo Night: actual editor chrome ───────────────────────────────────
+   Polychrome alone still read as "a colourful landing page cosplaying as a
+   code theme" - the colour was decorative section-tagging, not editor
+   semantics. So build the editor itself: a window title bar with traffic
+   lights, per-card window frames, and a real line-number gutter on prose. */
+[data-preset="tokyonight"] .op-hero {
+	padding-top: 6rem;
+}
+
+[data-preset="tokyonight"] .op-hero::before {
+	content: "";
+	position: absolute;
+	inset-inline: 0;
+	top: 0;
+	height: 2.25rem;
+	background: #24283b;
+	border-bottom: 1px solid #3b4261;
+}
+
+/* Traffic lights, drawn with one element and two box-shadows. */
+[data-preset="tokyonight"] .op-hero::after {
+	content: "";
+	position: absolute;
+	left: 1.1rem;
+	top: 0.85rem;
+	width: 0.62rem;
+	height: 0.62rem;
+	border-radius: 999px;
+	background: #ff5f57;
+	box-shadow:
+		1rem 0 0 #febc2e,
+		2rem 0 0 #28c840;
+}
+
+[data-preset="tokyonight"] .op-card {
+	position: relative;
+	padding-top: 2.75rem;
+}
+
+[data-preset="tokyonight"] .op-card::before {
+	content: "";
+	position: absolute;
+	left: 1.1rem;
+	top: 1.1rem;
+	width: 0.5rem;
+	height: 0.5rem;
+	border-radius: 999px;
+	background: #ff5f57;
+	box-shadow:
+		0.85rem 0 0 #febc2e,
+		1.7rem 0 0 #28c840;
+}
+
+/* Line numbers down the prose gutter. */
+[data-preset="tokyonight"] .op-prose {
+	counter-reset: op-line;
+}
+
+[data-preset="tokyonight"] .op-prose > p {
+	position: relative;
+	counter-increment: op-line;
+}
+
+[data-preset="tokyonight"] .op-prose > p::before {
+	content: counter(op-line, decimal-leading-zero);
+	position: absolute;
+	left: -2.6rem;
+	top: 0.3rem;
+	font-family: var(--font-mono);
+	font-size: 0.8em;
+	color: #7982b8;
+}
+
+/* ── Corporate vs Editorial ──────────────────────────────────────────────
+   Called out as near-twins. They now diverge structurally: corporate makes its
+   two-column split hero explicit with a rule between the columns from md up,
+   editorial sets its prose as real magazine columns under the drop cap. */
+[data-preset="corporate"] .op-hero-split .op-display {
+	font-size: clamp(2.75rem, 5.5vw, 4.25rem);
+}
+
+@media (width >= 48rem) {
+	[data-preset="corporate"] .op-hero-split > div > div {
+		grid-template-columns: 1.15fr 1fr;
+		display: grid;
+		gap: 3rem;
+		align-items: end;
+	}
+
+	[data-preset="corporate"] .op-hero-split .op-body {
+		border-left: 1px solid var(--line);
+		padding-left: 3rem;
+	}
+
+	[data-preset="editorial"] .op-prose {
+		column-count: 2;
+		column-gap: 3rem;
+		column-rule: 1px solid var(--line);
+	}
+
+	[data-preset="editorial"] .op-prose > p {
+		margin-top: 0;
+	}
+}
+
+/* ── Earning the devices ─────────────────────────────────────────────────
+   A tracked uppercase eyebrow over every section is grammar nobody chose, and
+   it was flattening all nine presets into the same page. So each preset now
+   either OWNS the device or drops it - and the ones that keep it use it as a
+   signature, not as furniture.
+
+   Restrained presets drop it entirely: their authority comes from type and
+   space, and a decorative kicker undercuts that. */
+[data-preset="corporate"] .op-eyebrow,
+[data-preset="paper"] .op-eyebrow {
+	display: none;
+}
+
+/* Monospace is for code, data and measurement - not a costume for "technical".
+   Corporate has no code on the page, so its labels are set in the body face. */
+[data-preset="corporate"] .op-stat,
+[data-preset="corporate"] .op-indexnum {
+	font-family: var(--font-body);
+}
+
+/* ── One decisive move each ──────────────────────────────────────────────
+   bolder.md: commit to a single move completely, then quiet everything around
+   it. Half-measures read as noise. Each of these is that preset's move. */
+
+/* SIXTIES - the circle is the motif, so make it architecture, not an icon. */
+[data-preset="sixties"] .op-hero {
+	position: relative;
+}
+
+[data-preset="sixties"] .op-hero .op-measure {
+	position: relative;
+	z-index: 1;
+}
+
+[data-preset="sixties"] .op-glow {
+	width: 34rem;
+	height: 34rem;
+	top: -6rem;
+	left: auto;
+	right: -6rem;
+	transform: none;
+	opacity: 1;
+	filter: none;
+	background: var(--accent);
+	border-radius: 999px;
+	mix-blend-mode: multiply;
+}
+
+/* NOIR - the move is scale and emptiness. Let the display type run enormous
+   and strip the section furniture around it to almost nothing. */
+[data-preset="noir"] .op-display {
+	font-size: clamp(3.5rem, 9vw, 6rem);
+	line-height: 0.94;
+}
+
+[data-preset="noir"] .op-h2 {
+	font-size: clamp(2rem, 4vw, 3rem);
+}
+
+[data-preset="noir"] .op-section {
+	border-top-color: color-mix(in oklab, var(--accent) 14%, transparent);
+}
+
+/* TERMINAL - the move is that the page IS a session, so frame it like one. */
+[data-preset="terminal"] .op-measure {
+	border-left: 1px solid var(--line);
+	border-right: 1px solid var(--line);
+	padding-inline: clamp(1rem, 4vw, 3.5rem);
+}
+
+[data-preset="terminal"] .op-eyebrow {
+	border: 0;
+	padding-inline: 0;
+}
+
+[data-preset="terminal"] .op-indexrow .op-card-title::before {
+	content: "$ ";
+	color: var(--accent);
+}
+
+/* ANSI - the move is the masthead. Real BBS art opens with a block-shade
+   banner, so the hero slab gets one instead of a tidy centred headline. */
+[data-preset="ansi"] .op-hero-banner {
+	background: repeating-linear-gradient(
+		90deg,
+		color-mix(in srgb, var(--accent) 100%, #000) 0 2ch,
+		color-mix(in srgb, var(--accent) 78%, #000) 2ch 4ch
+	);
+}
+
+[data-preset="ansi"] .op-hero-banner .op-display {
+	text-shadow: 3px 3px 0 #000;
+}
+
+[data-preset="ansi"] .op-row .op-card-title {
+	color: var(--cga-yellow);
+}
+
+/* ── Corporate: restraint, not absence ───────────────────────────────────
+   Critique: "stock SaaS-template blue and placeholder glyph icons - reads as a
+   wireframe that shipped, not as intentional quiet." Restraint has to be an
+   act. The accent is now deep navy ink so the primary action reads as
+   authority rather than as a default Bootstrap button, the placeholder glyphs
+   are gone, and the hierarchy is carried by type scale and rules. */
+[data-preset="corporate"] .op-icon {
+	display: none;
+}
+
+[data-preset="corporate"] .op-card {
+	border: 0;
+	border-top: 2px solid var(--fg);
+	border-radius: 0;
+	padding-top: 1.5rem;
+}
+
+[data-preset="corporate"] .op-cardgrid {
+	gap: 2.5rem 2rem;
+}
+
+[data-preset="corporate"] .op-card-title {
+	font-size: 1.0625rem;
+	letter-spacing: -0.015em;
+}
+
+[data-preset="corporate"] .op-display {
+	font-size: clamp(2.75rem, 5.5vw, 4.5rem);
+	font-weight: 620;
+}
+
+[data-preset="corporate"] .op-h2 {
+	font-size: clamp(1.75rem, 3vw, 2.25rem);
+}
+
+/* One hairline of colour, used once, instead of colour everywhere. */
+[data-preset="corporate"] .op-section {
+	border-top-color: var(--line);
+}
+
+[data-preset="corporate"] .op-stat {
+	font-size: clamp(2.5rem, 5vw, 3.5rem);
+	font-weight: 620;
+}
+
+/* ── Paper: a book, not a magazine ───────────────────────────────────────
+   Critique: "editorial with the ideas removed - the worst collision in the
+   set." They were both cream-and-serif because they were both reaching for
+   print. So split the reference: editorial is a MAGAZINE spread (two columns,
+   drop cap, terracotta), paper is a BOOK page - one narrow measure, very
+   generous leading, small-caps chapter heads over a thick rule, and ink only.
+   No accent on any text. That is what letterpress restraint actually looks
+   like, and it needs no fake grain to say so. */
+[data-preset="paper"] .op-measure {
+	max-width: 38rem;
+}
+
+[data-preset="paper"] .op-body {
+	font-size: 1.2rem;
+	line-height: 1.9;
+}
+
+[data-preset="paper"] .op-h2 {
+	font-size: 1.05rem;
+	font-variant-caps: all-small-caps;
+	letter-spacing: 0.16em;
+	font-weight: 500;
+	padding-bottom: 0.9rem;
+	border-bottom: 3px solid var(--fg);
+	margin-bottom: 2.5rem;
+}
+
+[data-preset="paper"] .op-display {
+	font-style: italic;
+	font-size: clamp(2.5rem, 6vw, 4rem);
+	line-height: 1.12;
+}
+
+/* Ink only. The accent survives on exactly one element, the primary action. */
+[data-preset="paper"] .op-indexnum,
+[data-preset="paper"] .op-stat,
+[data-preset="paper"] .op-card-title {
+	color: var(--fg);
+}
+
+[data-preset="paper"] .op-indexrow {
+	border-bottom-color: color-mix(in oklab, var(--fg) 18%, transparent);
+}
+
+[data-preset="paper"] .op-quote {
+	font-size: clamp(1.5rem, 3vw, 2rem);
+	line-height: 1.45;
+}

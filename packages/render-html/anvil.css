@@ -5,10 +5,15 @@
  * nothing leaks into the surrounding page and a host can restyle the whole
  * thing by redefining tokens:
  *
- *   .anvil-doc { --anvil-accent: #c0392a; --anvil-radius: 4px; }
+ *   .anvil-doc { --anvil-border: #d8d8dd; --anvil-radius: 4px; }
  *
  * Dark mode follows prefers-color-scheme, and can be forced from an ancestor
  * carrying [data-theme="dark"] or .dark.
+ *
+ * --anvil-warn and --anvil-danger are SEMANTIC, not brand colours. They are the
+ * only thing distinguishing a warn note from an info note, so pointing them at
+ * a brand accent destroys the distinction -- bind them to something that reads
+ * as a warning, or leave them alone. --anvil-primary is the decorative one.
  *
  * NOTE ON COLOUR MIXING: every color-mix() here interpolates toward
  * `transparent` in sRGB, never toward a second hued token. Mixing two tokens
@@ -23,7 +28,7 @@
   --anvil-bg: #ffffff;
   --anvil-surface: #f4f4f5;
   --anvil-border: #e0e0e3;
-  --anvil-accent: #b45309;
+  --anvil-warn: #b45309;
   --anvil-danger: #c0392a;
   --anvil-primary: #2563eb;
 
@@ -48,7 +53,7 @@
     --anvil-bg: #0f0f11;
     --anvil-surface: #1b1b1f;
     --anvil-border: #2e2e35;
-    --anvil-accent: #f0b429;
+    --anvil-warn: #f0b429;
     --anvil-danger: #ff6b57;
     --anvil-primary: #6ea8fe;
   }
@@ -61,7 +66,7 @@
   --anvil-bg: #0f0f11;
   --anvil-surface: #1b1b1f;
   --anvil-border: #2e2e35;
-  --anvil-accent: #f0b429;
+  --anvil-warn: #f0b429;
   --anvil-danger: #ff6b57;
   --anvil-primary: #6ea8fe;
 }
@@ -407,12 +412,12 @@
 }
 
 .anvil-note-warn {
-  background: color-mix(in srgb, var(--anvil-accent) 12%, transparent);
-  border-color: color-mix(in srgb, var(--anvil-accent) 45%, transparent);
+  background: color-mix(in srgb, var(--anvil-warn) 12%, transparent);
+  border-color: color-mix(in srgb, var(--anvil-warn) 45%, transparent);
 }
 
 .anvil-note-warn .anvil-icon {
-  color: var(--anvil-accent);
+  color: var(--anvil-warn);
 }
 
 .anvil-note-danger {
