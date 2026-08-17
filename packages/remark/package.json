@@ -1,0 +1,22 @@
+{
+  "name": "@anvil-md/remark",
+  "version": "0.1.0",
+  "description": "Remark plugin that renders ANVIL fences. Covers react-markdown, MDX, Astro and the unified ecosystem.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anvil-md/anvil.git",
+    "directory": "packages/remark"
+  },
+  "homepage": "https://anvil-md.frst.dev",
+  "bugs": "https://github.com/anvil-md/anvil/issues",
+  "keywords": ["anvil", "dsl", "markdown", "llm", "agent", "remark", "unified", "mdx"],
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "files": ["src", "README.md"],
+  "sideEffects": false,
+  "dependencies": { "@anvil-md/render-html": "workspace:*" }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "@anvil-md/react",
+  "version": "0.1.0",
+  "description": "ANVIL blocks as a React component, plus a react-markdown code renderer.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anvil-md/anvil.git",
+    "directory": "packages/react"
+  },
+  "homepage": "https://anvil-md.frst.dev",
+  "bugs": "https://github.com/anvil-md/anvil/issues",
+  "keywords": ["anvil", "dsl", "markdown", "llm", "agent", "react", "react-markdown"],
+  "main": "./src/index.tsx",
+  "module": "./src/index.tsx",
+  "types": "./src/index.tsx",
+  "exports": { ".": "./src/index.tsx" },
+  "files": ["src", "README.md"],
+  "sideEffects": false,
+  "dependencies": { "@anvil-md/render-html": "workspace:*" },
+  "peerDependencies": { "react": ">=18" }
+}

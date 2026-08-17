@@ -1,0 +1,22 @@
+{
+  "name": "@anvil-md/marked",
+  "version": "0.1.0",
+  "description": "Render ANVIL fences through marked.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anvil-md/anvil.git",
+    "directory": "packages/marked"
+  },
+  "homepage": "https://anvil-md.frst.dev",
+  "bugs": "https://github.com/anvil-md/anvil/issues",
+  "keywords": ["anvil", "dsl", "markdown", "llm", "agent", "marked"],
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "files": ["src", "README.md"],
+  "sideEffects": false,
+  "dependencies": { "@anvil-md/render-html": "workspace:*" }
+}

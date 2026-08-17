@@ -79,10 +79,34 @@ block visibly provisional and never answerable.
 
 ## Packages
 
+**Core** -- the two you always need:
+
 | Package | What it is | State |
 |---|---|---|
 | [`@anvil-md/parser`](./packages/parser) | Document model + parser. Zero dependencies, no DOM. | Stable |
 | [`@anvil-md/render-html`](./packages/render-html) | Fence -> HTML string, plus a baseline stylesheet. | Display only |
+
+**Integrations** -- thin adapters so you do not hand-wire the fence branch:
+
+| Package | Host | State |
+|---|---|---|
+| [`@anvil-md/marked`](./packages/marked) | [marked](https://marked.js.org) | Works |
+| [`@anvil-md/markdown-it`](./packages/markdown-it) | [markdown-it](https://github.com/markdown-it/markdown-it) | Works |
+| [`@anvil-md/react`](./packages/react) | React component + react-markdown | Works |
+| [`@anvil-md/remark`](./packages/remark) | remark / unified, so MDX, Astro, Docusaurus | **Experimental** |
+
+### The one thing every integration gets wrong
+
+**Whether the fence has finished streaming.** An LLM emits a fence token by
+token, and a block whose last option has not arrived must never look answerable.
+
+Only **marked** can work this out by itself, because its `code` token keeps
+`raw` -- the source *including* the delimiters. remark, markdown-it and
+react-markdown all discard the delimiters during parsing, so by the time they
+hand you a node the streaming state is gone. Those integrations assume complete
+and take a `closed` option; pass it from whatever your host knows.
+
+If you get to choose your markdown parser, choose marked.
 
 **Display only** means the emitted controls carry `disabled`: this renders a
 block, it does not run one. Stamping -- the answer half in [§6](./SPEC.md#6-the-stamp)

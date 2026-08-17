@@ -1,23 +1,49 @@
 {
-  "compilerOptions": {
-    "lib": ["ESNext", "DOM"],
-    "target": "ESNext",
-    "module": "Preserve",
-    "moduleResolution": "bundler",
-    "moduleDetection": "force",
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
-    "noEmit": true,
-    "strict": true,
-    "skipLibCheck": true,
-    "noUncheckedIndexedAccess": true,
-    "noFallthroughCasesInSwitch": true,
-    "noImplicitOverride": true,
-    "paths": {
-      "@anvil-md/parser": ["./packages/parser/src/index.ts"],
-      "@anvil-md/render-html": ["./packages/render-html/src/index.ts"]
-    }
-  },
-  "include": ["packages/*/src/**/*.ts"],
-  "exclude": ["node_modules", "site"]
+	"compilerOptions": {
+		"lib": [
+			"ESNext",
+			"DOM"
+		],
+		"target": "ESNext",
+		"module": "Preserve",
+		"moduleResolution": "bundler",
+		"moduleDetection": "force",
+		"allowImportingTsExtensions": true,
+		"verbatimModuleSyntax": true,
+		"noEmit": true,
+		"strict": true,
+		"skipLibCheck": true,
+		"noUncheckedIndexedAccess": true,
+		"noFallthroughCasesInSwitch": true,
+		"noImplicitOverride": true,
+		"paths": {
+			"@anvil-md/parser": [
+				"./packages/parser/src/index.ts"
+			],
+			"@anvil-md/render-html": [
+				"./packages/render-html/src/index.ts"
+			],
+			"@anvil-md/marked": [
+				"./packages/marked/src/index.ts"
+			],
+			"@anvil-md/markdown-it": [
+				"./packages/markdown-it/src/index.ts"
+			],
+			"@anvil-md/remark": [
+				"./packages/remark/src/index.ts"
+			],
+			"@anvil-md/react": [
+				"./packages/react/src/index.tsx"
+			]
+		},
+		"jsx": "react-jsx"
+	},
+	"include": [
+		"packages/*/src/**/*.ts",
+		"packages/*/src/**/*.tsx"
+	],
+	"exclude": [
+		"node_modules",
+		"site"
+	]
 }
