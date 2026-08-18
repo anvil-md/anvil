@@ -4,6 +4,10 @@
    are produced by the real renderer, so they must be styled by the real CSS. */
 @import "../../../packages/render-html/anvil.css";
 
+/* Syntax highlighting for ANVIL source: the token colours, plus the overlay
+   geometry the playground's editable textarea sits on. */
+@import "./anvil-syntax.css";
+
 /* Self-hosted type. No external calls - a spec should not phone anyone. */
 @import "@fontsource-variable/ibm-plex-sans";
 @import "@fontsource/ibm-plex-serif/400.css";
@@ -400,11 +404,15 @@
 .doc-prose .astro-code span {
 	color: var(--shiki-light);
 	font-style: var(--shiki-light-font-style);
+	/* The ANVIL grammar leans on weight, not hue, to separate a block header
+	   from its rows - so the weight variable has to be read too. */
+	font-weight: var(--shiki-light-font-weight);
 }
 html.dark .doc-prose .astro-code,
 html.dark .doc-prose .astro-code span {
 	color: var(--shiki-dark);
 	font-style: var(--shiki-dark-font-style);
+	font-weight: var(--shiki-dark-font-weight);
 }
 .doc-prose table {
 	display: block;

@@ -2,6 +2,7 @@
 import Masthead from '@/components/Masthead.astro'
 import SiteFooter from '@/components/SiteFooter.astro'
 import BaseLayout from '@/layouts/BaseLayout.astro'
+import { ghostHtml } from '@/scripts/highlight'
 import { DEFAULT_SOURCE, PRESETS, summarise } from '@/scripts/playground'
 import { parseAnvil } from '@anvil-md/parser'
 import { renderAnvilFence } from '@anvil-md/render-html'
@@ -14,6 +15,8 @@ import { renderAnvilFence } from '@anvil-md/render-html'
 const initialHtml = renderAnvilFence(DEFAULT_SOURCE, true)
 const initialDoc = parseAnvil(DEFAULT_SOURCE, { partial: false })
 const initialStatus = summarise(initialDoc, true)
+/** Same tokenizer the client repaints with, so the source is lit before hydration. */
+const initialGhost = ghostHtml(DEFAULT_SOURCE)
 
 const WIRE = `<span class="cmt">// the playground is these three lines, in a keyup handler</span>
 out.innerHTML = renderAnvilFence(textarea.value, fenceIsClosed)
@@ -101,15 +104,24 @@ out.innerHTML = renderAnvilFence(textarea.value, fenceIsClosed)
 			<div class="src-pair mt-7 grid gap-5 lg:grid-cols-2">
 				<div>
 					<p class="clause-label mb-2">Source</p>
-					<textarea
-						id="pg-source"
-						class="pg-input"
-						spellcheck="false"
-						autocomplete="off"
-						autocapitalize="off"
-						autocorrect="off"
-						aria-label="ANVIL source">{DEFAULT_SOURCE}</textarea
-					>
+					<!--
+						The textarea is real and editable; the <pre> behind it is the paint.
+						Both carry .pg-input, so their metrics cannot drift apart, and the
+						ghost is aria-hidden because the textarea already carries the label
+						and the text. Highlighting is decoration, not content.
+					-->
+					<div class="pg-editor">
+						<pre id="pg-ghost" class="pg-input pg-ghost anvil-syntax" aria-hidden="true"><code set:html={initialGhost} /></pre>
+						<textarea
+							id="pg-source"
+							class="pg-input pg-live"
+							spellcheck="false"
+							autocomplete="off"
+							autocapitalize="off"
+							autocorrect="off"
+							aria-label="ANVIL source">{DEFAULT_SOURCE}</textarea
+						>
+					</div>
 				</div>
 				<div>
 					<p class="clause-label mb-2">Rendered</p>

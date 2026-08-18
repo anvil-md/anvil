@@ -11,6 +11,7 @@
  */
 import { type AnvilDoc, parseAnvil } from '@anvil-md/parser'
 import { renderAnvilFence } from '@anvil-md/render-html'
+import { attachHighlighter } from './highlight'
 
 /** The parser is microseconds; this exists to stop the layout thrashing. */
 const DEBOUNCE_MS = 100
@@ -193,9 +194,16 @@ export function mount(): void {
 
 	const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-preset]'))
 
+	// The highlighter repaints on `input` itself, undebounced, so the paint keeps
+	// up with the caret. `paint` here is only for the programmatic value changes
+	// below, which fire no input event.
+	const ghost = document.querySelector<HTMLElement>('#pg-ghost')
+	const highlighter = ghost ? attachHighlighter(source, ghost) : null
+
 	const draw = (): void => {
 		const text = source.value
 		const closed = !streaming.checked
+		highlighter?.paint()
 
 		// Exactly the call a host makes from its markdown renderer. `closed` is
 		// false while the fence is still arriving, which renders the block

@@ -1,9 +1,53 @@
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'astro/config'
+import { anvilGrammar } from './src/grammars/anvil.tmlanguage'
+import { ANVIL_TOKENS, type AnvilTokenRole } from './src/scripts/anvil-tokens'
 
 const assetPrefix = 'lib'
 
-/** Hex approximations of the oklch design tokens in global.css. */
+/**
+ * Hex approximations of the oklch design tokens in global.css.
+ *
+ * Shiki resolves a theme to inline hex at build time, so the ```anvil listings
+ * cannot read the CSS custom properties the playground's overlay uses. The
+ * token NAMES are shared (src/scripts/anvil-tokens.ts); these are the same
+ * seven roles, spelled in sRGB. `primary` `warn` `danger` are lifted verbatim
+ * from packages/render-html/anvil.css so a checkbox state is the same colour
+ * in a listing as it is in a rendered block.
+ */
+const roles: Record<'light' | 'dark', Record<AnvilTokenRole, string>> = {
+	light: {
+		grammar: '#1f5aa8',
+		ink: '#1b1c22',
+		soft: '#4a4b53',
+		faint: '#9296a0',
+		primary: '#2563eb',
+		warn: '#b45309',
+		danger: '#c0392a',
+	},
+	dark: {
+		grammar: '#7cb3f5',
+		ink: '#eef0f4',
+		soft: '#b0b2bc',
+		faint: '#7d7f89',
+		primary: '#6ea8fe',
+		warn: '#f0b429',
+		danger: '#ff6b57',
+	},
+}
+
+/** One theme rule per ANVIL token, straight off the shared vocabulary. */
+const anvilTokens = (mode: 'light' | 'dark') =>
+	Object.values(ANVIL_TOKENS).map((t) => {
+		const fontStyle = [t.bold ? 'bold' : '', t.italic ? 'italic' : ''].filter(Boolean).join(' ')
+		return {
+			scope: [t.scope],
+			settings: fontStyle
+				? { foreground: roles[mode][t.role], fontStyle }
+				: { foreground: roles[mode][t.role] },
+		}
+	})
+
 const tokens = (c: { comment: string; accent: string; ink: string }) => [
 	{
 		scope: ['comment', 'punctuation.definition.comment'],
@@ -26,7 +70,10 @@ const anvilLight = {
 	type: 'light' as const,
 	fg: '#4a4b53',
 	bg: '#f1f0ed',
-	settings: tokens({ comment: '#9296a0', accent: '#1f5aa8', ink: '#1b1c22' }),
+	settings: [
+		...tokens({ comment: '#9296a0', accent: '#1f5aa8', ink: '#1b1c22' }),
+		...anvilTokens('light'),
+	],
 }
 
 const anvilDark = {
@@ -34,7 +81,10 @@ const anvilDark = {
 	type: 'dark' as const,
 	fg: '#b0b2bc',
 	bg: '#24252a',
-	settings: tokens({ comment: '#7d7f89', accent: '#7cb3f5', ink: '#eef0f4' }),
+	settings: [
+		...tokens({ comment: '#7d7f89', accent: '#7cb3f5', ink: '#eef0f4' }),
+		...anvilTokens('dark'),
+	],
 }
 
 export default defineConfig({
@@ -54,13 +104,16 @@ export default defineConfig({
 		// Restrained highlighting on the brand palette: keywords carry the slate
 		// accent, strings and numbers sit at ink, comments recede. No rainbow -
 		// a spec listing should read like print. Two themes so it follows the
-		// light/dark toggle. `anvil` is aliased to yaml, whose key:value +
-		// #comment shape is the closest match to an ANVIL fence.
+		// light/dark toggle.
+		//
+		// ```anvil used to borrow yaml's grammar, which got the #comment right
+		// and everything else wrong. It now has its own, generated from the
+		// parser's own ANVIL_KINDS -- see src/grammars/anvil.tmlanguage.ts.
 		syntaxHighlight: 'shiki',
 		shikiConfig: {
 			themes: { light: anvilLight, dark: anvilDark },
 			defaultColor: false,
-			langAlias: { anvil: 'yaml' },
+			langs: [anvilGrammar],
 			wrap: false,
 		},
 	},

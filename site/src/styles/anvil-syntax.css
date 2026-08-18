@@ -1,0 +1,166 @@
+/* ─────────────────────────────────────────────────────────────
+   ANVIL syntax - the highlighter's colours, and the overlay that
+   puts them behind the playground's textarea.
+
+   Seven roles, not twenty-seven colours. The grammar marks (@ ? :
+   - _ % | ~~~) carry the one slate accent because they ARE the
+   grammar; the content sits at ink; everything procedural recedes
+   to faint. The semantic three - primary, warn, danger - appear
+   only where they mean it: a destructive option, a checkbox state.
+
+   The point is that the SHAPE of a block reads at a glance. A
+   rainbow would make every token equally loud, which is the same
+   as making none of them loud.
+
+   Token names come from scripts/anvil-tokens.ts, which the Shiki
+   grammar for ```anvil fences also reads, so a listing in the spec
+   and the playground agree about what a token is. The two disagree
+   about where the colour comes from and cannot help it: Shiki
+   resolves a theme to inline hex at build time, so astro.config.ts
+   carries hex approximations of these same design tokens. Same
+   arrangement the site already uses for its other listings.
+   ───────────────────────────────────────────────────────────── */
+
+.anvil-syntax {
+	--syn-grammar: var(--accent-ink);
+	--syn-ink: var(--ink);
+	--syn-soft: var(--ink-soft);
+	--syn-faint: var(--ink-faint);
+	/* The four checkbox states, matching the block renderer's own tokens
+	   (packages/render-html/anvil.css). Kept SEMANTIC: bound to the brand
+	   accent, a blocked task would render as a decoration. */
+	--syn-primary: var(--accent);
+	--syn-warn: oklch(0.56 0.1 75);
+	--syn-danger: oklch(0.52 0.14 25);
+}
+
+.dark .anvil-syntax {
+	--syn-warn: oklch(0.78 0.12 75);
+	--syn-danger: oklch(0.7 0.15 25);
+}
+
+/* ── Tokens ───────────────────────────────────────────────────
+   Structure. The header line and the sigils are the skeleton. */
+.anvil-syntax .av-at,
+.anvil-syntax .av-end,
+.anvil-syntax .av-sigil,
+.anvil-syntax .av-fence {
+	color: var(--syn-grammar);
+	font-weight: 600;
+}
+.anvil-syntax .av-escape,
+.anvil-syntax .av-required {
+	color: var(--syn-grammar);
+}
+
+/* Content. What a human is actually reading. */
+.anvil-syntax .av-kind,
+.anvil-syntax .av-prompt {
+	color: var(--syn-ink);
+	font-weight: 600;
+}
+.anvil-syntax .av-key,
+.anvil-syntax .av-attrValue,
+.anvil-syntax .av-attrString {
+	color: var(--syn-ink);
+}
+.anvil-syntax .av-subtext,
+.anvil-syntax .av-prose,
+.anvil-syntax .av-literal,
+.anvil-syntax .av-attrKey,
+.anvil-syntax .av-cellKey,
+.anvil-syntax .av-fieldType {
+	color: var(--syn-soft);
+}
+
+/* Procedural. Present, never competing. */
+.anvil-syntax .av-pipe,
+.anvil-syntax .av-attrEq {
+	color: var(--syn-faint);
+}
+.anvil-syntax .av-comment {
+	color: var(--syn-faint);
+	font-style: italic;
+}
+/* A kind the parser does not know differs from a known one by weight alone.
+   The parse report under the pane is where the warning belongs; SPEC.md
+   documents six blocks the reference parser has yet to implement, and
+   flagging those across half the specification would be a lie about which
+   of the two is behind. */
+.anvil-syntax .av-kindUnknown {
+	color: var(--syn-soft);
+}
+
+/* Semantic. Four states, four colours, and the one destructive prefix. */
+.anvil-syntax .av-danger,
+.anvil-syntax .av-boxBlocked {
+	color: var(--syn-danger);
+	font-weight: 600;
+}
+.anvil-syntax .av-boxDone {
+	color: var(--syn-primary);
+	font-weight: 600;
+}
+.anvil-syntax .av-boxDoing {
+	color: var(--syn-warn);
+	font-weight: 600;
+}
+.anvil-syntax .av-boxTodo {
+	color: var(--syn-faint);
+}
+
+/* ── The overlay ──────────────────────────────────────────────
+   A transparent textarea over an aria-hidden <pre>. Both carry
+   .pg-input, so font, size, leading, padding, border width and
+   white-space are identical BY CONSTRUCTION - the usual failure
+   of this technique is someone editing one of the two boxes
+   months later and the paint sliding off the caret. Here there
+   is only one box to edit.                                     */
+.pg-editor {
+	position: relative;
+	/* The textarea is the one in flow, so a drag on its resize grip grows
+	   this wrapper and the absolutely-positioned ghost follows. */
+	display: grid;
+}
+
+/* Qualified by element, not because two <pre>s exist but because these have to
+   beat .pg-input's own background and colour whatever order the two files end
+   up imported in. Equal specificity here would make the cascade positional. */
+pre.pg-ghost {
+	position: absolute;
+	inset: 0;
+	margin: 0;
+	z-index: 0;
+	overflow: hidden;
+	resize: none;
+	pointer-events: none;
+	/* It is decoration. The textarea carries the label and the text. */
+	user-select: none;
+}
+
+textarea.pg-live {
+	position: relative;
+	z-index: 1;
+	background: transparent;
+	color: transparent;
+	-webkit-text-fill-color: transparent;
+	caret-color: var(--ink);
+}
+
+/* An opaque selection would paint over the glyphs it is selecting, since
+   the ghost is behind. A wash lets them through. */
+textarea.pg-live::selection {
+	background: color-mix(in oklch, var(--accent) 24%, transparent);
+}
+
+/* No paint at all beats invisible text: in forced colours the ghost's
+   colours are overridden and the transparent textarea would be blank. */
+@media (forced-colors: active) {
+	pre.pg-ghost {
+		display: none;
+	}
+	textarea.pg-live {
+		color: CanvasText;
+		-webkit-text-fill-color: CanvasText;
+	}
+}
