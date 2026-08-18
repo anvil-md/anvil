@@ -256,6 +256,36 @@ export function recipients(block: AnvilBlock, key: string): string[] {
 }
 
 /**
+ * Where a @message is in its life.
+ *
+ *   draft ──stamp──► approved ──host──► sent
+ *     │                  │
+ *     │                  └──host──► failed
+ *     └──stamp──► declined
+ *
+ * The five exist because THE CLICK IS APPROVAL, NOT DELIVERY. A stamp records
+ * that a human said yes at 14:04; whether the SMTP handoff succeeded is a
+ * different fact, arriving later, from a different actor. Collapsing the two
+ * would be the same lie as a draft that renders like a sent message -- the
+ * failure §4.15.1 exists to prevent -- just three seconds further along.
+ *
+ * `sent`, `failed` and `declined` are ABSORBING, exactly like the stamp states
+ * in §7.2. Nothing leaves them.
+ */
+export type MessageState = 'draft' | 'approved' | 'sent' | 'failed' | 'declined'
+
+export const MESSAGE_STATES: readonly MessageState[] = ['draft', 'approved', 'sent', 'failed', 'declined']
+
+const STATE_SET = new Set<string>(MESSAGE_STATES)
+
+/** A message in one of these is frozen: no gate, no button, no second answer. */
+const LOCKED = new Set<MessageState>(['approved', 'sent', 'failed', 'declined'])
+
+export function isLocked(state: MessageState): boolean {
+  return LOCKED.has(state)
+}
+
+/**
  * Every spelling of "no" an agent might reach for. Lowercased before lookup,
  * because `sent=No` -- the single most likely casing a model produces -- read
  * as SENT when this was two exact-string comparisons. A safety default that
@@ -264,17 +294,36 @@ export function recipients(block: AnvilBlock, key: string): string[] {
 const NOT_SENT = new Set(['false', 'no', 'n', '0', 'off', 'never', ''])
 
 /**
- * Has this message actually been sent?
+ * Where this message is.
  *
- * Defaults to NO, and that default is the safety property. A draft that renders
- * indistinguishably from a sent message is how a human scrolling back concludes
- * an email went out when it never did -- so `sent` must be asserted, never
- * assumed. See §4.15.1.
+ * Defaults to `draft`, and that default is the safety property: a draft
+ * rendering indistinguishably from a sent message is how a human scrolling
+ * back concludes an email went out when it never did. Every state past `draft`
+ * has to be ASSERTED (§4.15.1).
+ *
+ * `sent=<time>` is kept as sugar for `state=sent at=<time>`, because it is what
+ * everyone writes first and it reads better than the long form.
  */
-export function isSent(block: AnvilBlock): boolean {
+export function messageState(block: AnvilBlock): MessageState {
+  const declared = attrString(block, 'state').trim().toLowerCase()
+  if (STATE_SET.has(declared)) return declared as MessageState
+  if (block.attrs.error !== undefined) return 'failed'
+
   const raw = block.attrs.sent
-  if (raw === undefined) return false
-  return !NOT_SENT.has(String(raw).trim().toLowerCase())
+  if (raw !== undefined && !NOT_SENT.has(String(raw).trim().toLowerCase())) return 'sent'
+  return 'draft'
+}
+
+/** When the message reached its current state, if the agent said. */
+export function messageAt(block: AnvilBlock): string {
+  const sugar = attrString(block, 'sent')
+  const at = attrString(block, 'at') || (sugar && !NOT_SENT.has(sugar.toLowerCase()) ? sugar : '')
+  return at === 'true' ? '' : at
+}
+
+/** True once the message can no longer be answered. */
+export function isSent(block: AnvilBlock): boolean {
+  return messageState(block) === 'sent'
 }
 
 /**

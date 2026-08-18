@@ -791,7 +791,10 @@ human reads it the way the recipient will.
 | `channel` | `email` `whatsapp` `imessage` `sms` `signal` `telegram` `slack` `discord` `memo` |
 | `to` `cc` `bcc` `from` | the envelope. Comma **or** semicolon separated. |
 | `subject` | alias for the `?` line. `?` wins when both are given. |
-| `sent` | **must be asserted.** Bare, or a timestamp. |
+| `state` | `draft` (default) `approved` `sent` `failed` `declined`. See §4.15.5. |
+| `at` | when it reached that state. `by` names who. |
+| `error` | with `failed`, what went wrong. Implies `state=failed`. |
+| `sent` | sugar for `state=sent at=…`. **Must be asserted.** |
 | `ask` | the send gate. Without it the block is a record and never stamps. |
 | `danger` `phrase` | as §4, for a send that cannot be taken back |
 
@@ -835,6 +838,92 @@ Pair it with `danger phrase="SEND"` when the send cannot be recalled.
 A channel nobody has written chrome for renders as a plain memo plus a warning.
 Drawing an unrecognised channel as a WhatsApp bubble tells the human this is
 going somewhere it is not.
+
+### 4.15.5 The lifecycle
+
+```
+   draft ──stamp──► approved ──host──► sent
+     │                  │
+     │                  └──host──► failed
+     └──stamp──► declined
+```
+
+**The click is approval, not delivery.** This is the whole reason there are
+five states rather than two. A stamp records that a human said yes at 14:04;
+whether the SMTP handoff succeeded is a different fact, arriving three seconds
+later, from a different actor, and it can be *no*. A block that flipped
+straight to `sent` on the click would be telling exactly the lie §4.15.1 exists
+to prevent, just further along the wire.
+
+So the stamp moves the block to **`approved`**, and the host writes the outcome
+afterwards:
+
+| State | Means | Written by |
+|---|---|---|
+| `draft` | nobody has approved it | the agent (default) |
+| `approved` | the human said yes; the wire has not answered | the **stamp** |
+| `declined` | the human said no | the **stamp** |
+| `sent` | delivery succeeded | the **host**, after the fact |
+| `failed` | delivery was attempted and did not succeed | the **host**, with `error=` |
+
+`sent`, `failed` and `declined` are **absorbing**, exactly like the stamp states
+in §7.2. Nothing leaves them.
+
+**4.15.5.1 This is the only post-stamp mutation in the language.**
+
+§1 says a stamped block is frozen, and everywhere else that is absolute. The
+`approved → sent | failed` edge is the one exception, and it is narrow enough to
+defend: it is written **once**, by the **host**, it is **terminal**, and it
+records an outcome *of* the stamp rather than editing the answer inside it. The
+human's decision never changes. What changes is what the world did with it.
+
+A host that cannot observe delivery must leave the block at `approved`. That is
+an honest state, and it is a better one than a `sent` nobody witnessed.
+
+**4.15.5.2 The gate becomes the receipt. It does not disappear.**
+
+§9.2 requires a stamped block to occupy exactly the height it did while open,
+and on a message the send gate is the tallest thing on the block -- so removing
+it would jump every pixel below it up the page at the exact moment the human is
+looking for confirmation.
+
+It transforms instead. The question stays on screen and the button is replaced
+by the answer:
+
+```
+   ╭─ EMAIL ───────────────────────────────── draft · not sent ──╮      ╭─ EMAIL ─────────────────────────────────────────── sent ──╮
+   │  Re: the retry ladder                                       │      │  Re: the retry ladder                                     │
+   │  ─────────────────────────────────────────────────────────  │      │  ───────────────────────────────────────────────────────  │
+   │  TO    j@duplo.org                                          │  ►   │  TO    j@duplo.org                                        │
+   │                                                             │      │                                                           │
+   │  Hey Jonas, the retry ladder is in.                         │      │  Hey Jonas, the retry ladder is in.                       │
+   │  ─────────────────────────────────────────────────────────  │      │  ───────────────────────────────────────────────────────  │
+   │  › Send it?                                        [ Send ] │      │  ✓ Send it?              SENT · by Ana · at 14:07         │
+   ╰──────────────────────────────────── draft ──────────────────╯      ╰────────────────────────────────── sent · at 14:07 ────────╯
+```
+
+Keeping the question is the §4.1 rule in a second place. A stamped choice keeps
+its rejected rows because they show what the human was choosing between; a sent
+message keeps its gate because **"what exactly did the human approve"** is the
+thing a transcript exists to answer.
+
+**4.15.5.3 The transition is one attribute.**
+
+The state lives in `data-state` on the frame, and every visual difference --
+accent, border, pill, receipt -- hangs off it. A host stamps by swapping that
+one attribute on the live element, and the animation follows from CSS
+transitions with no scripting and no re-render. A host that re-renders the
+whole string instead gets a one-shot entry animation on the pill.
+
+Two constraints on that animation, and they are not stylistic:
+
+- **Opacity and transform only.** Anything that animates a box model reflows
+  the block mid-transition, and §9.2 has just finished promising it will not
+  move.
+- **`prefers-reduced-motion` removes the motion, never the information.** The
+  state must still be legible with every animation switched off, which it is,
+  because the state is carried by colour, glyph and words -- not by the
+  movement between them.
 
 ---
 
@@ -920,13 +1009,17 @@ Craft, then speed, then cost.
 Pick up the runbook entry next.
 </stamp>
 
-<!-- @message ask= -- the send gate. `sent` is the host's assertion, not the agent's -->
-<stamp block="intro-mail" kind="message" channel="email" value="send" sent="yes" at="14:04:20">
+<!-- @message ask= -- the send gate. The stamp says APPROVED, never `sent`. -->
+<stamp block="intro-mail" kind="message" channel="email" value="send" state="approved" at="14:04:20" by="Ana">
 Yes, send it.
 </stamp>
-<stamp block="intro-mail" kind="message" channel="email" value="hold">
+<stamp block="intro-mail" kind="message" channel="email" value="hold" state="declined">
 Not yet.
 </stamp>
+
+<!-- the outcome, written by the HOST afterwards. Not a second stamp. -->
+<sent block="intro-mail" state="sent" at="14:04:23"/>
+<sent block="intro-mail" state="failed" at="14:04:23" error="550 mailbox unavailable"/>
 
 <!-- skipped / expired -->
 <stamp block="refs" kind="link" skipped="yes">Skipped that one.</stamp>
@@ -936,9 +1029,12 @@ Not yet.
 A card stamps its task **`ref`**, never the label: the ref is what survives
 somebody rewording a subtask. A message stamps `send` or `hold` and nothing
 else -- the body is already in the transcript above it, and repeating it in the
-tag gives an escaping bug somewhere to live. `sent="yes"` is written by the
-host **after** the send actually succeeded; an agent that writes it is claiming
-something it did not witness.
+tag gives an escaping bug somewhere to live.
+
+**The stamp never says `sent`.** It says `approved`, because that is the only
+thing the click proves (§4.15.5). The outcome arrives afterwards as a separate
+`<sent>` tag written by the **host**, once, terminally. An agent that writes
+`state="sent"` is claiming a delivery it did not witness.
 
 Every tag may also carry `at=` and, where more than one human can act, `by=`.
 Always include `label`/`labels` alongside `value`/`values` -- whoever summarises
@@ -1011,6 +1107,25 @@ most of them will not be. That is what `@void` is for.
 goes optimistic immediately, everything else disables, a spinner sits in the
 footer. **Never optimistically render `stamped`** -- law II says the server
 decides, and a stamp you have to take back is worse than a spinner.
+
+**One block extends this, and only one.** A `@message` carries an outcome
+*after* it stamps, because the click is approval and the send happens later
+(§4.15.5):
+
+```
+   ┌─────────┐   stamp    ┌──────────┐   host    ┌─────────┐
+   │  open   │ ─────────► │ approved │ ────────► │  sent   │
+   └─────────┘            └────┬─────┘           └─────────┘
+                               │  host           ┌─────────┐
+                               └───────────────► │ failed  │
+                                                 └─────────┘
+```
+
+That edge is written **once**, by the **host**, and it is terminal. It records
+what the world did with the stamp; it never edits the answer inside it. The
+human's decision is still frozen at the instant they made it, which is all §1
+ever asked for. A host that cannot observe delivery leaves the block at
+`approved` -- an honest state, and a better one than a `sent` nobody witnessed.
 
 ### 7.3 Idempotency
 
@@ -1259,6 +1374,9 @@ reorder. A positional id lands the stamp on the wrong block.
 | 24 | A `mailto:` or live link inside a draft | addresses are text; the only affordance is the gate (§4.15.2) |
 | 25 | A stamp pointing at bytes someone else can change | snapshot or proxy `img=` / `@link` at stamp time (§4.12.2) |
 | 26 | A row parsed and then never drawn | render it or warn; never both parse and drop (§11) |
+| 27 | A stamp rendered as `sent` before delivery | the click is approval; the host writes the outcome (§4.15.5) |
+| 28 | A send gate that vanishes when it stamps | it becomes the receipt, at the same height (§4.15.5.2, §9.2) |
+| 29 | A state transition that animates a box model | opacity and transform only, or the block reflows (§4.15.5.3) |
 
 ---
 

@@ -18,8 +18,10 @@ import {
   attrString,
   isContainer,
   isMulti,
-  isSent,
   MESSAGE_CHANNELS,
+  MESSAGE_STATES,
+  messageAt,
+  messageState,
   recipients,
   taskProgress,
 } from '@anvil-md/parser'
@@ -66,7 +68,7 @@ const KIND_ATTRS: Record<string, Set<string>> = {
   note: new Set(['tone']),
   card: new Set(['type', 'status', 'href', 'ask']),
   board: new Set(['max', 'ask']),
-  message: new Set(['channel', 'to', 'cc', 'bcc', 'from', 'subject', 'sent', 'ask']),
+  message: new Set(['channel', 'to', 'cc', 'bcc', 'from', 'subject', 'sent', 'state', 'at', 'by', 'error', 'ask']),
   grid: new Set(['cols', 'min', 'gap', 'frame']),
   stack: new Set(['gap', 'frame']),
 }
@@ -138,16 +140,61 @@ export const RULES: Rule[] = [
     },
   },
   {
-    id: 'message-sent-is-not-a-question',
+    id: 'message-state-is-known',
     severity: 'error',
-    spec: '4.15.1',
-    about: 'A message cannot be both already sent and awaiting approval.',
+    spec: '4.15.5',
+    about: 'An unrecognised state= silently falls back to draft.',
     run(blocks, report) {
       for (const b of blocks) {
         if (b.kind !== 'message') continue
-        if (isSent(b) && attrString(b, 'ask')) {
-          report(b, 'sent= and ask= together offer a human the chance to approve something that already happened')
-        }
+        const declared = attrString(b, 'state').trim().toLowerCase()
+        if (!declared || (MESSAGE_STATES as readonly string[]).includes(declared)) continue
+        // Falling back to draft is the safe direction, but silently calling a
+        // sent message a draft is still wrong, and loudly is better.
+        report(b, `state="${declared}" is not a state; drawn as draft. Known: ${MESSAGE_STATES.join(', ')}`)
+      }
+    },
+  },
+  {
+    id: 'message-locked-needs-no-gate',
+    severity: 'warn',
+    spec: '4.15.5',
+    about: 'A message past draft keeps its question but can no longer be answered.',
+    run(blocks, report) {
+      for (const b of blocks) {
+        if (b.kind !== 'message') continue
+        const state = messageState(b)
+        if (state === 'draft' || attrString(b, 'ask')) continue
+        // The receipt is built from `ask=`. Without it a stamped message has no
+        // record of what the human was actually asked.
+        report(b, `state="${state}" with no ask=: the block shows an outcome with no question attached to it`)
+      }
+    },
+  },
+  {
+    id: 'message-outcome-needs-a-time',
+    severity: 'info',
+    spec: '4.15.5',
+    about: 'A terminal state without a timestamp loses when it happened.',
+    run(blocks, report) {
+      for (const b of blocks) {
+        if (b.kind !== 'message') continue
+        const state = messageState(b)
+        if (state === 'draft' || messageAt(b)) continue
+        report(b, `state="${state}" with no at=: the transcript records that it happened, but not when`)
+      }
+    },
+  },
+  {
+    id: 'message-failure-says-why',
+    severity: 'warn',
+    spec: '4.15.5',
+    about: 'A failed send with no reason gives the human nothing to act on.',
+    run(blocks, report) {
+      for (const b of blocks) {
+        if (b.kind !== 'message' || messageState(b) !== 'failed') continue
+        if (attrString(b, 'error').trim()) continue
+        report(b, 'state="failed" with no error=: the human is told it broke and not what broke')
       }
     },
   },

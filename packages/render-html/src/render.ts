@@ -19,10 +19,13 @@ import {
   cardStatus,
   type GalleryRender,
   galleryRender,
-  isSent,
+  isLocked,
+  messageAt,
   type MessageChannel,
   messageChannel,
   messageChrome,
+  messageState,
+  type MessageState,
   parseAnvil,
   recipients,
   type TaskState,
@@ -199,15 +202,45 @@ const CHANNEL_LABEL: Record<MessageChannel, string> = {
   discord: 'Discord',
 }
 
+/** The pill on the frame. Short, because it is read at a glance, not parsed. */
+const STATE_PILL: Record<MessageState, string> = {
+  draft: 'draft &middot; not sent',
+  approved: 'approved &middot; sending',
+  sent: 'sent',
+  failed: 'not sent',
+  declined: 'declined',
+}
+
+const STATE_GLYPH: Record<MessageState, IconName> = {
+  draft: 'circle',
+  approved: 'circle-dot',
+  sent: 'circle-check',
+  failed: 'octagon-alert',
+  declined: 'ban',
+}
+
+/** What the footer says happened, and when. */
+const STATE_FOOT: Record<MessageState, string> = {
+  draft: 'draft',
+  approved: 'approved',
+  sent: 'sent',
+  failed: 'send failed',
+  declined: 'declined',
+}
+
 /**
  * The frame for a proposed message.
  *
- * THE DRAFT MARKER IS THE POINT. A rendered email that looks exactly like a
+ * THE STATE MARKER IS THE POINT. A rendered email that looks exactly like a
  * sent email is the most dangerous thing this block can do: a human scrolling
  * back three screens must be able to tell, at a glance and without reading the
- * body, whether the thing actually went out. So `sent` has to be ASSERTED --
- * every message is a draft until an attribute says otherwise -- and the state
- * is drawn on the frame, not buried in the footer.
+ * body, whether the thing actually went out. So every state past `draft` has to
+ * be ASSERTED, and it is drawn on the frame rather than buried in the footer.
+ *
+ * `approved` exists for the same reason one step later. THE CLICK IS APPROVAL,
+ * NOT DELIVERY -- a stamp records that a human said yes, and the send can still
+ * fail afterwards. A block that flipped to `sent` on the click would be telling
+ * the same lie three seconds further along.
  *
  * This is §1 arriving from a third direction. A transcript is a record of
  * things that happened; a draft that looks sent is a record of something that
@@ -216,7 +249,8 @@ const CHANNEL_LABEL: Record<MessageChannel, string> = {
 function messageShell(block: AnvilBlock, partial: boolean): string {
   const channel = messageChannel(block)
   const chrome = messageChrome(channel)
-  const sent = isSent(block)
+  const state = messageState(block)
+  const locked = isLocked(state)
   const authored = attrString(block, 'channel').toLowerCase()
 
   if (authored && channel === 'memo') {
@@ -228,9 +262,7 @@ function messageShell(block: AnvilBlock, partial: boolean): string {
   // or it is simply not on screen anywhere.
   const peer = chrome === 'envelope' ? '' : to.join(', ') || attrString(block, 'from')
 
-  const mark = sent
-    ? `<span class="anvil-msg-state" data-sent="yes">sent</span>`
-    : `<span class="anvil-msg-state" data-sent="no">draft &middot; not sent</span>`
+  const mark = `<span class="anvil-msg-state">${icon(STATE_GLYPH[state])}<span>${STATE_PILL[state]}</span></span>`
 
   const head = `<header class="anvil-card-head">
     <span class="anvil-icon">${icon(resolveIcon(block.attrs.icon, CHANNEL_ICON[channel]))}</span>
@@ -241,21 +273,52 @@ function messageShell(block: AnvilBlock, partial: boolean): string {
 
   const subject = block.prompt ? `<div class="anvil-card-title">${esc(block.prompt)}</div>` : ''
   const sub = block.subtext ? `<div class="anvil-subtext">${esc(block.subtext)}</div>` : ''
-  const at = attrString(block, 'sent') || attrString(block, 'as')
-  const when = at && at !== 'true' ? at : ''
-  const foot = [
-    partial ? 'streaming' : sent ? 'sent' : 'draft',
-    when ? (sent ? `at ${when}` : `as of ${when}`) : '',
-  ]
-    .filter(Boolean)
-    .join(' · ')
+  const when = messageAt(block) || attrString(block, 'as')
+  const foot = [partial ? 'streaming' : STATE_FOOT[state], when ? `at ${when}` : ''].filter(Boolean).join(' · ')
 
   const danger = block.attrs.danger ? ' anvil-msg-danger' : ''
 
-  return `<section class="anvil-block anvil-card-block anvil-msg anvil-msg-${chrome}${danger}" data-anvil-id="${esc(block.id)}" data-anvil-kind="message" data-channel="${esc(channel)}" data-sent="${sent ? 'yes' : 'no'}">
-    ${head}${subject}${sub}${renderMessage(block)}${warnings(block)}${submitBar(block)}
+  return `<section class="anvil-block anvil-card-block anvil-msg anvil-msg-${chrome}${danger}" data-anvil-id="${esc(block.id)}" data-anvil-kind="message" data-channel="${esc(channel)}" data-state="${state}" data-locked="${locked ? 'yes' : 'no'}">
+    ${head}${subject}${sub}${renderMessage(block)}${warnings(block)}${gateOrReceipt(block, state)}
     <footer class="anvil-foot"><span>${esc(foot)}</span></footer>
   </section>`
+}
+
+/**
+ * The bottom of the block: a send gate before the stamp, the receipt of that
+ * stamp afterwards.
+ *
+ * ONE ROW, TRANSFORMED -- never a row that vanishes. §9.2 requires a stamped
+ * block to occupy exactly the height it did while open, and the gate is the
+ * tallest thing on a message, so removing it would jump every pixel below it up
+ * the page at the moment the human is looking for confirmation.
+ *
+ * It is also the §4.1 rule in a second place: a stamped choice keeps its
+ * rejected rows because they are part of the record. A sent message keeps the
+ * question it was asked, because "what exactly did the human approve" is what a
+ * transcript is for.
+ */
+function gateOrReceipt(block: AnvilBlock, state: MessageState): string {
+  const ask = attrString(block, 'ask')
+  if (!ask) return ''
+
+  if (state === 'draft') {
+    return `<div class="anvil-msg-gate">
+      <span class="anvil-prompt anvil-msg-ask"><span class="anvil-icon">${icon('send')}</span>${esc(ask)}</span>
+      ${submitBar(block)}
+    </div>`
+  }
+
+  const by = attrString(block, 'by')
+  const when = messageAt(block)
+  const detail = [by ? `by ${by}` : '', when ? `at ${when}` : ''].filter(Boolean).join(' · ')
+  const error = state === 'failed' ? attrString(block, 'error') : ''
+
+  return `<div class="anvil-msg-gate anvil-msg-receipt">
+    <span class="anvil-prompt anvil-msg-ask">${icon(STATE_GLYPH[state])}${esc(ask)}</span>
+    <span class="anvil-msg-answer">${STATE_PILL[state]}${detail ? ` <span class="anvil-msg-by">${esc(detail)}</span>` : ''}</span>
+    ${error ? `<span class="anvil-msg-error">${esc(error)}</span>` : ''}
+  </div>`
 }
 
 /* ── layout ──────────────────────────────────────────────────────────────── */

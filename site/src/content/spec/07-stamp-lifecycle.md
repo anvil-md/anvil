@@ -53,6 +53,25 @@ goes optimistic immediately, everything else disables, a spinner sits in the
 footer. **Never optimistically render `stamped`** -- law II says the server
 decides, and a stamp you have to take back is worse than a spinner.
 
+**One block extends this, and only one.** A `@message` carries an outcome
+*after* it stamps, because the click is approval and the send happens later
+(§4.15.5):
+
+```
+   ┌─────────┐   stamp    ┌──────────┐   host    ┌─────────┐
+   │  open   │ ─────────► │ approved │ ────────► │  sent   │
+   └─────────┘            └────┬─────┘           └─────────┘
+                               │  host           ┌─────────┐
+                               └───────────────► │ failed  │
+                                                 └─────────┘
+```
+
+That edge is written **once**, by the **host**, and it is terminal. It records
+what the world did with the stamp; it never edits the answer inside it. The
+human's decision is still frozen at the instant they made it, which is all §1
+ever asked for. A host that cannot observe delivery leaves the block at
+`approved` -- an honest state, and a better one than a `sent` nobody witnessed.
+
 ### 7.3 Idempotency
 
 Every submission carries `(blockId, nonce)`. The server keeps the **first**

@@ -165,8 +165,8 @@ const LAYOUT = `# Drag the window narrower. Nothing here has a breakpoint:
 @end`
 
 const MESSAGE = `# A message an agent proposes to send. It renders as a DRAFT
-# until something asserts otherwise - flip sent=14:07 on and watch
-# the frame change.
+# until something asserts otherwise - add state=sent at=14:07 and
+# watch the frame, the pill and the gate all change together.
 
 @message channel=email to="jonas@duplo.org" cc="ana@x.dev, kit@x.dev"
          from="bot@frst.dev" ask="Send it?"
@@ -184,6 +184,33 @@ const MESSAGE = `# A message an agent proposes to send. It renders as a DRAFT
 ? Deploy notice
 > Shipping the retry ladder to prod in ten minutes.`
 
+const LIFECYCLE = `# THE CLICK IS APPROVAL, NOT DELIVERY.
+#
+# A stamp records that a human said yes at 14:04. Whether the send
+# succeeded is a different fact, arriving later, from the host - and
+# it can be no. So the stamp lands on "approved" and the outcome
+# comes after. Note the gate never disappears: it becomes the
+# receipt, at the same height, so nothing below it jumps.
+
+@grid cols=2 min=19rem
+@message channel=email to="j@duplo.org" ask="Send it?"
+? Re: the retry ladder
+> The ladder is in. Three attempts, then dead-letter.
+
+@message channel=email to="j@duplo.org" ask="Send it?" state=approved at=14:04 by=Ana
+? Re: the retry ladder
+> The ladder is in. Three attempts, then dead-letter.
+
+@message channel=email to="j@duplo.org" ask="Send it?" state=sent at=14:04:23 by=Ana
+? Re: the retry ladder
+> The ladder is in. Three attempts, then dead-letter.
+
+@message channel=email to="j@duplo.org" ask="Send it?" at=14:04:23 by=Ana
+         error="550 mailbox unavailable"
+? Re: the retry ladder
+> The ladder is in. Three attempts, then dead-letter.
+@end`
+
 export const PRESETS: Preset[] = [
 	{ id: 'choice', label: '@choice', source: CHOICE },
 	{ id: 'gallery', label: '@gallery render=swatch', source: GALLERY },
@@ -193,6 +220,7 @@ export const PRESETS: Preset[] = [
 	{ id: 'card', label: '@card', source: CARD },
 	{ id: 'epic', label: '@card type=epic + @board', source: EPIC },
 	{ id: 'message', label: '@message', source: MESSAGE },
+	{ id: 'lifecycle', label: 'draft → sent', source: LIFECYCLE },
 	{ id: 'layout', label: '@grid + @stack', source: LAYOUT },
 	{ id: 'broken', label: 'malformed', source: BROKEN },
 ]

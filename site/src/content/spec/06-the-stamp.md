@@ -70,13 +70,17 @@ Craft, then speed, then cost.
 Pick up the runbook entry next.
 </stamp>
 
-<!-- @message ask= -- the send gate. `sent` is the host's assertion, not the agent's -->
-<stamp block="intro-mail" kind="message" channel="email" value="send" sent="yes" at="14:04:20">
+<!-- @message ask= -- the send gate. The stamp says APPROVED, never `sent`. -->
+<stamp block="intro-mail" kind="message" channel="email" value="send" state="approved" at="14:04:20" by="Ana">
 Yes, send it.
 </stamp>
-<stamp block="intro-mail" kind="message" channel="email" value="hold">
+<stamp block="intro-mail" kind="message" channel="email" value="hold" state="declined">
 Not yet.
 </stamp>
+
+<!-- the outcome, written by the HOST afterwards. Not a second stamp. -->
+<sent block="intro-mail" state="sent" at="14:04:23"/>
+<sent block="intro-mail" state="failed" at="14:04:23" error="550 mailbox unavailable"/>
 
 <!-- skipped / expired -->
 <stamp block="refs" kind="link" skipped="yes">Skipped that one.</stamp>
@@ -86,9 +90,12 @@ Not yet.
 A card stamps its task **`ref`**, never the label: the ref is what survives
 somebody rewording a subtask. A message stamps `send` or `hold` and nothing
 else -- the body is already in the transcript above it, and repeating it in the
-tag gives an escaping bug somewhere to live. `sent="yes"` is written by the
-host **after** the send actually succeeded; an agent that writes it is claiming
-something it did not witness.
+tag gives an escaping bug somewhere to live.
+
+**The stamp never says `sent`.** It says `approved`, because that is the only
+thing the click proves (§4.15.5). The outcome arrives afterwards as a separate
+`<sent>` tag written by the **host**, once, terminally. An agent that writes
+`state="sent"` is claiming a delivery it did not witness.
 
 Every tag may also carry `at=` and, where more than one human can act, `by=`.
 Always include `label`/`labels` alongside `value`/`values` -- whoever summarises

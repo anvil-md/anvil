@@ -227,21 +227,55 @@
       "spec": "4.15.1",
       "title": "sent must be asserted",
       "source": "@message channel=email to=\"a@x\"\n? S\n> body",
-      "expect": { "htmlContains": ["data-sent=\"no\"", "not sent"] }
+      "expect": { "htmlContains": ["data-state=\"draft\"", "data-locked=\"no\"", "not sent"] }
     },
     {
       "id": "message-every-spelling-of-no",
       "spec": "4.15.1",
       "title": "a capital letter must not defeat the safety default",
       "source": "@message to=\"a@x\" sent=No\n> body",
-      "expect": { "htmlContains": ["data-sent=\"no\""] }
+      "expect": { "htmlContains": ["data-state=\"draft\""] }
     },
     {
       "id": "message-sent-is-visibly-different",
       "spec": "4.15.1",
       "title": "an asserted send reads as sent, with its time",
       "source": "@message channel=whatsapp to=\"+66900\" sent=14:07\n> shipped",
-      "expect": { "htmlContains": ["data-sent=\"yes\"", "at 14:07"], "htmlExcludes": ["not sent"] }
+      "expect": { "htmlContains": ["data-state=\"sent\"", "at 14:07"], "htmlExcludes": ["not sent"] }
+    },
+    {
+      "id": "message-approved-is-not-sent",
+      "spec": "4.15.5",
+      "title": "the click is approval; delivery is a later fact from a different actor",
+      "source": "@message to=\"a@x\" ask=\"Send?\" state=approved at=14:04\n> body",
+      "expect": {
+        "htmlContains": ["data-state=\"approved\"", "data-locked=\"yes\"", "sending"],
+        "htmlExcludes": [">sent<", "anvil-submit"]
+      }
+    },
+    {
+      "id": "message-gate-becomes-a-receipt",
+      "spec": "4.15.5",
+      "title": "the gate transforms rather than vanishing, so the height holds",
+      "source": "@message to=\"a@x\" ask=\"Send it?\" state=sent at=14:07 by=Ana\n> body",
+      "expect": {
+        "htmlContains": ["anvil-msg-gate", "anvil-msg-receipt", "Send it?", "by Ana · at 14:07"],
+        "htmlExcludes": ["anvil-submit"]
+      }
+    },
+    {
+      "id": "message-failure-says-why",
+      "spec": "4.15.5",
+      "title": "a send that failed is not a draft and not a send",
+      "source": "@message to=\"a@x\" ask=\"Send?\" error=\"550 mailbox unavailable\"\n> body",
+      "expect": { "htmlContains": ["data-state=\"failed\"", "550 mailbox unavailable"] }
+    },
+    {
+      "id": "message-declined-keeps-the-record",
+      "spec": "4.15.5",
+      "title": "a declined message stays legible and stops pretending it is going anywhere",
+      "source": "@message to=\"a@x\" ask=\"Send?\" state=declined by=Ana\n> body",
+      "expect": { "htmlContains": ["data-state=\"declined\"", "body", "Send?"], "htmlExcludes": ["anvil-submit"] }
     },
     {
       "id": "message-addresses-are-not-links",

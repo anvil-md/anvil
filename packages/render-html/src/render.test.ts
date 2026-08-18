@@ -250,12 +250,12 @@ describe('@message', () => {
     // The safety property of the whole block. A draft that renders like a sent
     // message is how a human concludes an email went out when it never did.
     const draft = renderAnvilFence(MESSAGE, true)
-    expect(draft).toContain('data-sent="no"')
+    expect(draft).toContain('data-state="draft"')
+    expect(draft).toContain('data-locked="no"')
     expect(draft).toContain('draft &middot; not sent')
-    expect(draft).toContain('>draft<')
 
     const sent = renderAnvilFence('@message channel=whatsapp to="+66900" sent=14:07\n> done', true)
-    expect(sent).toContain('data-sent="yes"')
+    expect(sent).toContain('data-state="sent"')
     expect(sent).toContain('sent · at 14:07')
     expect(sent).not.toContain('not sent')
   })
@@ -265,9 +265,60 @@ describe('@message', () => {
     // SENT when this was two exact-string comparisons.
     for (const v of ['false', 'No', 'NO', 'FALSE', '0', 'off', 'n', 'Never']) {
       const html = renderAnvilFence(`@message to=x sent=${v}\n> hi`, true)
-      expect(html).toContain('data-sent="no"')
+      expect(html).toContain('data-state="draft"')
       expect(html).toContain('not sent')
     }
+  })
+
+  test('the click is approval, not delivery', () => {
+    // A block that flipped straight to `sent` on the stamp would be claiming a
+    // delivery nobody witnessed -- the §4.15.1 lie, three seconds further on.
+    const approved = renderAnvilFence('@message to=a@x state=approved at=14:04 ask="Send?"\n> hi', true)
+    expect(approved).toContain('data-state="approved"')
+    expect(approved).toContain('approved &middot; sending')
+    expect(approved).not.toContain('>sent<')
+    // Locked: the question stays, the button does not.
+    expect(approved).toContain('data-locked="yes"')
+    expect(approved).toContain('Send?')
+    expect(approved).not.toContain('anvil-submit')
+  })
+
+  test('every state past draft renders differently and locks', () => {
+    for (const [state, pill] of [
+      ['approved', 'approved &middot; sending'],
+      ['sent', '>sent<'],
+      ['failed', '>not sent<'],
+      ['declined', '>declined<'],
+    ] as const) {
+      const html = renderAnvilFence(`@message to=a@x state=${state} ask="Send?"\n> hi`, true)
+      expect(html, state).toContain(`data-state="${state}"`)
+      expect(html, state).toContain(pill)
+      expect(html, state).toContain('data-locked="yes"')
+      expect(html, state).not.toContain('anvil-submit')
+    }
+  })
+
+  test('the gate becomes a receipt rather than vanishing', () => {
+    // §9.2: a stamped block keeps the height it had while open, and the gate is
+    // the tallest thing on a message.
+    const draft = renderAnvilFence('@message to=a@x ask="Send it?"\n> hi', true)
+    const sent = renderAnvilFence('@message to=a@x ask="Send it?" state=sent at=14:07 by=Ana\n> hi', true)
+    for (const html of [draft, sent]) expect(html).toContain('anvil-msg-gate')
+    expect(sent).toContain('anvil-msg-receipt')
+    // The question it was asked is part of the record (§4.1, same rule).
+    expect(sent).toContain('Send it?')
+    expect(sent).toContain('by Ana · at 14:07')
+  })
+
+  test('a failure says why, and error= alone is enough to mean failed', () => {
+    const html = renderAnvilFence('@message to=a@x ask="Send?" error="550 mailbox unavailable"\n> hi', true)
+    expect(html).toContain('data-state="failed"')
+    expect(html).toContain('550 mailbox unavailable')
+  })
+
+  test('state= wins over the sent= sugar', () => {
+    const html = renderAnvilFence('@message to=a@x sent=14:07 state=failed\n> hi', true)
+    expect(html).toContain('data-state="failed"')
   })
 
   test('addresses are text, never links', () => {

@@ -33,3 +33,6 @@ summary: "Twenty-two ways to get this wrong, ranked by how much each one hurts, 
 | 24 | A `mailto:` or live link inside a draft | addresses are text; the only affordance is the gate (§4.15.2) |
 | 25 | A stamp pointing at bytes someone else can change | snapshot or proxy `img=` / `@link` at stamp time (§4.12.2) |
 | 26 | A row parsed and then never drawn | render it or warn; never both parse and drop (§11) |
+| 27 | A stamp rendered as `sent` before delivery | the click is approval; the host writes the outcome (§4.15.5) |
+| 28 | A send gate that vanishes when it stamps | it becomes the receipt, at the same height (§4.15.5.2, §9.2) |
+| 29 | A state transition that animates a box model | opacity and transform only, or the block reflows (§4.15.5.3) |

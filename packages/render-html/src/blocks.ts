@@ -26,6 +26,7 @@ import {
   type MessageChannel,
   messageChannel,
   messageChrome,
+  messageState,
   type NoteTone,
   recipients,
   type TaskState,
@@ -541,12 +542,9 @@ export function renderMessage(b: AnvilBlock): string {
         </div>`
       : ''
 
-  const ask = attrString(b, 'ask')
-  const gate = ask
-    ? `<div class="anvil-prompt anvil-msg-ask"><span class="anvil-icon">${icon('send')}</span>${esc(ask)}</div>`
-    : ''
-
-  return `${envelope}${messageBody(b)}${attachments(b)}${gate}`
+  // The gate lives on the shell, not here: it has to become the receipt when
+  // the message stamps, and it must keep its height doing it (§9.2).
+  return `${envelope}${messageBody(b)}${attachments(b)}`
 }
 
 /**
@@ -563,8 +561,10 @@ const NEEDS_SUBMIT: Record<AnvilKind, (b: AnvilBlock) => boolean> = {
   card: b => askable(b) && isMulti(b),
   // A board is a record. Layout is not answerable at all (§4.14 L5).
   board: () => false,
-  // Sending is always one deliberate act, never a click-to-select.
-  message: askable,
+  // Sending is one deliberate act, never a click-to-select -- and only while
+  // the message is still a draft. A locked message keeps the question on
+  // screen (§9.2) but the button is gone, because it has been answered.
+  message: b => askable(b) && messageState(b) === 'draft',
   grid: () => false,
   stack: () => false,
 }

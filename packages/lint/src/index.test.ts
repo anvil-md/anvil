@@ -85,9 +85,34 @@ describe('errors', () => {
     expect(rules('@message to=a@x ask="Send?"\n? Subject only')).toContain('message-body-is-required')
   })
 
-  test('already sent and awaiting approval is a contradiction', () => {
-    expect(rules('@message to=a@x sent=14:00 ask="Send?"\n> hi')).toContain('message-sent-is-not-a-question')
-    expect(rules('@message to=a@x sent=no ask="Send?"\n> hi')).not.toContain('message-sent-is-not-a-question')
+  test('an unrecognised state falls back to draft, loudly', () => {
+    expect(messageFor('@message to=a@x state=posted\n> hi', 'message-state-is-known')).toContain('drawn as draft')
+    for (const s of ['draft', 'approved', 'sent', 'failed', 'declined']) {
+      expect(rules(`@message to=a@x state=${s} ask="Send?" at=1 error=x\n> hi`), s).not.toContain(
+        'message-state-is-known',
+      )
+    }
+  })
+
+  test('an outcome with no question attached to it', () => {
+    // The receipt is built from ask=; without it a stamped message shows an
+    // answer to nothing.
+    expect(rules('@message to=a@x state=sent at=14:07\n> hi')).toContain('message-locked-needs-no-gate')
+    expect(rules('@message to=a@x state=sent at=14:07 ask="Send?"\n> hi')).not.toContain('message-locked-needs-no-gate')
+  })
+
+  test('a terminal state should carry its timestamp', () => {
+    expect(rules('@message to=a@x state=sent ask="Send?"\n> hi')).toContain('message-outcome-needs-a-time')
+    expect(rules('@message to=a@x state=sent at=14:07 ask="Send?"\n> hi')).not.toContain('message-outcome-needs-a-time')
+    // sent=<time> is the sugar, and it counts.
+    expect(rules('@message to=a@x sent=14:07 ask="Send?"\n> hi')).not.toContain('message-outcome-needs-a-time')
+  })
+
+  test('a failure has to say what broke', () => {
+    expect(rules('@message to=a@x state=failed at=1 ask="Send?"\n> hi')).toContain('message-failure-says-why')
+    expect(rules('@message to=a@x error="550 mailbox unavailable" at=1 ask="Send?"\n> hi')).not.toContain(
+      'message-failure-says-why',
+    )
   })
 })
 

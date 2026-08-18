@@ -951,8 +951,28 @@
  * reading a word of the body -- so it gets a warning-toned pill on the frame
  * and a dashed edge, and `sent` has to be asserted before either goes away. */
 
+/* THE STATE TRANSITION.
+ *
+ * Everything below is driven by ONE attribute on the frame -- `data-state` --
+ * so a host that stamps by swapping that attribute on the live element gets the
+ * whole animation for free, with no JavaScript in this package and no second
+ * render. Colour, border and background all transition; the pill also runs a
+ * one-shot keyframe, which fires when the node is (re)created, so a host that
+ * re-renders the whole string is covered too.
+ *
+ * draft ──stamp──► approved ──host──► sent | failed
+ *   └───stamp────► declined
+ *
+ * The five states carry five different accents on purpose. `approved` is NOT
+ * `sent`: the human has said yes and the wire has not answered yet, and a block
+ * that jumped straight to green would be claiming a delivery nobody witnessed.
+ */
+
 .anvil-msg-state {
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
   font-family: var(--anvil-mono);
   font-size: 0.66em;
   letter-spacing: 0.06em;
@@ -960,22 +980,180 @@
   padding: 0.1rem 0.45rem;
   border-radius: 999px;
   white-space: nowrap;
+  border: 1px solid transparent;
+  transition:
+    color 260ms ease,
+    background-color 260ms ease,
+    border-color 260ms ease;
 }
 
-.anvil-msg-state[data-sent='no'] {
+.anvil-msg-state .anvil-svg {
+  width: 1em;
+  height: 1em;
+}
+
+.anvil-msg[data-state='draft'] .anvil-msg-state {
   color: var(--anvil-warn);
   background: color-mix(in srgb, var(--anvil-warn) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--anvil-warn) 45%, transparent);
+  border-color: color-mix(in srgb, var(--anvil-warn) 45%, transparent);
 }
 
-.anvil-msg-state[data-sent='yes'] {
+.anvil-msg[data-state='approved'] .anvil-msg-state {
+  color: var(--anvil-primary);
+  background: color-mix(in srgb, var(--anvil-primary) 12%, transparent);
+  border-color: color-mix(in srgb, var(--anvil-primary) 45%, transparent);
+}
+
+.anvil-msg[data-state='sent'] .anvil-msg-state {
+  color: var(--anvil-ok);
+  background: color-mix(in srgb, var(--anvil-ok) 12%, transparent);
+  border-color: color-mix(in srgb, var(--anvil-ok) 45%, transparent);
+}
+
+.anvil-msg[data-state='failed'] .anvil-msg-state {
+  color: var(--anvil-danger);
+  background: color-mix(in srgb, var(--anvil-danger) 12%, transparent);
+  border-color: color-mix(in srgb, var(--anvil-danger) 45%, transparent);
+}
+
+.anvil-msg[data-state='declined'] .anvil-msg-state {
   color: var(--anvil-muted-fg);
-  border: 1px solid var(--anvil-border);
+  border-color: var(--anvil-border);
 }
 
-.anvil-msg[data-sent='no'] {
+/* A dashed edge means "this has not happened yet", and it is the one thing on
+   the block readable from across the room. It survives `approved`, because
+   approved is not delivered either. */
+.anvil-msg[data-state='draft'],
+.anvil-msg[data-state='approved'] {
   border-style: dashed;
+}
+
+.anvil-msg {
+  transition: border-color 260ms ease;
+}
+
+.anvil-msg[data-state='draft'] {
   border-color: color-mix(in srgb, var(--anvil-warn) 40%, var(--anvil-border));
+}
+
+.anvil-msg[data-state='approved'] {
+  border-color: color-mix(in srgb, var(--anvil-primary) 40%, var(--anvil-border));
+}
+
+.anvil-msg[data-state='sent'] {
+  border-color: color-mix(in srgb, var(--anvil-ok) 35%, var(--anvil-border));
+}
+
+.anvil-msg[data-state='failed'] {
+  border-color: color-mix(in srgb, var(--anvil-danger) 45%, var(--anvil-border));
+}
+
+/* One-shot, for the host that re-renders rather than swapping the attribute.
+   Opacity and transform only: both are compositor-only, so the frame cannot
+   reflow mid-animation and §9.2's fixed height survives. */
+@keyframes anvil-settle {
+  from {
+    opacity: 0;
+    transform: translateY(-2px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.anvil-msg[data-locked='yes'] .anvil-msg-state,
+.anvil-msg[data-locked='yes'] .anvil-msg-answer {
+  animation: anvil-settle 260ms ease-out both;
+}
+
+/* THE GATE AND THE RECEIPT ARE THE SAME BOX.
+ *
+ * §9.2: a stamped block occupies exactly the height it did while open. The gate
+ * is the tallest thing on a message, so letting it vanish would jump every
+ * pixel below it up the page at the moment the human is looking for
+ * confirmation. It transforms; it does not disappear.
+ *
+ * min-height is the row height with a button in it, so the receipt -- which has
+ * no button -- lands on the same line. */
+.anvil-msg-gate {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.1rem;
+  margin-top: 0.75rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--anvil-border);
+}
+
+.anvil-msg-gate .anvil-actions {
+  margin: 0 0 0 auto;
+}
+
+.anvil-msg-gate .anvil-msg-ask {
+  margin: 0;
+  font-size: 0.92em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Answered, so it reads as a record rather than a question. The text stays at
+   full contrast: what the human approved is the most important sentence in the
+   block, not the least. */
+.anvil-msg-receipt .anvil-msg-ask .anvil-svg {
+  width: 1.05em;
+  height: 1.05em;
+}
+
+.anvil-msg-answer {
+  margin-left: auto;
+  font-family: var(--anvil-mono);
+  font-size: 0.7em;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.anvil-msg-by {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--anvil-muted-fg);
+}
+
+.anvil-msg-error {
+  flex-basis: 100%;
+  font-size: 0.8em;
+  color: var(--anvil-danger);
+}
+
+.anvil-msg[data-state='sent'] .anvil-msg-answer,
+.anvil-msg[data-state='sent'] .anvil-msg-receipt .anvil-svg {
+  color: var(--anvil-ok);
+}
+
+.anvil-msg[data-state='approved'] .anvil-msg-answer,
+.anvil-msg[data-state='approved'] .anvil-msg-receipt .anvil-svg {
+  color: var(--anvil-primary);
+}
+
+.anvil-msg[data-state='failed'] .anvil-msg-answer,
+.anvil-msg[data-state='failed'] .anvil-msg-receipt .anvil-svg {
+  color: var(--anvil-danger);
+}
+
+.anvil-msg[data-state='declined'] .anvil-msg-answer,
+.anvil-msg[data-state='declined'] .anvil-msg-receipt .anvil-svg {
+  color: var(--anvil-muted-fg);
+}
+
+/* A declined message is struck through the way a @void block is: the record
+   stays legible, and it stops pretending it is going anywhere. */
+.anvil-msg[data-state='declined'] .anvil-msg-body,
+.anvil-msg[data-state='declined'] .anvil-envelope {
+  opacity: 0.6;
 }
 
 .anvil-msg-danger {
@@ -1103,8 +1281,15 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .anvil-task-detail {
+  .anvil-task-detail,
+  .anvil-msg,
+  .anvil-msg-state {
     transition: none;
+  }
+  /* The state must still be legible; only the movement goes. */
+  .anvil-msg[data-locked='yes'] .anvil-msg-state,
+  .anvil-msg[data-locked='yes'] .anvil-msg-answer {
+    animation: none;
   }
 }
 
