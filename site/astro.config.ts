@@ -129,6 +129,9 @@ export default defineConfig({
 				'@anvil-md/parser': new URL('../packages/parser/src/index.ts', import.meta.url).pathname,
 				'@anvil-md/render-html': new URL('../packages/render-html/src/index.ts', import.meta.url)
 					.pathname,
+				// Used by the examples test, which refuses to let the examples page
+				// teach ANVIL that the linter rejects.
+				'@anvil-md/lint': new URL('../packages/lint/src/index.ts', import.meta.url).pathname,
 			},
 		},
 		build: {

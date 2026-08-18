@@ -168,8 +168,7 @@ const MESSAGE = `# A message an agent proposes to send. It renders as a DRAFT
 # until something asserts otherwise - add state=sent at=14:07 and
 # watch the frame, the pill and the gate all change together.
 
-@message channel=email to="jonas@duplo.org" cc="ana@x.dev, kit@x.dev"
-         from="bot@frst.dev" ask="Send it?"
+@message channel=email to="jonas@duplo.org" cc="ana@x.dev" from="bot@frst.dev" ask="Send it?"
 ? Re: the retry ladder
 > Hey Jonas,
 >
@@ -205,8 +204,7 @@ const LIFECYCLE = `# THE CLICK IS APPROVAL, NOT DELIVERY.
 ? Re: the retry ladder
 > The ladder is in. Three attempts, then dead-letter.
 
-@message channel=email to="j@duplo.org" ask="Send it?" at=14:04:23 by=Ana
-         error="550 mailbox unavailable"
+@message channel=email to="j@duplo.org" ask="Send it?" at=14:04:26 by=Ana error="550 mailbox unavailable"
 ? Re: the retry ladder
 > The ladder is in. Three attempts, then dead-letter.
 @end`

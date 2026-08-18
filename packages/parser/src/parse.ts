@@ -26,6 +26,9 @@ const DEFAULT_STEPS = 5
 const HEADER = /^@(\w+)\s*(.*)$/
 const ATTR = /([A-Za-z_][\w-]*)(?:=(?:"([^"]*)"|'([^']*)'|(\S+)))?/g
 
+/** A sigil-less line that opens with `key=` -- almost always a wrapped header. */
+const WRAPPED_HEADER = /^[A-Za-z_][\w-]*=/
+
 /** The kinds whose `-` rows are tasks rather than options. */
 const TASK_KINDS = new Set<AnvilKind>(['card', 'board'])
 
@@ -329,8 +332,19 @@ export function parseAnvil(source: string, opts: { partial?: boolean } = {}): An
       continue
     }
 
-    if (handler) handler(line.slice(1).trim(), cur)
-    else cur.block.prompt = join(cur.block.prompt, line, '\n')
+    if (handler) {
+      handler(line.slice(1).trim(), cur)
+      continue
+    }
+
+    // A block header is ONE LINE (§3.2). An agent with a long attribute list
+    // will wrap it anyway, and the sigil-less fallback below then folds
+    // `from="…" ask="…"` into the prompt -- so the block loses its attributes,
+    // gains a line of machine text as its title, and says nothing about either.
+    if (WRAPPED_HEADER.test(line)) {
+      cur.block.warnings.push(`"${line.split(/\s+/)[0]}" looks like a wrapped @ header; keep attributes on one line`)
+    }
+    cur.block.prompt = join(cur.block.prompt, line, '\n')
   }
 
   // An unclosed container is not an error. A fence truncated mid-grid must

@@ -199,6 +199,16 @@ describe('@card', () => {
     expect(b?.warnings.join(' ')).toContain('no [ ] state')
   })
 
+  test('a wrapped header is caught, because otherwise it is invisible', () => {
+    // §3.2 ends a header at the newline, so the second line was folded into the
+    // prompt: the block lost `ask=` and gained a line of machine text as its
+    // title, and said nothing about either.
+    const [b] = parseAnvil('@message channel=email to="a@x"\n         from="b@x" ask="Send?"\n> hi').blocks
+    expect(b?.warnings.join(' ')).toContain('wrapped @ header')
+    // Prose that merely contains an `=` is not a wrapped header.
+    expect(parseAnvil('@choice id=c\nx = y + 1\n- a | A').blocks[0]?.warnings).toEqual([])
+  })
+
   test('an unknown checkbox character degrades to todo with a warning', () => {
     const [b] = parseAnvil('@card id=c\n- [z] ANV-1 | Something').blocks
     expect(b?.tasks[0]?.state).toBe('todo')

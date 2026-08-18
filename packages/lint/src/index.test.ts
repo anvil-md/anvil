@@ -94,11 +94,36 @@ describe('errors', () => {
     }
   })
 
-  test('an outcome with no question attached to it', () => {
-    // The receipt is built from ask=; without it a stamped message shows an
-    // answer to nothing.
-    expect(rules('@message to=a@x state=sent at=14:07\n> hi')).toContain('message-locked-needs-no-gate')
-    expect(rules('@message to=a@x state=sent at=14:07 ask="Send?"\n> hi')).not.toContain('message-locked-needs-no-gate')
+  test('a stamped state with nothing that could have been stamped', () => {
+    for (const s of ['approved', 'declined']) {
+      expect(rules(`@message to=a@x state=${s} at=1\n> hi`), s).toContain('message-stamped-state-needs-a-gate')
+    }
+    // But `sent` and `failed` need no gate. An agent authorised in advance
+    // sends first and shows the record afterwards, which is a real thing to
+    // want, and requiring a question there would ban it.
+    for (const s of ['sent', 'failed']) {
+      expect(rules(`@message to=a@x state=${s} at=1 error=x\n> hi`), s).not.toContain(
+        'message-stamped-state-needs-a-gate',
+      )
+    }
+  })
+
+  test('a message that has already been answered is not a question in a grid', () => {
+    // Four sent messages side by side is a gallery of outcomes, not a form.
+    const outcomes = `@grid cols=2
+@message to=a@x ask="Send?" state=sent at=1
+> a
+@message to=b@x ask="Send?" state=failed at=1 error=x
+> b
+@end`
+    expect(rules(outcomes)).not.toContain('no-question-in-a-grid')
+    const drafts = `@grid cols=2
+@message to=a@x ask="Send?"
+> a
+@message to=b@x ask="Send?"
+> b
+@end`
+    expect(rules(drafts)).toContain('no-question-in-a-grid')
   })
 
   test('a terminal state should carry its timestamp', () => {

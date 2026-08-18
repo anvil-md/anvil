@@ -48,10 +48,18 @@ export interface Rule {
   run: (blocks: AnvilBlock[], report: (b: AnvilBlock | null, message: string) => void) => void
 }
 
-/** Blocks that ask something, and therefore stamp. */
+/**
+ * Blocks that are asking something RIGHT NOW, and will therefore stamp.
+ *
+ * A message past `draft` has already been answered, so it is a record with a
+ * receipt on it, not a question -- and four sent messages in a grid is a
+ * gallery of outcomes rather than the form `no-question-in-a-grid` is worried
+ * about.
+ */
 function isAsk(b: AnvilBlock): boolean {
   if (b.kind === 'choice' || b.kind === 'gallery' || b.kind === 'input' || b.kind === 'scale') return true
-  if (b.kind === 'card' || b.kind === 'message') return attrString(b, 'ask').length > 0
+  if (b.kind === 'card') return attrString(b, 'ask').length > 0
+  if (b.kind === 'message') return attrString(b, 'ask').length > 0 && messageState(b) === 'draft'
   return false
 }
 
@@ -156,18 +164,20 @@ export const RULES: Rule[] = [
     },
   },
   {
-    id: 'message-locked-needs-no-gate',
+    id: 'message-stamped-state-needs-a-gate',
     severity: 'warn',
     spec: '4.15.5',
-    about: 'A message past draft keeps its question but can no longer be answered.',
+    about: 'approved and declined are written by a stamp, so there must be something that was stamped.',
     run(blocks, report) {
       for (const b of blocks) {
-        if (b.kind !== 'message') continue
+        if (b.kind !== 'message' || attrString(b, 'ask')) continue
         const state = messageState(b)
-        if (state === 'draft' || attrString(b, 'ask')) continue
-        // The receipt is built from `ask=`. Without it a stamped message has no
-        // record of what the human was actually asked.
-        report(b, `state="${state}" with no ask=: the block shows an outcome with no question attached to it`)
+        // Only the two states a STAMP can produce. `sent` and `failed` are fine
+        // without a gate: an agent that was authorised in advance sends first
+        // and shows the record afterwards, and that record is a real thing to
+        // want. Requiring a question there would ban it.
+        if (state !== 'approved' && state !== 'declined') continue
+        report(b, `state="${state}" is written by a stamp, but there is no ask= for anyone to have stamped`)
       }
     },
   },

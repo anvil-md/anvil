@@ -759,14 +759,20 @@ SMS, a Slack post. Rendered with the chrome of the thing it will become, so the
 human reads it the way the recipient will.
 
 ```anvil
-@message channel=email to="j@duplo.org" cc="ana@x.dev, kit@x.dev"
-         from="bot@frst.dev" ask="Send it?"
+@message channel=email to="j@duplo.org" cc="ana@x.dev" from="bot@frst.dev" ask="Send it?"
 ? Re: the retry ladder
 > Hey Jonas,
 >
 > The retry ladder is in. Three attempts, then dead-letter.
 + patch.diff | 4 KB
 ```
+
+**A header is one line.** It gets long, and wrapping it is the obvious thing to
+reach for -- but §3.2's grammar ends the header at the newline, so a wrapped
+attribute list is parsed as prompt text and the block silently loses every
+attribute after the break. The parser warns when a sigil-less line opens with
+`key=`, because the failure is otherwise invisible: the block renders, with a
+line of machine text where its title should be.
 
 ```
    ╭─ EMAIL ───────────────────────────────── draft · not sent ──╮
@@ -1377,6 +1383,7 @@ reorder. A positional id lands the stamp on the wrong block.
 | 27 | A stamp rendered as `sent` before delivery | the click is approval; the host writes the outcome (§4.15.5) |
 | 28 | A send gate that vanishes when it stamps | it becomes the receipt, at the same height (§4.15.5.2, §9.2) |
 | 29 | A state transition that animates a box model | opacity and transform only, or the block reflows (§4.15.5.3) |
+| 30 | A wrapped `@` header losing half its attributes | headers are one line; the parser warns on a `key=` continuation (§3.2) |
 
 ---
 

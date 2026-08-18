@@ -7,7 +7,8 @@
 		"paths": {
 			"@/*": ["./src/*"],
 			"@anvil-md/parser": ["../packages/parser/src/index.ts"],
-			"@anvil-md/render-html": ["../packages/render-html/src/index.ts"]
+			"@anvil-md/render-html": ["../packages/render-html/src/index.ts"],
+			"@anvil-md/lint": ["../packages/lint/src/index.ts"]
 		}
 	}
 }

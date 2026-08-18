@@ -1,0 +1,244 @@
+---
+import Masthead from '@/components/Masthead.astro'
+import SiteFooter from '@/components/SiteFooter.astro'
+import { GROUPS } from '@/content/examples'
+import { ghostHtml } from '@/scripts/highlight'
+import BaseLayout from '@/layouts/BaseLayout.astro'
+import { parseAnvil } from '@anvil-md/parser'
+import { renderAnvilFence } from '@anvil-md/render-html'
+
+/**
+ * Every block on this page is produced at BUILD TIME by the same two functions
+ * a host calls inside its markdown renderer. Nothing here is a screenshot and
+ * nothing is hand-written HTML -- so when a block regresses, this page shows the
+ * regression instead of the intention.
+ */
+const rendered = GROUPS.map((group) => ({
+	...group,
+	examples: group.examples.map((ex) => ({
+		...ex,
+		html: renderAnvilFence(ex.source, true),
+		ghost: ghostHtml(ex.source),
+		blocks: parseAnvil(ex.source).blocks.length,
+	})),
+}))
+
+const total = rendered.reduce((n, g) => n + g.examples.length, 0)
+---
+
+<BaseLayout
+	title="ANVIL examples - every block, rendered"
+	description="Every ANVIL block rendered by the reference implementation, with the source beside it. Cards, boards, messages, layout containers, and what the parser does when the agent gets it wrong."
+>
+	<Masthead />
+
+	<main class="mx-auto max-w-5xl px-5 pb-24 lg:px-6">
+		<!-- ── Heading ──────────────────────────────────────────────── -->
+		<section class="py-12 sm:py-14">
+			<p class="clause-label mb-6">Appendix &nbsp;&middot;&nbsp; Examples</p>
+
+			<h1
+				class="max-w-3xl font-serif text-3xl leading-[1.12] tracking-[-0.01em] text-ink sm:text-4xl"
+			>
+				The whole language, <span class="text-accent-ink">drawn.</span>
+			</h1>
+
+			<p class="mt-6 max-w-2xl text-lg leading-relaxed text-ink-soft">
+				Source on the left, what the reference renderer makes of it on the right. Every block below
+				was produced at build time by <span class="font-mono text-base">renderAnvilFence</span>, so
+				this page cannot show you something the packages do not actually do.
+			</p>
+
+			<dl
+				class="mt-8 grid max-w-2xl grid-cols-[auto_1fr] gap-x-6 gap-y-2.5 border-t border-rule pt-6 font-mono text-xs"
+			>
+				<dt class="text-ink-faint">EXAMPLES</dt>
+				<dd class="text-ink-soft">{total}, every one real ANVIL a test lints on each run.</dd>
+				<dt class="text-ink-faint">DISPLAY</dt>
+				<dd class="text-ink-soft">
+					Controls are inert by design - this draws a block, it does not run one.
+				</dd>
+				<dt class="text-ink-faint">TRY IT</dt>
+				<dd class="text-ink-soft">
+					Every source here pastes straight into the <a href="/playground/" class="doc-link"
+						>playground</a
+					>.
+				</dd>
+			</dl>
+
+			<!-- Index. A long page owes the reader a way past it. -->
+			<nav class="mt-9 flex flex-wrap gap-x-5 gap-y-2 border-t border-rule pt-6">
+				{
+					rendered.map((g) => (
+						<a href={`#${g.id}`} class="font-mono text-xs text-ink-soft hover:text-accent-ink">
+							{g.title}
+							<span class="text-ink-faint"> {g.examples.length}</span>
+						</a>
+					))
+				}
+			</nav>
+		</section>
+
+		{
+			rendered.map((group) => (
+				<section id={group.id} class="rule-tick scroll-mt-20 pt-10 pb-4">
+					<p class="clause-label mb-5">{group.title}</p>
+					<p class="max-w-2xl text-ink-soft leading-relaxed">{group.blurb}</p>
+
+					{group.examples.map((ex) => (
+						<article id={ex.id} class="ex scroll-mt-20">
+							<header class="ex-head">
+								<h2 class="ex-title">{ex.title}</h2>
+								<a
+									href={`/spec/#${ex.spec}`}
+									class="ex-spec"
+									title={`Specification section ${ex.spec}`}
+								>
+									&sect;{ex.spec}
+								</a>
+								<a href={`#${ex.id}`} class="ex-anchor" aria-label={`Link to ${ex.title}`}>
+									#
+								</a>
+							</header>
+
+							<p class="ex-note" set:html={ex.note.replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\*([^*]+)\*/g, '<em>$1</em>')} />
+
+							<div class={ex.wide ? 'ex-panes ex-panes-stacked' : 'ex-panes src-pair'}>
+								<div>
+									<p class="clause-label mb-2">Source</p>
+									<pre class="src-well anvil-syntax"><code set:html={ex.ghost} /></pre>
+								</div>
+								<div>
+									<p class="clause-label mb-2">Rendered</p>
+									<div class="ex-out" set:html={ex.html} />
+								</div>
+							</div>
+						</article>
+					))}
+				</section>
+			))
+		}
+
+		<!-- ── Close ────────────────────────────────────────────────── -->
+		<section class="rule-tick pt-10 pb-12">
+			<p class="clause-label mb-5">Next</p>
+			<h2 class="max-w-2xl font-serif text-2xl leading-tight text-ink">
+				Nothing above is a special case.
+			</h2>
+
+			<div class="doc-prose mt-6 max-w-2xl">
+				<p>
+					Two functions produced every block on this page, from the strings printed beside them.
+					Both packages are zero-dependency and DOM-free, so the same call runs in a browser tab, in
+					a Worker, or in whatever renders your transcript.
+					<a href="/playground/" class="doc-link">Edit any of it in the playground</a>, or read
+					<a href="/spec/" class="doc-link">the specification</a> for the grammar and the rules each
+					of these is obeying.
+				</p>
+			</div>
+		</section>
+	</main>
+
+	<SiteFooter />
+</BaseLayout>
+
+<style>
+	/* An example is a numbered clause with two panes, not a card. Hairlines and
+	   space do the separating; nothing floats, rounds or glows. */
+	.ex {
+		padding-top: 2.25rem;
+		margin-top: 2.25rem;
+		border-top: 1px solid var(--rule);
+	}
+
+	.ex-head {
+		display: flex;
+		align-items: baseline;
+		gap: 0.7rem;
+	}
+
+	.ex-title {
+		font-family: var(--font-mono);
+		font-size: 0.95rem;
+		font-weight: 600;
+		color: var(--ink);
+		letter-spacing: -0.01em;
+	}
+
+	.ex-spec {
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		color: var(--ink-faint);
+		white-space: nowrap;
+	}
+
+	.ex-spec:hover {
+		color: var(--accent-ink);
+	}
+
+	/* Present but quiet until the row is hovered: a permalink is for the person
+	   who already wants one. */
+	.ex-anchor {
+		margin-left: auto;
+		font-family: var(--font-mono);
+		font-size: 0.8rem;
+		color: transparent;
+		transition: color 0.15s;
+	}
+
+	.ex:hover .ex-anchor,
+	.ex-anchor:focus-visible {
+		color: var(--ink-faint);
+	}
+
+	.ex-anchor:hover {
+		color: var(--accent-ink);
+	}
+
+	.ex-note {
+		margin-top: 0.55rem;
+		max-width: 46rem;
+		font-size: 0.9rem;
+		line-height: 1.7;
+		color: var(--ink-soft);
+	}
+
+	.ex-note :global(code) {
+		font-family: var(--font-mono);
+		font-size: 0.84em;
+		background: var(--paper-sunk);
+		border: 1px solid var(--rule);
+		border-radius: var(--radius);
+		padding: 0.08em 0.35em;
+	}
+
+	.ex-note :global(strong) {
+		font-weight: 600;
+		color: var(--ink);
+	}
+
+	.ex-panes {
+		display: grid;
+		gap: 1.25rem;
+		margin-top: 1.25rem;
+	}
+
+	/* Two columns only when there is room. This is the one place a breakpoint is
+	   legitimate: it is a page deciding its own layout, not an agent guessing at
+	   a screen it cannot see. */
+	@media (min-width: 62rem) {
+		.ex-panes:not(.ex-panes-stacked) {
+			grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		}
+	}
+
+	/* A board, a grid or a lifecycle row needs the full column to be honest about
+	   how it collapses, so those stack instead. */
+	.ex-panes-stacked {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.ex-out {
+		min-height: 4rem;
+	}
+</style>

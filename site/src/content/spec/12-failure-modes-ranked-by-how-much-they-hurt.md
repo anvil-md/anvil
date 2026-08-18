@@ -36,3 +36,4 @@ summary: "Twenty-two ways to get this wrong, ranked by how much each one hurts, 
 | 27 | A stamp rendered as `sent` before delivery | the click is approval; the host writes the outcome (§4.15.5) |
 | 28 | A send gate that vanishes when it stamps | it becomes the receipt, at the same height (§4.15.5.2, §9.2) |
 | 29 | A state transition that animates a box model | opacity and transform only, or the block reflows (§4.15.5.3) |
+| 30 | A wrapped `@` header losing half its attributes | headers are one line; the parser warns on a `key=` continuation (§3.2) |
