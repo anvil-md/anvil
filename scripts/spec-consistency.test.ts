@@ -13,6 +13,7 @@
 import { describe, expect, test } from 'bun:test'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { lintMarkdown } from '../packages/lint/src/index'
 import { type AnvilBlock, type AnvilDoc, parseAnvil, taskProgress } from '../packages/parser/src/index'
 
 const ROOT = new URL('..', import.meta.url).pathname
@@ -150,6 +151,20 @@ describe('SPEC.md examples', () => {
     }
 
     expect(wrong).toEqual([])
+  })
+
+  test('the specification lints clean against its own linter', () => {
+    // Dogfood. If a rule fires on the document that defines the rule, one of
+    // the two is wrong -- and finding out which is exactly the argument for
+    // having a linter. (This caught `danger-needs-a-phrase` firing on §4.1's
+    // own `- !scrap` row, which turned out to be the rule, not the example.)
+    const report = lintMarkdown(src, 'SPEC.md')
+    const real = report.fences.flatMap(f =>
+      f.result.diagnostics.filter(
+        d => !(d.rule === 'parse-warning' && UNIMPLEMENTED.some(k => d.message === `unknown block "@${k}"`)),
+      ),
+    )
+    expect(real.map(d => `${d.rule}: ${d.message}`)).toEqual([])
   })
 
   test('a lane count in a picture matches the rows in its source', () => {

@@ -8,7 +8,7 @@ A tiny DSL an LLM writes inside a fenced code block, which renders as **real UI
 inline in the conversation**. Every interaction compiles back to structured text
 the model reads as an ordinary turn.
 
-[Spec](./SPEC.md) · [Parser](./packages/parser) · [HTML renderer](./packages/render-html) · [anvil-md.frst.dev](https://anvil-md.frst.dev)
+[Spec](./SPEC.md) · [Parser](./packages/parser) · [HTML renderer](./packages/render-html) · [Linter](./packages/lint) · [Conformance](./packages/conformance) · [anvil-md.frst.dev](https://anvil-md.frst.dev)
 
 </div>
 
@@ -85,6 +85,8 @@ block visibly provisional and never answerable.
 |---|---|---|
 | [`@anvil-md/parser`](./packages/parser) | Document model + parser. Zero dependencies, no DOM. | Stable |
 | [`@anvil-md/render-html`](./packages/render-html) | Fence -> HTML string, plus a baseline stylesheet. | Display only |
+| [`@anvil-md/lint`](./packages/lint) | `anvil-lint`: the checks a total parser cannot make. | Stable |
+| [`@anvil-md/conformance`](./packages/conformance) | The corpus. One JSON file, any language. | Stable |
 
 **Integrations** -- thin adapters so you do not hand-wire the fence branch:
 

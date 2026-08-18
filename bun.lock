@@ -13,6 +13,17 @@
         "typescript": "^5.7.0",
       },
     },
+    "packages/conformance": {
+      "name": "@anvil-md/conformance",
+      "version": "0.1.0",
+    },
+    "packages/lint": {
+      "name": "@anvil-md/lint",
+      "version": "0.1.0",
+      "bin": {
+        "anvil-lint": "./src/cli.ts",
+      },
+    },
     "packages/markdown-it": {
       "name": "@anvil-md/markdown-it",
       "version": "0.1.0",
@@ -57,6 +68,10 @@
     },
   },
   "packages": {
+    "@anvil-md/conformance": ["@anvil-md/conformance@workspace:packages/conformance"],
+
+    "@anvil-md/lint": ["@anvil-md/lint@workspace:packages/lint"],
+
     "@anvil-md/markdown-it": ["@anvil-md/markdown-it@workspace:packages/markdown-it"],
 
     "@anvil-md/marked": ["@anvil-md/marked@workspace:packages/marked"],
