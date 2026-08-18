@@ -1,0 +1,423 @@
+{
+  "version": 1,
+  "about": "The ANVIL conformance corpus. Every case is a source string plus what any conformant implementation must make of it. Language-agnostic on purpose: read this file, run your parser, compare. See README.md for the schema and §14 of SPEC.md for what conformance means.",
+  "cases": [
+    {
+      "id": "choice-basic",
+      "spec": "4.1",
+      "title": "a choice keeps its rows in order, with hints",
+      "source": "@choice id=deploy\n? Where?\n: Staging is wiped nightly.\n- prod  | Production | live traffic\n- stage | Staging",
+      "expect": {
+        "blocks": [
+          {
+            "kind": "choice",
+            "id": "deploy",
+            "derivedId": false,
+            "prompt": "Where?",
+            "subtext": "Staging is wiped nightly.",
+            "optionValues": ["prod", "stage"]
+          }
+        ],
+        "warnings": []
+      }
+    },
+    {
+      "id": "choice-danger-row",
+      "spec": "4.1",
+      "title": "a ! prefix marks one row destructive without touching the value",
+      "source": "@choice id=c\n? Q\n- !wipe | Start over",
+      "expect": { "blocks": [{ "kind": "choice", "optionValues": ["wipe"] }], "warnings": [] }
+    },
+    {
+      "id": "derived-id-is-content-not-position",
+      "spec": "11",
+      "title": "two identical blocks in different positions derive the same id",
+      "source": "@note\n> filler\n\n@choice\n? Q\n- a | A",
+      "expect": { "blocks": [{ "kind": "note" }, { "kind": "choice", "derivedId": true }] },
+      "sameDerivedIdAs": "@choice\n? Q\n- a | A"
+    },
+    {
+      "id": "unknown-kind-warns-and-renders",
+      "spec": "11",
+      "title": "an unknown block becomes a warned note rather than nothing",
+      "source": "@wormhole id=x\n? hi",
+      "expect": {
+        "blocks": [{ "kind": "note" }],
+        "warningsContain": ["unknown block"]
+      }
+    },
+    {
+      "id": "unknown-field-type-falls-back",
+      "spec": "4.3",
+      "title": "an unknown field type becomes text and says so",
+      "source": "@input id=i\n_ email | emial | Email",
+      "expect": { "blocks": [{ "kind": "input" }], "warningsContain": ["unknown field type"] }
+    },
+    {
+      "id": "secret-never-renders-in-the-clear",
+      "spec": "4.3",
+      "title": "a secret field is masked by the control, not by the value",
+      "source": "@input id=i\n_ token | secret | API key",
+      "expect": { "htmlContains": ["type=\"password\""] }
+    },
+
+    {
+      "id": "card-progress-is-counted",
+      "spec": "4.12.1",
+      "title": "the bar is counted from the rows and no attribute can move it",
+      "source": "@card id=c progress=99 done=9 total=9\n? T\n- [x] a\n- [ ] b\n- [ ] c",
+      "expect": {
+        "blocks": [{ "kind": "card", "taskStates": ["done", "todo", "todo"], "progress": { "done": 1, "total": 3, "pct": 33 } }],
+        "htmlContains": ["1/3 · 33%"],
+        "htmlExcludes": ["9/9"]
+      }
+    },
+    {
+      "id": "card-checkbox-states",
+      "spec": "4.12",
+      "title": "four states, plus the two in-flight aliases",
+      "source": "@card id=c\n- [ ] a\n- [x] b\n- [~] c\n- [!] d\n- [/] e\n- [-] f",
+      "expect": {
+        "blocks": [{ "taskStates": ["todo", "done", "flight", "blocked", "flight", "flight"] }],
+        "warnings": []
+      }
+    },
+    {
+      "id": "card-ref-doubles-as-label",
+      "spec": "4.12",
+      "title": "one cell means the ref is the label, exactly as an option value is",
+      "source": "@card id=c\n- [ ] Write the runbook",
+      "expect": { "blocks": [{ "taskRefs": ["Write the runbook"], "taskLabels": ["Write the runbook"] }] }
+    },
+    {
+      "id": "card-epic-rollup",
+      "spec": "4.12.1",
+      "title": "a parent sums the n/m its children carry",
+      "source": "@card id=e type=epic\n- [~] A | Story A | 3/7\n- [x] B | Story B | 6/6\n- [ ] C | Story C | 0/9",
+      "expect": {
+        "blocks": [{ "progress": { "done": 9, "total": 22, "pct": 41, "rollup": true } }],
+        "htmlContains": ["9/22"]
+      }
+    },
+    {
+      "id": "card-rollup-mixed-with-bare-rows",
+      "spec": "4.12.1",
+      "title": "a bare row counts as one of one once any row rolls up",
+      "source": "@card id=e\n- [~] A | Story A | 3/7\n- [x] B | Story B",
+      "expect": { "blocks": [{ "progress": { "done": 4, "total": 8, "rollup": true } }] }
+    },
+    {
+      "id": "card-rollup-needs-a-separator",
+      "spec": "4.12.1",
+      "title": "a date in the meta cell is not a count",
+      "source": "@card id=c\n- [ ] ANV-1 | Ship it | due 24/12",
+      "expect": {
+        "blocks": [{ "progress": { "done": 0, "total": 1 }, "taskRollups": [null] }],
+        "warningsContain": ["not a rollup"]
+      }
+    },
+    {
+      "id": "card-rollup-after-separator",
+      "spec": "4.12.1",
+      "title": "a count after an explicit separator rolls up and keeps the rest of the cell",
+      "source": "@card id=c\n- [~] A | Story | Kit · 6/6",
+      "expect": { "blocks": [{ "taskMeta": ["Kit"], "progress": { "done": 6, "total": 6 } }], "warnings": [] }
+    },
+    {
+      "id": "card-rollup-refuses-impossible-counts",
+      "spec": "4.12.1",
+      "title": "more done than total is refused, not clamped into a confident lie",
+      "source": "@card id=c\n- [~] A | Story | 9/4",
+      "expect": { "blocks": [{ "taskRollups": [null] }], "warningsContain": ["more done than total"] }
+    },
+    {
+      "id": "card-status-loses-to-the-rows",
+      "spec": "4.12.1",
+      "title": "an authored status that contradicts the count loses and warns",
+      "source": "@card id=c status=done\n- [ ] a\n- [ ] b",
+      "expect": { "warningsContain": ["contradicts 0/2"], "htmlContains": ["data-state=\"todo\""] }
+    },
+    {
+      "id": "card-status-blocked-is-never-a-contradiction",
+      "spec": "4.12.1",
+      "title": "blocked is a fact about the world the rows cannot check",
+      "source": "@card id=c status=blocked\n- [ ] a",
+      "expect": { "warnings": [], "htmlContains": ["data-state=\"blocked\""] }
+    },
+    {
+      "id": "card-detail-is-reachable-without-a-pointer",
+      "spec": "4.12.3",
+      "title": "row detail is in the document and described from its row",
+      "source": "@card id=c\n- [~] A | Story\n> Needs the SQS policy.",
+      "expect": {
+        "blocks": [{ "taskDetails": ["Needs the SQS policy."] }],
+        "htmlContains": ["aria-describedby=", "tabindex=\"0\"", "Needs the SQS policy."]
+      }
+    },
+    {
+      "id": "card-prose-before-rows-is-the-cards-own",
+      "spec": "4.12.3",
+      "title": "prose written before the first row belongs to the card and is drawn",
+      "source": "@card id=c\n> Blocked on legal review.\n- [ ] a",
+      "expect": { "htmlContains": ["Blocked on legal review."] }
+    },
+    {
+      "id": "card-is-a-record-until-ask",
+      "spec": "4.12.4",
+      "title": "no ask, no affordance",
+      "source": "@card id=c\n- [ ] a\n- [ ] b",
+      "expect": { "htmlExcludes": ["anvil-submit", "anvil-task-pick\""] }
+    },
+    {
+      "id": "card-ask-offers-only-open-rows",
+      "spec": "4.12.4",
+      "title": "a done or blocked subtask is not an offer",
+      "source": "@card id=c ask=\"What next?\"\n- [x] a\n- [!] b\n- [ ] c\n- [ ] d",
+      "expect": { "htmlContains": ["What next?"], "htmlCount": { "anvil-task-pick\"": 2 } }
+    },
+    {
+      "id": "card-checkbox-on-a-choice-warns",
+      "spec": "4.12",
+      "title": "a task row in the wrong block still renders, with a complaint",
+      "source": "@choice id=c\n- [x] a | A",
+      "expect": { "blocks": [{ "kind": "choice", "optionValues": ["a"] }], "warningsContain": ["only @card and @board"] }
+    },
+    {
+      "id": "card-href-is-allowlisted",
+      "spec": "4.12",
+      "title": "the one outbound affordance is http(s) only",
+      "source": "@card id=ANV-1 href=javascript:alert(1)\n- [ ] a",
+      "expect": { "htmlExcludes": ["javascript:", "<a "] }
+    },
+
+    {
+      "id": "board-lanes-are-derived",
+      "spec": "4.13",
+      "title": "an empty lane does not render and a full one counts itself",
+      "source": "@board id=b\n? S\n- [ ] a\n- [ ] b\n- [x] c",
+      "expect": {
+        "htmlContains": ["data-state=\"todo\"", "data-state=\"done\"", "1/3 · 33% done"],
+        "htmlExcludes": ["data-state=\"blocked\""]
+      }
+    },
+    {
+      "id": "board-truncation-is-never-silent",
+      "spec": "4.13",
+      "title": "max bounds a lane and the board says how much it hid",
+      "source": "@board id=b max=1\n? S\n- [ ] a\n- [ ] b\n- [ ] c",
+      "expect": { "htmlContains": ["+2 more"] }
+    },
+    {
+      "id": "board-lane-bar-is-a-share-not-progress",
+      "spec": "4.13",
+      "title": "three todo cards are not three done",
+      "source": "@board id=b\n? S\n- [ ] a\n- [ ] b\n- [x] c",
+      "expect": { "htmlContains": ["2 of 3 cards todo"], "htmlExcludes": ["2 of 3 done"] }
+    },
+    {
+      "id": "board-never-submits",
+      "spec": "4.13",
+      "title": "a board is a record of many things and holds no single question",
+      "source": "@board id=b ask=\"which?\" select=many\n- [ ] a",
+      "expect": { "htmlExcludes": ["anvil-submit"] }
+    },
+
+    {
+      "id": "message-is-a-draft-by-default",
+      "spec": "4.15.1",
+      "title": "sent must be asserted",
+      "source": "@message channel=email to=\"a@x\"\n? S\n> body",
+      "expect": { "htmlContains": ["data-sent=\"no\"", "not sent"] }
+    },
+    {
+      "id": "message-every-spelling-of-no",
+      "spec": "4.15.1",
+      "title": "a capital letter must not defeat the safety default",
+      "source": "@message to=\"a@x\" sent=No\n> body",
+      "expect": { "htmlContains": ["data-sent=\"no\""] }
+    },
+    {
+      "id": "message-sent-is-visibly-different",
+      "spec": "4.15.1",
+      "title": "an asserted send reads as sent, with its time",
+      "source": "@message channel=whatsapp to=\"+66900\" sent=14:07\n> shipped",
+      "expect": { "htmlContains": ["data-sent=\"yes\"", "at 14:07"], "htmlExcludes": ["not sent"] }
+    },
+    {
+      "id": "message-addresses-are-not-links",
+      "spec": "4.15.2",
+      "title": "nothing in a draft is one mis-click from a composer",
+      "source": "@message channel=email to=\"a@x\" cc=\"b@x; c@x\"\n? S\n> body",
+      "expect": { "htmlContains": ["a@x", "b@x", "c@x"], "htmlExcludes": ["mailto:", "<a "] }
+    },
+    {
+      "id": "message-subject-alias",
+      "spec": "4.15",
+      "title": "subject= fills the title and the ? line wins over it",
+      "source": "@message to=\"a@x\" subject=\"From attr\"\n? From the line\n> body",
+      "expect": { "blocks": [{ "prompt": "From the line" }], "htmlExcludes": ["From attr"] }
+    },
+    {
+      "id": "message-unknown-channel-borrows-nothing",
+      "spec": "4.15.4",
+      "title": "an unrecognised channel is a memo, not somebody else's bubble",
+      "source": "@message channel=carrierpigeon to=\"a@x\"\n> body",
+      "expect": { "htmlContains": ["anvil-msg-envelope", "unknown channel"], "htmlExcludes": ["anvil-msg-bubble"] }
+    },
+    {
+      "id": "message-attachment-is-one-line",
+      "spec": "4.15",
+      "title": "name and size are one attachment, not two",
+      "source": "@message to=\"a@x\"\n> body\n+ patch.diff | 4 KB",
+      "expect": { "blocks": [{ "meta": [["patch.diff", "4 KB"]] }], "htmlCount": { "<li>": 1 } }
+    },
+    {
+      "id": "message-button-says-what-it-does",
+      "spec": "4.15.2",
+      "title": "Send, not Confirm",
+      "source": "@message to=\"a@x\" ask=\"Send it?\"\n> body",
+      "expect": { "htmlContains": [">Send<"] }
+    },
+
+    {
+      "id": "layout-holds-children",
+      "spec": "4.14",
+      "title": "a container nests rather than flattening into the document",
+      "source": "@grid cols=3\n@card id=a\n? A\n@card id=b\n? B\n@end",
+      "expect": {
+        "topLevelKinds": ["grid"],
+        "tree": [{ "kind": "grid", "children": ["a", "b"] }]
+      }
+    },
+    {
+      "id": "layout-has-no-identity",
+      "spec": "4.14",
+      "title": "an id on a container is refused, because layout cannot be answered",
+      "source": "@grid id=nope\n@card id=a\n? A",
+      "expect": { "blocks": [{ "kind": "grid", "id": "" }], "warningsContain": ["layout has no id"] }
+    },
+    {
+      "id": "layout-unclosed-closes-at-the-fence",
+      "spec": "4.14",
+      "title": "a truncated grid renders what arrived",
+      "source": "@grid cols=2\n@card id=a\n? A",
+      "partial": true,
+      "expect": { "topLevelKinds": ["grid"], "tree": [{ "kind": "grid", "children": ["a"] }] }
+    },
+    {
+      "id": "layout-depth-is-capped-and-stays-balanced",
+      "spec": "4.14",
+      "title": "a third level flattens, warns once, and still eats its @end",
+      "source": "@grid\n@stack\n@grid\n@card id=deep\n? D\n@end\n@end\n@card id=after\n? A",
+      "expect": {
+        "topLevelKinds": ["grid"],
+        "maxDepth": 2,
+        "warningsContain": ["flattened"]
+      }
+    },
+    {
+      "id": "layout-rows-are-not-silently-eaten",
+      "spec": "4.14",
+      "title": "a container holds blocks; anything else says so",
+      "source": "@grid\n- opt | O\n+ chip\n@end",
+      "expect": { "warningsContain": ["holds blocks"] }
+    },
+    {
+      "id": "layout-stray-end",
+      "spec": "4.14",
+      "title": "an @end with nothing open is visible, not silent",
+      "source": "@end",
+      "expect": { "warningsContain": ["stray @end"] }
+    },
+    {
+      "id": "layout-emits-no-breakpoint",
+      "spec": "4.14",
+      "title": "cols is a maximum, clamped, and gap is a keyword",
+      "source": "@grid cols=99 gap=8rem min=100vw\n@note\n> x",
+      "expect": {
+        "htmlContains": ["--anvil-cols:6", "--anvil-lgap:0.6rem"],
+        "htmlExcludes": ["--anvil-min", "100vw"]
+      }
+    },
+
+    {
+      "id": "injection-swatch",
+      "spec": "8.3",
+      "title": "a non-hex swatch is dropped rather than escaped into a style attribute",
+      "source": "@gallery id=g render=swatch\n- a | A | swatch=#fff;}</style><script>alert(1)</script>",
+      "expect": { "htmlExcludes": ["<script", "</style>"] }
+    },
+    {
+      "id": "injection-img",
+      "spec": "8.3",
+      "title": "a non-http img never reaches src",
+      "source": "@gallery id=g\n- a | A | img=javascript:alert(1)",
+      "expect": { "htmlExcludes": ["javascript:"] }
+    },
+    {
+      "id": "injection-prototype-key",
+      "spec": "8.3",
+      "title": "an inherited property is not a valid keyword",
+      "source": "@grid gap=constructor\n@note tone=toString\n> x",
+      "expect": { "htmlContains": ["--anvil-lgap:0.6rem"], "htmlExcludes": ["native code"] }
+    },
+    {
+      "id": "injection-prompt-escaped",
+      "spec": "8.3",
+      "title": "prompt text is escaped",
+      "source": "@choice id=c\n? <script>alert(1)</script>\n- a | A",
+      "expect": { "htmlExcludes": ["<script>"] }
+    },
+
+    {
+      "id": "scale-knob-stays-on-its-track",
+      "spec": "4.8",
+      "title": "an out-of-range steps= resolves once, in the parser",
+      "source": "@scale id=s steps=1\n% a | Lo | Hi | 4",
+      "expect": { "warningsContain": ["out of range"], "htmlExcludes": ["left:300.0%"] }
+    },
+    {
+      "id": "note-carries-its-warnings-inside",
+      "spec": "4.5",
+      "title": "a note has no frame to hang a warning off, so it holds its own",
+      "source": "@nonsense\n? hi",
+      "expect": { "htmlContains": ["anvil-warn"] }
+    },
+    {
+      "id": "comment-never-reaches-the-document",
+      "spec": "3.1",
+      "title": "a hash line is parsed and dropped",
+      "source": "# not content\n@choice id=c\n? Q\n- a | A",
+      "expect": { "blocks": [{ "kind": "choice", "prompt": "Q" }], "htmlExcludes": ["not content"] }
+    },
+    {
+      "id": "escaped-pipe-in-a-label",
+      "spec": "3.2",
+      "title": "a literal pipe survives the cell split",
+      "source": "@choice id=c\n? Q\n- a | A \\| B",
+      "expect": { "blocks": [{ "optionLabels": ["A | B"] }] }
+    },
+    {
+      "id": "streaming-is-inert",
+      "spec": "5",
+      "title": "an unfinished fence renders, visibly provisional",
+      "source": "@choice id=c\n? Q\n- a | A",
+      "partial": true,
+      "expect": { "htmlContains": ["anvil-doc-streaming"] }
+    },
+    {
+      "id": "empty-source",
+      "spec": "11",
+      "title": "nothing in, nothing out, no throw",
+      "source": "",
+      "expect": { "topLevelKinds": [] }
+    },
+    {
+      "id": "degenerate-sigils",
+      "spec": "11",
+      "title": "every sigil with no payload survives",
+      "source": "@\n- \n_ \n% \n+ \n? \n> \n@end\n~~~",
+      "expect": { "neverThrows": true }
+    }
+  ]
+}

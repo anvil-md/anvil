@@ -100,14 +100,42 @@ transcript containing ANVIL blocks reads truthfully after the fact.
      @note      prose, hints, warnings. Body is markdown.
      @code      a verbatim literal, inside the block
      @example   a canned value that fills an ASK block
+     @board     task rows grouped into lanes
+
+   SHOW, until ask= (a record; with ask= it is an ASK block and stamps once)
+     @card      one work item: subtasks, counted progress, status
+     @message   a message an agent proposes to send
+
+   LAYOUT (holds blocks, has no identity, cannot be answered)
+     @grid      up to N columns, collapsing on the container
+     @stack     one column, controlled gap
+     @end       closes the innermost container
 
    CONTROL
      @void      retract an unanswered block the conversation moved past
 ```
 
-Ten blocks and one directive. The set is **closed on purpose**. Almost everything
-an implementer is tempted to add (`@confirm`, `@yesno`, `@palette`, `@rate`,
-`@multi`, `@markdown`) is one of these with an attribute set.
+Thirteen blocks, two containers and one directive. The set is **closed on
+purpose**. Almost everything an implementer is tempted to add (`@confirm`,
+`@yesno`, `@palette`, `@rate`, `@multi`, `@markdown`) is one of these with an
+attribute set.
+
+**The set splits on what the human sees, not on what the data is.** That line
+has been here since the beginning -- `@choice` and `@gallery` hold identical
+rows and differ only in how they are drawn -- and it is the test a new block
+has to pass. `@board` is `@card`'s rows in lanes, and it earns a name for the
+same reason `@gallery` does: lanes and a checklist are two different things to
+look at, and an attribute that silently changes what a block *is* on screen is
+harder to read than a second name.
+
+`@card` passes a stronger test than that. A work item drawn as a `@note` full
+of markdown has a progress number the agent typed by hand, and a number typed
+by hand is a number that can disagree with the list underneath it. A block that
+**counts** cannot.
+
+Two blocks change category on an attribute, and both say so out loud: `@card`
+and `@message` are records until `ask=` turns them into questions. Nothing else
+in the set does this, and nothing else should.
 
 `@markdown` in particular does not exist and should not be added: it would be
 `@note` with different escaping. `@note` renders markdown. `@code lang=markdown`
@@ -118,23 +146,32 @@ two are deliberately not aliased.
 
 ## 3. Grammar
 
-Line-oriented, one level of nesting, no lookahead. Leading whitespace is
-insignificant.
+Line-oriented, no lookahead. Leading whitespace is insignificant. Blocks are
+flat; the only nesting is a layout container holding blocks, capped at two
+deep (§4.14).
 
 ### 3.1 Sigils
 
 | Sigil | Means | Appears in |
 |---|---|---|
 | `@` | block header: `@kind key=value key="quoted value"` | starts every block |
-| `?` | the prompt. Repeatable; lines join with a newline. | all |
+| `?` | the prompt, or a card's title, or a container's group label | all |
 | `:` | subtext / help, rendered smaller under the prompt | all |
 | `-` | an option row | `@choice` `@gallery` `@order` |
+| `- [ ]` | a task row. The box is the state. | `@card` `@board` |
 | `_` | a field row | `@input` |
 | `%` | a scale row | `@scale` |
+| `+` | the chip strip: `+ 5 pts \| high \| Sprint 24` | `@card` |
 | `=` | a prefill row: `field=value` | `@example` |
-| `>` | prose line (markdown) | `@note` |
+| `>` | prose line (markdown), or the detail of the task row above it | `@note` `@card` |
 | `#` | comment. Parsed, never rendered, never sent. | anywhere |
 | `~~~` | literal fence, opens and closes a verbatim body | `@code` `@example` |
+
+Two of those are the same sigil doing the same job in a second place, on
+purpose. `-` is a row in a list either way, and the checkbox is what says the
+row already has an answer. `>` is the sentence attached to the thing above it
+either way. A second sigil for each would be two things to remember where the
+language already had one.
 
 A line beginning with none of the above is treated as prose and appended to the
 current prompt. **This is deliberate**: an agent that forgets a sigil gets
@@ -151,6 +188,13 @@ option   = "-" , [ "!" ] , value , { "|" , cell } , NL ;
 cell     = label | hint | ( key , "=" , value ) ;       (* img= swatch= font= *)
 field    = "_" , name , [ "*" ] , "|" , type , { "|" , cell } , NL ;
 scale    = "%" , name , "|" , leftPole , "|" , rightPole , [ "|" , default ] , NL ;
+task     = "-" , box , ref , [ "|" , label ] , [ "|" , meta ] , NL ;
+box      = "[" , ( " " | "x" | "~" | "!" ) , "]" ;      (* "/" "-" alias "~"   *)
+meta     = text | rollup ;
+rollup   = digits , "/" , digits ;                      (* a child's own count *)
+detail   = ">" , text , NL ;                            (* attaches to the task above *)
+chips    = "+" , text , { "|" , text } , NL ;
+layout   = ( "@grid" | "@stack" ) , { ws , attr } , NL , block* , [ "@end" , NL ] ;
 literal  = "~~~" , NL , { any } , "~~~" , NL ;
 ```
 
@@ -300,10 +344,16 @@ fence, so the parser stays total.
 
 `tone` is `info` (default), `warn`, `danger`. No id, no interaction, no stamp.
 
-The body is **markdown**. Two constraints come with that: reuse a markdown
-configuration that escapes raw HTML (this is agent-authored text), and add a
-recursion depth guard, because a note containing an ` ```anvil ` fence would
-otherwise re-enter the renderer forever.
+The body is **markdown**, with one carve-out: a `#` at the start of a line is a
+comment (§3.1) and never reaches the body, so an ATX heading cannot be written
+inside a note. Use `**bold**` for a lead-in, or a second note. The sigil is
+older than the block and stripping it is the one thing that keeps `#` usable as
+a comment anywhere in the language.
+
+Two more constraints come with markdown: reuse a configuration that escapes raw
+HTML (this is agent-authored text), and add a recursion depth guard, because a
+note containing an ` ```anvil ` fence would otherwise re-enter the renderer
+forever.
 
 A note also carries its own parse warnings **inside** its tinted box. It has no
 frame to hang them off, so a sibling warning would float naked in the page.
@@ -396,6 +446,396 @@ voided block can never be answered, it just stops pretending it can be.
 Emit it the moment the conversation overtakes an unanswered block. A stale live
 widget three screens up is the single most annoying failure mode of inline UI.
 
+### 4.12 `@card`
+
+A work item: a story, an epic, a bug, a ticket. The single most common thing an
+agent has to show a human while doing work, and the thing every chat surface
+currently fakes with a bulleted list and a hand-typed percentage.
+
+```anvil
+@card id=ANV-114 type=story status=flight as=14:02
+? Payment retry ladder
+: Three attempts, 1m / 10m / 2h, then dead-letter.
++ 5 pts | high | Sprint 24 | epic ANV-100
+- [x] ANV-115 | Retry scheduler      | Ana
+- [x] ANV-116 | Backoff policy table | Ana
+- [~] ANV-117 | Dead-letter queue    | Kit
+> Kit · 2d in flight · 3 of 5 checks green. Needs the SQS policy
+> from infra before this can merge. PR 482.
+- [!] ANV-118 | Alerting hook        | blocked · ANV-117
+- [ ] ANV-119 | Metrics
+- [ ] ANV-120 | Runbook entry
+- [ ] ANV-121 | Load test at 10x
+```
+
+```
+   ╭─ ANV-114 · story ────────────────────────── ◐ in flight ──╮
+   │  Payment retry ladder                                     │
+   │  Three attempts, 1m / 10m / 2h, then dead-letter.         │
+   │                                                           │
+   │  ▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░░░░  2/7 · 29%        │
+   │                                                           │
+   │  ✓  ANV-115  Retry scheduler                        Ana   │
+   │  ✓  ANV-116  Backoff policy table                   Ana   │
+   │  ◐  ANV-117  Dead-letter queue                      Kit   │
+   │  ✕  ANV-118  Alerting hook             blocked · ANV-117  │
+   │  ○  ANV-119  Metrics                                      │
+   │  ○  ANV-120  Runbook entry                                │
+   │  ○  ANV-121  Load test at 10x                             │
+   │                                                           │
+   │  5 pts · high · Sprint 24 · epic ANV-100                  │
+   ╰──────────────────────────── as of 14:02 · snapshot ───────╯
+```
+
+Every number in that picture is produced by the rows above it, and a test in
+this repo re-derives them from `SPEC.md` on every run. The first draft of this
+section printed `3/7 · 43%` over five rows with two done, which is exactly the
+failure §4.12.1 goes on to argue is worth a whole block to prevent.
+
+| Attribute | Meaning |
+|---|---|
+| `type` | free text, shown as a chip. `epic`, `bug` and `spike` also pick the icon. |
+| `status` | `todo` `flight` `done` `blocked`. Counted from the rows, and **the count wins** (§4.12.1). |
+| `href` | a link to the real ticket. The card's only outbound affordance. |
+| `as` | the timestamp the data was read. The renderer supplies no clock of its own. |
+| `ask` | turns the card into a question (§4.12.4) |
+
+`?` is the title. `:` is one line of subtext. `>` written **before the first
+task row** is card-level prose; the same sigil after a row is that row's detail
+(§4.12.3), and the ordering is the only thing that distinguishes them. `+` is
+the chip strip, one chip per cell; a leading `!` marks one urgent.
+
+`href` is allowlisted to `http(s)` like every other agent-authored URL (§8.3),
+and it does **not** make the card interactive: a link is navigation, not an
+answer.
+
+**4.12.1 The bar is counted, never authored.**
+
+There is no `progress=`. There is no `done=`. The bar, the `3/7` and the `43%`
+are all computed from the rows on screen, and that is the whole reason `@card`
+is an ANVIL block rather than an HTML embed: an agent that writes `3/7` above
+nine subtasks is lying, and a format should not hand it the vocabulary.
+
+A row may carry its own `n/m` in the meta cell -- an epic listing stories, each
+with a count of its own. When any row does, every row contributes a pair and a
+bare row counts as one of one, so the sum stays exact:
+
+```anvil
+@card id=ANV-100 type=epic as=14:02
+? Billing that survives a bad night
+- [~] ANV-114 | Payment retry ladder | 3/7
+- [x] ANV-130 | Idempotency keys     | 6/6
+- [ ] ANV-141 | Dunning emails       | 0/9
+```
+
+```
+   ╭─ ANV-100 · epic ─────────────────────────── ◐ in flight ──╮
+   │  Billing that survives a bad night                        │
+   │                                                           │
+   │  ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░  9/22 · 41%        │
+   │  ✓ done 1      ◐ flight 1      ○ todo 1                   │
+   │                                                           │
+   │  ◐  ANV-114  Payment retry ladder                         │
+   │     ▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░  3/7                         │
+   │  ✓  ANV-130  Idempotency keys                             │
+   │     ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓  6/6                         │
+   │  ○  ANV-141  Dunning emails                               │
+   │     ░░░░░░░░░░░░░░░░░░░░░░░░  0/9                         │
+   ╰──────────────────────────── as of 14:02 · snapshot ───────╯
+```
+
+A child claiming more done than total is clamped where it is parsed, so one bad
+row cannot poison every ancestor's bar. A count is read from the **end** of the
+meta cell, so `Kit · 6/6` is both an assignee and a rollup; an `n/m` sitting
+mid-cell is refused with a warning rather than guessed at, because `PR 3/7
+checks` is not a progress count.
+
+**And `status=` loses to the rows.** It exists because a card can be `blocked`
+at any progress, which is a fact the rows cannot know, and because a card may
+be written before it has any rows. But `status=done` above two open subtasks is
+the same hand-typed claim this section bans, so the count wins and the
+contradiction is a parse warning:
+
+```
+   status="done" contradicts 0/2; using "todo"
+```
+
+**4.12.2 A card is a snapshot, not a view.**
+
+The footer says `snapshot`, always: no polling, no live subscription, no
+refresh. When the ticket moves, emit a new card further down the conversation,
+exactly as you would say the new thing out loud. `as=` is the agent's own
+timestamp, and a renderer must **not** substitute its clock -- it cannot know
+whether the data is fresh, and printing a time would claim that it does.
+
+The rule is aimed at hosts, not at the grammar: a card carries no ticket handle
+and nothing refetchable, so it *cannot* go stale on its own. Two blocks that
+can, and until now did not say so:
+
+> **A stamp cannot freeze bytes ANVIL does not own.** A `@gallery` renders
+> `img=` from someone else's server and then stamps; that image can change, or
+> 404, and the frozen record afterwards shows something other than what the
+> human clicked. `@link` folds host-fetched metadata into a stamp the same way.
+> A host that wants a record it can defend snapshots or proxies those bytes at
+> stamp time, and stores the copy. Otherwise the stamp is honest about the
+> click and silent about the thing clicked.
+
+**4.12.3 Subtask detail is a disclosure, never a hover.**
+
+A `>` line under a task row is that row's detail. It must be reachable by
+pointer, by keyboard **and** by touch, and it must be in the document with an
+`aria-describedby` from its row whether or not it is currently painted.
+
+Hover-only detail is the same accessibility failure as drag-only ranking in
+§4.9: it does not exist on a keyboard, and it does not exist on a phone.
+
+**4.12.4 `ask=` is what makes a card a question.**
+
+Without it, a card is a record and never stamps. With it, the card grows a
+prompt and its `[ ]` rows become selectable -- and *only* its `[ ]` rows.
+Offering a done or blocked subtask as "what next" is a lie about what the human
+can choose.
+
+```anvil
+@card id=ANV-114 type=story ask="Which one do you want me to pick up next?"
+- [!] ANV-118 | Alerting hook  | blocked · ANV-117
+- [ ] ANV-119 | Metrics
+- [ ] ANV-120 | Runbook entry
+```
+
+Everything in §6 and §7 then applies unchanged: it stamps once, it freezes, and
+the rejected rows stay on screen because they are part of the record. A card
+inherits `select`, `submit`, `min`, `max`, `optional` and `expires` from the
+ASK table **only** while `ask=` is set; on a record they are meaningless and
+warn.
+
+**The pick marker must not be one of the four state glyphs.** A tick meaning
+"you chose this" next to a circle meaning "this is not done" puts two different
+questions in one row wearing the same vocabulary, and an agent re-reading its
+own fence cannot tell them apart.
+
+### 4.13 `@board`
+
+The same task rows, grouped by the state they already carry.
+
+```anvil
+@board id=sprint-24 max=2 as=14:02
+? Sprint 24
+- [ ] ANV-119 | Metrics
+- [ ] ANV-120 | Runbook entry
+- [ ] ANV-121 | Load test at 10x
+- [~] ANV-117 | Dead-letter queue
+- [~] ANV-142 | Webhook replay
+- [~] ANV-143 | Retry budget
+- [x] ANV-115 | Retry scheduler
+- [x] ANV-116 | Backoff policy table
+```
+
+```
+   ╭─ Sprint 24 ───────────────────────────── 2/8 · 25% done ──╮
+   │                                                           │
+   │  ○ TODO 3          ◐ IN FLIGHT 3       ✓ DONE 2           │
+   │  ▓▓▓▓░░░░░░        ▓▓▓▓░░░░░░          ▓▓▓░░░░░░░         │
+   │                                                           │
+   │  ANV-119           ANV-117             ANV-115            │
+   │  Metrics           Dead-letter queue   Retry scheduler    │
+   │                                                           │
+   │  ANV-120           ANV-142             ANV-116            │
+   │  Runbook entry     Webhook replay      Backoff table      │
+   │                                                           │
+   │  +1 more           +1 more                                │
+   ╰──────────────────────────── as of 14:02 · snapshot ───────╯
+```
+
+Lanes are **derived**, so a board cannot claim a lane count that disagrees with
+the cards in it, and an empty lane does not render at all. A board never
+stamps: it is a record of many things, and there is no single question in it.
+
+Two rules that are easy to get wrong:
+
+- **`+N more` is mandatory.** `max` bounds a lane for readability; a board that
+  truncates silently reads as a complete board, which is the same lie as an
+  authored progress number.
+- **A lane bar is a share of the board, not progress.** Announce it as
+  `3 of 5 cards todo`. Announcing a todo lane as "3 of 5 done" is a
+  straightforward lie to anyone who cannot see the colour.
+
+### 4.14 `@grid` and `@stack`
+
+Two containers. `@grid` flows its children into at most `cols` columns;
+`@stack` is one column with a controlled gap. Both close at `@end`, or at the
+end of the fence.
+
+```anvil
+@grid cols=3 min=16rem gap=normal
+@card id=ANV-114 type=story status=flight
+? Payment retry ladder
+- [x] ANV-115 | Retry scheduler
+- [~] ANV-117 | Dead-letter queue
+@card id=ANV-130 type=story status=done
+? Idempotency keys
+- [x] ANV-131 | Key derivation
+@end
+```
+
+| Attribute | Default | Meaning |
+|---|---|---|
+| `cols` | `2` | **maximum** columns, clamped 1-6. Not a count. |
+| `min` | `14rem` | narrowest a column may get before the grid drops one |
+| `gap` | `normal` | `tight` `normal` `loose`. A keyword, never a length. |
+| `frame` | off | draw a border around the group |
+
+Five rules, and the first is the one that matters:
+
+**L1. No breakpoints. Ever.** The agent writing the fence cannot see the
+screen, so it must not be allowed to guess at one. The surface rendering it is
+as likely to be a 380px chat column on a 5K display as a full page, which means
+a viewport media query is measuring the wrong box regardless. Collapse is
+computed against the **container**:
+
+```css
+.anvil-auto {
+  --anvil-cols: 2;      /* from cols=  */
+  --anvil-min: 14rem;   /* from min=   */
+  --anvil-lgap: 0.6rem; /* from gap=   */
+
+  display: grid;
+  gap: var(--anvil-lgap);
+  grid-template-columns: repeat(auto-fit, minmax(
+    min(100%, max(var(--anvil-min),
+      calc((100% - (var(--anvil-cols) - 1) * var(--anvil-lgap)) / var(--anvil-cols))))
+  , 1fr));
+}
+```
+
+Every track is at least `--anvil-min`, so a column never gets unreadable. Every
+track is also at least its exact share **once the gutters are subtracted** --
+`(100% - (n-1)·gap) / n` -- so `n` tracks plus `n-1` gaps consume exactly 100%
+and an `n+1`th cannot fit. That is what makes `cols` a maximum. The outer
+`min(100%, …)` caps the track when the container is narrower than the minimum,
+so a narrow panel collapses instead of overflowing. No media query, no
+container query.
+
+**The gap subtraction is not decoration.** A plain `100%/n` leaves
+`n·(100%/n) + (n-1)·gap > 100%`, which caps the grid at `n-1` columns for any
+non-zero gap. Anyone simplifying this expression should read that sentence
+first.
+
+Two more things the arithmetic depends on: `--anvil-lgap` must be the
+container's actual `gap`, or the track width is computed against a gutter that
+is not there; and grid items need `min-width: 0`, or one long unbroken ref
+pushes a track past its share and quietly breaks the column count.
+
+One case the formula does not cover: a grid whose own inline size is
+**indefinite** (inside `width: fit-content`, or a float). CSS Grid resolves an
+`auto-fit` track list against an indefinite size by repeating once, so it draws
+one column whatever `cols` says. Give the container a definite width.
+
+**L2. No coordinates.** No `span`, no `areas`, no `row-start`, no `order`. One
+block per cell, in source order. A layout that needs a coordinate is a document,
+not a sentence in a conversation, and this is the boundary that stops ANVIL
+growing into a worse HTML.
+
+**L3. Two containers deep, enforced by the parser.** Any container may hold any
+other -- what is capped is the DEPTH, not the pairing, and two is the ceiling. A
+third level is flattened with a warning rather than dropped, and it still
+consumes its matching `@end` so everything below it stays balanced. `@grid`
+holding a `@stack` is the case worth having; `@stack` inside `@stack` is a
+no-op the parser permits rather than a shape anyone should write.
+
+**L4. An unclosed container is not an error.** It closes at the end of the
+fence, the same way an unclosed `~~~` does (§4.4), because a fence truncated
+mid-grid must still render what arrived (§5).
+
+**L5. Layout has no identity.** No `id`, no stamp, no `for=` target, no `@void`.
+Layout is the one thing in ANVIL that cannot be answered, so it must not carry a
+single pixel that suggests otherwise. An `id=` on a container is a warning and
+is ignored.
+
+### 4.15 `@message`
+
+A message an agent is *proposing* to send: an email, a WhatsApp, an iMessage, an
+SMS, a Slack post. Rendered with the chrome of the thing it will become, so the
+human reads it the way the recipient will.
+
+```anvil
+@message channel=email to="j@duplo.org" cc="ana@x.dev, kit@x.dev"
+         from="bot@frst.dev" ask="Send it?"
+? Re: the retry ladder
+> Hey Jonas,
+>
+> The retry ladder is in. Three attempts, then dead-letter.
++ patch.diff | 4 KB
+```
+
+```
+   ╭─ EMAIL ───────────────────────────────── draft · not sent ──╮
+   │  Re: the retry ladder                                       │
+   │  ─────────────────────────────────────────────────────────  │
+   │  FROM  bot@frst.dev                                         │
+   │  TO    j@duplo.org                                          │
+   │  CC    ana@x.dev  kit@x.dev                                 │
+   │                                                             │
+   │  Hey Jonas,                                                 │
+   │                                                             │
+   │  The retry ladder is in. Three attempts, then dead-letter.  │
+   │                                                             │
+   │  ⊕ patch.diff · 4 KB                                        │
+   │                                                             │
+   │  › Send it?                                        [ Send ] │
+   ╰──────────────────────────────────── draft ──────────────────╯
+```
+
+| Attribute | Meaning |
+|---|---|
+| `channel` | `email` `whatsapp` `imessage` `sms` `signal` `telegram` `slack` `discord` `memo` |
+| `to` `cc` `bcc` `from` | the envelope. Comma **or** semicolon separated. |
+| `subject` | alias for the `?` line. `?` wins when both are given. |
+| `sent` | **must be asserted.** Bare, or a timestamp. |
+| `ask` | the send gate. Without it the block is a record and never stamps. |
+| `danger` `phrase` | as §4, for a send that cannot be taken back |
+
+`?` is the subject or headline. `>` is the body; a blank `>` is a paragraph
+break. Each `+` line is one attachment: `name | size | mime`.
+
+**4.15.1 Draft is the default, and that is a safety property.**
+
+`sent` has to be **asserted**. Every message renders as `draft · not sent`
+until an attribute says otherwise, and the state sits on the frame -- a tinted
+pill and a dashed border -- rather than in the footer where nobody reads it.
+
+The failure this prevents is specific and expensive: a human scrolls back three
+screens, sees something that looks exactly like an email, and concludes it went
+out. It never did. A block that renders a proposal identically to a record is
+the same lie as a card that re-renders live state (§4.12.2), except the cost is
+a message that never arrived.
+
+**4.15.2 Nothing in a draft is a live affordance.**
+
+Addresses render as **text, never as links**. A `mailto:` inside a draft is one
+mis-click from a composer pre-filled with agent-authored text, and the whole
+point of the block is that it is the place a human *reads* what is about to be
+sent. The only thing on it that should do anything is the button that says yes.
+
+For the same reason the button says what the click does. `Send`, not
+`Confirm` -- the one moment a label matters is the one where the action leaves
+the building.
+
+**4.15.3 The send gate is an ordinary stamp.**
+
+With `ask=`, everything in §6 and §7 applies unchanged: one click, one stamp,
+frozen. That is the correct shape for an outbound message, because "did the
+human approve this" is exactly the question a transcript should still be able to
+answer six months later.
+
+Pair it with `danger phrase="SEND"` when the send cannot be recalled.
+
+**4.15.4 Unknown channels do not borrow chrome.**
+
+A channel nobody has written chrome for renders as a plain memo plus a warning.
+Drawing an unrecognised channel as a WhatsApp bubble tells the human this is
+going somewhere it is not.
+
 ---
 
 ## 5. Streaming
@@ -475,10 +915,30 @@ These are the ones.
 Craft, then speed, then cost.
 </stamp>
 
+<!-- @card ask= -- value is the task REF, because that is the stable handle -->
+<stamp block="ANV-114" kind="card" value="ANV-120" label="Runbook entry">
+Pick up the runbook entry next.
+</stamp>
+
+<!-- @message ask= -- the send gate. `sent` is the host's assertion, not the agent's -->
+<stamp block="intro-mail" kind="message" channel="email" value="send" sent="yes" at="14:04:20">
+Yes, send it.
+</stamp>
+<stamp block="intro-mail" kind="message" channel="email" value="hold">
+Not yet.
+</stamp>
+
 <!-- skipped / expired -->
 <stamp block="refs" kind="link" skipped="yes">Skipped that one.</stamp>
 <stamp block="mood" kind="gallery" expired="yes">That one timed out.</stamp>
 ```
+
+A card stamps its task **`ref`**, never the label: the ref is what survives
+somebody rewording a subtask. A message stamps `send` or `hold` and nothing
+else -- the body is already in the transcript above it, and repeating it in the
+tag gives an escaping bug somewhere to live. `sent="yes"` is written by the
+host **after** the send actually succeeded; an agent that writes it is claiming
+something it did not witness.
 
 Every tag may also carry `at=` and, where more than one human can act, `by=`.
 Always include `label`/`labels` alongside `value`/`values` -- whoever summarises
@@ -688,6 +1148,13 @@ Each of these has cost someone a bug.
   overtook.
 - Give reversible choices an exit row (`Not sure yet`). A two-option block with
   no exit is a trap, and people click it just to make it go away.
+- Emit a fresh `@card` when the work moves, instead of imagining the old one
+  updated. The transcript is a sequence of states, and that is the useful part.
+- Put a `@message` in front of anything that leaves the building, with `ask=`
+  set. It costs one turn and it is the difference between a draft and an
+  apology.
+- Use `@grid` when several records deserve the same glance: three cards, or a
+  card beside the note that explains it.
 
 **Do not**
 
@@ -701,6 +1168,13 @@ Each of these has cost someone a bug.
 - Do not assume an answer will come.
 - Do not reference a block's answer in text written *before* that answer exists.
 - Do not write `<stamp>` tags. That channel belongs to the client.
+- **Do not put two questions side by side in a `@grid`.** A grid holds records.
+  Two ASK blocks in one row is a form, and §10's whole argument is that an
+  interview beats a form. One question per turn survives the layout.
+- Do not type a progress number. There is nowhere to put one, and that is
+  deliberate -- write the rows and let them count.
+- Do not mark a `@message` `sent` until it has been. The default exists so that
+  a lie takes an act of typing.
 
 ### Interviews
 
@@ -775,6 +1249,16 @@ reorder. A positional id lands the stamp on the wrong block.
 | 14 | Example still clickable after target stamps | examples die with their target (§4.10) |
 | 15 | Agent value in a style/src attribute | allowlist, do not escape (§8.3) |
 | 16 | Tags hand-rolled per block | one serializer, one escaping policy (§6.2) |
+| 17 | A progress number that disagrees with the rows | count the rows; there is no `progress=` (§4.12.1) |
+| 18 | A card that re-renders today's state | a card is a snapshot; emit a new one (§4.12.2) |
+| 19 | Subtask detail on hover only | disclosure + `aria-describedby` (§4.12.3) |
+| 20 | A lane bar announced as progress | it is a share of the board (§4.13) |
+| 21 | A truncated lane that looks complete | `+N more`, always (§4.13) |
+| 22 | Breakpoints in a layout the agent cannot see | container-driven `auto-fit`, `cols` is a max (§4.14 L1) |
+| 23 | A draft rendered like a sent message | `sent` must be asserted; draft is the default (§4.15.1) |
+| 24 | A `mailto:` or live link inside a draft | addresses are text; the only affordance is the gate (§4.15.2) |
+| 25 | A stamp pointing at bytes someone else can change | snapshot or proxy `img=` / `@link` at stamp time (§4.12.2) |
+| 26 | A row parsed and then never drawn | render it or warn; never both parse and drop (§11) |
 
 ---
 
@@ -791,12 +1275,21 @@ reorder. A positional id lands the stamp on the wrong block.
    ├── SHOW / CONTROL ────────────────────────────────────────────────────┤
    │ @note tone=info|warn|danger (markdown body)                          │
    │ @code lang= label=   @example for=<id>   @void id= reason=           │
+   │ @card type= status= as= ask=      @board max= as=                    │
+   │ the bar is COUNTED from the rows. there is no progress=              │
+   ├── LAYOUT ────────────────────────────────────────────────────────────┤
+   │ @grid cols=<max, 1-6> min= gap=tight|normal|loose frame              │
+   │ @stack gap=            @end  (or the end of the fence)               │
+   │ 2 deep max · no id · no coordinates · no breakpoints                 │
    ├── LINES ─────────────────────────────────────────────────────────────┤
    │ ? prompt          : subtext          # comment (never rendered)      │
    │ - value | Label | hint | img= swatch= font= sample=   (! = danger)   │
+   │ - [ ] ref | Label | meta    [ ]todo [~]flight [x]done [!]blocked     │
    │ _ name[*] | type | Label | placeholder                               │
    │ % name | leftPole | rightPole | default                              │
-   │ = field=value     > prose (markdown)     ~~~ … ~~~  literal          │
+   │ + chip | chip | chip          (a card's meta strip)                  │
+   │ = field=value     > prose, or the detail of the task above           │
+   │ ~~~ … ~~~  literal                                                   │
    ├── FIELD TYPES ───────────────────────────────────────────────────────┤
    │ text  longtext  number  bool  secret  path  url  date                │
    ├── STAMP ─────────────────────────────────────────────────────────────┤
@@ -823,10 +1316,16 @@ An implementation is **ANVIL v1 conformant** if:
    rather than being dropped silently or throwing.
 3. Derived ids depend only on content.
 4. Blocks render inert while the fence is incomplete.
-5. `swatch`, `font` and `img` are allowlisted; everything else is escaped.
+5. `swatch`, `font`, `img` and `min` are allowlisted; everything else is escaped.
 6. If it implements stamping: the five laws hold, stamps are idempotent on
    `(blockId, nonce)`, and expiry is enforced server-side.
 7. If it delivers stamps to a model: they are framed as untrusted data.
+8. Every number a `@card` or `@board` draws is counted from its rows. No
+   attribute can set, override or contradict one.
+9. A `@card` renders as a snapshot and never refreshes itself, and subtask
+   detail is reachable without a pointer.
+10. Layout collapses against its container, has no id, and never renders an
+    interactive affordance of any kind.
 
 Reference implementation: [`packages/parser`](./packages/parser) and
 [`packages/render-html`](./packages/render-html).

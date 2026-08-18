@@ -2,7 +2,7 @@
 title: "Failure modes, ranked by how much they hurt"
 nav: "Failure modes"
 section: 12
-summary: "Sixteen ways to get this wrong, ranked by how much each one hurts, with the guard for each."
+summary: "Twenty-two ways to get this wrong, ranked by how much each one hurts, with the guard for each."
 ---
 
 | # | Failure | Guard |
@@ -23,3 +23,13 @@ summary: "Sixteen ways to get this wrong, ranked by how much each one hurts, wit
 | 14 | Example still clickable after target stamps | examples die with their target (§4.10) |
 | 15 | Agent value in a style/src attribute | allowlist, do not escape (§8.3) |
 | 16 | Tags hand-rolled per block | one serializer, one escaping policy (§6.2) |
+| 17 | A progress number that disagrees with the rows | count the rows; there is no `progress=` (§4.12.1) |
+| 18 | A card that re-renders today's state | a card is a snapshot; emit a new one (§4.12.2) |
+| 19 | Subtask detail on hover only | disclosure + `aria-describedby` (§4.12.3) |
+| 20 | A lane bar announced as progress | it is a share of the board (§4.13) |
+| 21 | A truncated lane that looks complete | `+N more`, always (§4.13) |
+| 22 | Breakpoints in a layout the agent cannot see | container-driven `auto-fit`, `cols` is a max (§4.14 L1) |
+| 23 | A draft rendered like a sent message | `sent` must be asserted; draft is the default (§4.15.1) |
+| 24 | A `mailto:` or live link inside a draft | addresses are text; the only affordance is the gate (§4.15.2) |
+| 25 | A stamp pointing at bytes someone else can change | snapshot or proxy `img=` / `@link` at stamp time (§4.12.2) |
+| 26 | A row parsed and then never drawn | render it or warn; never both parse and drop (§11) |

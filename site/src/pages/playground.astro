@@ -3,7 +3,7 @@ import Masthead from '@/components/Masthead.astro'
 import SiteFooter from '@/components/SiteFooter.astro'
 import BaseLayout from '@/layouts/BaseLayout.astro'
 import { ghostHtml } from '@/scripts/highlight'
-import { DEFAULT_SOURCE, PRESETS, summarise } from '@/scripts/playground'
+import { DEFAULT_SOURCE, flatten, PRESETS, summarise } from '@/scripts/playground'
 import { parseAnvil } from '@anvil-md/parser'
 import { renderAnvilFence } from '@anvil-md/render-html'
 
@@ -151,11 +151,11 @@ out.innerHTML = renderAnvilFence(textarea.value, fenceIsClosed)
 					</thead>
 					<tbody>
 						{
-							initialDoc.blocks.map((b) => (
+							flatten(initialDoc).map((b) => (
 								<tr>
 									<td class="pg-id">
-										{b.id}
-										{b.derivedId && <span class="pg-derived">derived</span>}
+										{b.id || '--'}
+										{b.derivedId && b.id && <span class="pg-derived">derived</span>}
 									</td>
 									<td class="pg-kind">@{b.kind}</td>
 									<td>

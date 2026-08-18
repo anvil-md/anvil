@@ -3,8 +3,21 @@ import { anvilMarkdownIt } from './index'
 
 const BODY = '@choice id=x\n? Q\n- a | A'
 
-/** The slice of markdown-it the plugin touches. */
-function fakeMd(fallback = (_t: unknown[], _i: number) => '<pre>default</pre>') {
+type FenceRule = (tokens: unknown[], idx: number) => string
+
+/**
+ * The slice of markdown-it the plugin touches.
+ *
+ * `fence` is declared OPTIONAL rather than inferred, because the plugin's whole
+ * job is to install it. Inferring the shape from an object literal typed the
+ * no-fallback case as `rules: {}`, which had no `fence` property at all and
+ * failed the typecheck at the one call site that matters.
+ */
+interface FakeMd {
+	renderer: { rules: { fence?: FenceRule } }
+}
+
+function fakeMd(fallback: FenceRule = () => '<pre>default</pre>'): FakeMd {
 	return { renderer: { rules: { fence: fallback } } }
 }
 
@@ -39,9 +52,7 @@ describe('anvilMarkdownIt', () => {
 		// Annotated, not inferred: a bare `{}` widens to a type with no `fence`
 		// at all, so the assertion below stops typechecking. This is a host that
 		// registered no fence renderer, which is the whole point of the test.
-		const md: { renderer: { rules: { fence?: (t: unknown[], i: number) => string } } } = {
-			renderer: { rules: {} },
-		}
+		const md: FakeMd = { renderer: { rules: {} } }
 		anvilMarkdownIt()(md)
 		expect(() => md.renderer.rules.fence?.([{ info: 'ts', content: 'x' }], 0)).toThrow(/fall back/)
 	})

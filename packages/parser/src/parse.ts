@@ -1,5 +1,5 @@
 /**
- * The ANVIL parser. Line-oriented, one level of nesting, no lookahead.
+ * The ANVIL parser. Line-oriented, no lookahead.
  *
  * TOTAL BY CONTRACT: this function has no throw path. It parses agent-authored
  * text that arrives token by token, so every malformed shape degrades to
@@ -10,13 +10,27 @@
  * Row parsing lives in rows.ts; this file is the line dispatch and the block
  * assembly, nothing else.
  */
-import { parseDial, parseField, parseOption } from './rows'
-import { ANVIL_KINDS, type AnvilBlock, type AnvilDoc, type AnvilKind } from './types'
+import { parseDial, parseField, parseMeta, parseOption, parseTask, TASK_BOX, taskState } from './rows'
+import {
+  ANVIL_KINDS,
+  type AnvilBlock,
+  type AnvilDoc,
+  type AnvilKind,
+  isContainer,
+  MAX_LAYOUT_DEPTH,
+  statusConflict,
+} from './types'
 
 const KIND_SET = new Set<string>(ANVIL_KINDS)
 const DEFAULT_STEPS = 5
 const HEADER = /^@(\w+)\s*(.*)$/
 const ATTR = /([A-Za-z_][\w-]*)(?:=(?:"([^"]*)"|'([^']*)'|(\S+)))?/g
+
+/** The kinds whose `-` rows are tasks rather than options. */
+const TASK_KINDS = new Set<AnvilKind>(['card', 'board'])
+
+/** The kinds that draw a `+` row. Everywhere else it would be parsed and dropped. */
+const META_KINDS = new Set<AnvilKind>(['card', 'board', 'message'])
 
 /** `key=value`, `key="quoted value"`, or a bare `key` meaning true. */
 function parseAttrs(s: string): Record<string, string | boolean> {
@@ -52,6 +66,9 @@ function blank(kind: AnvilKind): AnvilBlock {
     options: [],
     fields: [],
     dials: [],
+    tasks: [],
+    meta: [],
+    children: [],
     prose: '',
     warnings: [],
   }
@@ -64,6 +81,61 @@ function join(prev: string, next: string, sep: string): string {
 interface Cursor {
   block: AnvilBlock
   steps: number
+  /** Containers are placed in the tree the moment they open, so close() must
+   *  not place them a second time. */
+  attached: boolean
+}
+
+/**
+ * A `-` row means different things in different blocks, and the difference is
+ * whether the row already has an answer. Rather than a second sigil, the
+ * checkbox decides.
+ */
+function dashRow(rest: string, block: AnvilBlock): void {
+  const wantsTasks = TASK_KINDS.has(block.kind)
+  const boxed = TASK_BOX.exec(rest)
+  const state = boxed ? taskState(boxed[1] ?? '') : null
+
+  if (boxed && state) {
+    if (wantsTasks) {
+      parseTask(state, boxed[2] ?? '', block)
+      return
+    }
+    // Visible, not silent: a checkbox on a @choice row is almost always an
+    // agent reaching for @card, and the option still renders.
+    block.warnings.push(`[${boxed[1]}] state ignored: only @card and @board have task rows`)
+    parseOption(boxed[2] ?? '', block)
+    return
+  }
+
+  if (boxed && !state) {
+    block.warnings.push(`unknown task state "[${boxed[1]}]", using todo`)
+    if (wantsTasks) {
+      parseTask('todo', boxed[2] ?? '', block)
+      return
+    }
+  }
+
+  if (wantsTasks) {
+    if (!boxed) block.warnings.push('task row with no [ ] state, using todo')
+    parseTask('todo', boxed ? (boxed[2] ?? '') : rest, block)
+    return
+  }
+  parseOption(rest, block)
+}
+
+/**
+ * `>` is a note's prose everywhere except under a task row, where it is that
+ * row's detail. Not a new sigil, because it is the same idea in both places:
+ * the sentence attached to the thing above it.
+ */
+function proseRow(rest: string, block: AnvilBlock): void {
+  const last = block.tasks[block.tasks.length - 1]
+  if (last && TASK_KINDS.has(block.kind)) {
+    last.detail = join(last.detail, rest, '\n')
+    return
+  }
+  block.prose = join(block.prose, rest, '\n')
 }
 
 /**
@@ -78,39 +150,56 @@ const LINES: Record<string, (rest: string, cur: Cursor) => void> = {
   ':': (rest, { block }) => {
     block.subtext = join(block.subtext, rest, ' ')
   },
-  '>': (rest, { block }) => {
-    block.prose = join(block.prose, rest, '\n')
-  },
-  '-': (rest, { block }) => parseOption(rest, block),
+  '>': (rest, { block }) => proseRow(rest, block),
+  '-': (rest, { block }) => dashRow(rest, block),
+  '+': (rest, { block }) => parseMeta(rest, block),
   _: (rest, { block }) => parseField(rest, block),
   '%': (rest, cur) => parseDial(rest, cur.block, cur.steps),
 }
 
-/** Reads `steps=` off a freshly opened block, warning when out of range. */
+/**
+ * Reads `steps=` off a freshly opened block, warning when out of range.
+ *
+ * The resolved value is written BACK onto the attribute. A renderer that
+ * re-derives it from the raw string reaches a different number -- clamping
+ * `steps=1` to 2 where the parser defaulted it to 5 -- and then places a knob
+ * at `left: 300%`. One number, resolved once, in the file that owns it.
+ */
 function readSteps(block: AnvilBlock): number {
   const raw = block.attrs.steps
   if (typeof raw !== 'string') return DEFAULT_STEPS
   const n = Number.parseInt(raw, 10)
   if (Number.isFinite(n) && n >= 2 && n <= 11) return n
   block.warnings.push(`steps="${raw}" out of range, using ${DEFAULT_STEPS}`)
+  block.attrs.steps = String(DEFAULT_STEPS)
   return DEFAULT_STEPS
+}
+
+function unknownBlock(line: string, what: string): AnvilBlock {
+  const block = blank('note')
+  block.attrs.tone = 'warn'
+  block.prose = line
+  block.warnings.push(what)
+  return block
 }
 
 function openBlock(line: string): Cursor {
   const m = HEADER.exec(line)
   const rawKind = (m?.[1] ?? '').toLowerCase()
   const known = KIND_SET.has(rawKind)
-  const block = blank(known ? (rawKind as AnvilKind) : 'note')
-  block.attrs = parseAttrs(m?.[2] ?? '')
-  if (!known) {
-    block.attrs.tone = 'warn'
-    block.prose = line
-    block.warnings.push(`unknown block "@${rawKind || '?'}"`)
-  }
-  return { block, steps: readSteps(block) }
+  const block = known ? blank(rawKind as AnvilKind) : unknownBlock(line, `unknown block "@${rawKind || '?'}"`)
+  if (known) block.attrs = parseAttrs(m?.[2] ?? '')
+  return { block, steps: readSteps(block), attached: false }
 }
 
 function finish(block: AnvilBlock, body: string[]): AnvilBlock {
+  // `subject=` is an alias for the `?` line on a @message, because that is what
+  // everyone reaches for first. The `?` line wins when both are present: it is
+  // the one that is part of the language rather than a convenience.
+  if (block.kind === 'message' && !block.prompt && typeof block.attrs.subject === 'string') {
+    block.prompt = block.attrs.subject
+  }
+
   const authored = block.attrs.id
   if (typeof authored === 'string' && authored) {
     block.id = authored
@@ -121,18 +210,91 @@ function finish(block: AnvilBlock, body: string[]): AnvilBlock {
   if (block.options.length > 12) {
     block.warnings.push(`${block.options.length} options is past the point a human scans; use @input`)
   }
+  // An authored status that argues with the rows loses to them, loudly.
+  if (block.kind === 'card') {
+    const conflict = statusConflict(block)
+    if (conflict) block.warnings.push(conflict)
+  }
+  // Parsed-but-never-drawn is the silent drop §11 forbids.
+  if (block.meta.length && !META_KINDS.has(block.kind)) {
+    block.warnings.push(`+ rows are only drawn on @card, @board and @message, not @${block.kind}`)
+  }
+  if (block.prose && block.kind === 'board') {
+    block.warnings.push('@board has no prose body; use a @note beside it')
+  }
   return block
 }
 
 export function parseAnvil(source: string, opts: { partial?: boolean } = {}): AnvilDoc {
   const doc: AnvilDoc = { blocks: [], partial: opts.partial === true }
+
+  /**
+   * The open containers, innermost last. Never longer than MAX_LAYOUT_DEPTH.
+   *
+   * Containers opened past the cap are counted in `ghosts` instead of pushed.
+   * They are provably always a suffix -- a real frame can never open above a
+   * flattened one -- so an integer holds all the information a stack would, and
+   * `@end` stays balanced by draining ghosts first. The array version made
+   * `parseAnvil` quadratic: 60k `@grid` lines took 5.7 seconds and hung 60k
+   * warning strings off one block, which white-screens a transcript just as
+   * effectively as the throw the totality contract forbids.
+   */
+  const open: AnvilBlock[] = []
+  let ghosts = 0
+  /** One flatten warning per parent, however many containers it swallowed. */
+  let warnedFlat = false
+
   let cur: Cursor | null = null
   let body: string[] = []
 
+  /** Where a finished block goes: the innermost open container, else the doc. */
+  const sink = (): AnvilBlock[] => open[open.length - 1]?.children ?? doc.blocks
+
   const close = (): void => {
-    if (cur) doc.blocks.push(finish(cur.block, body))
+    if (cur && !cur.attached) sink().push(finish(cur.block, body))
     cur = null
     body = []
+  }
+
+  const openContainer = (line: string): void => {
+    const opened = openBlock(line)
+    if (open.length >= MAX_LAYOUT_DEPTH) {
+      // Flattened, not dropped: its children still render, one level shallower.
+      ghosts++
+      const parent = open[open.length - 1]
+      if (parent && !warnedFlat) {
+        parent.warnings.push(`layout nests ${MAX_LAYOUT_DEPTH} deep at most; deeper containers are flattened`)
+        warnedFlat = true
+      }
+      return
+    }
+    if (opened.block.attrs.id) {
+      opened.block.warnings.push('layout has no id: a @grid or @stack is never stamped, voided or targeted')
+    }
+    // A container has no identity: it is never stamped, never voided, never
+    // referenced by a `for=`. An id here would imply it could be.
+    opened.block.id = ''
+    opened.block.derivedId = false
+    opened.attached = true
+    sink().push(opened.block)
+    open.push(opened.block)
+    // Stays the cursor so `? Title` on the next line titles the container
+    // rather than opening an implicit note beside it.
+    cur = opened
+  }
+
+  const closeContainer = (line: string): void => {
+    close()
+    if (ghosts > 0) {
+      ghosts--
+      return
+    }
+    if (open.length) {
+      open.pop()
+      warnedFlat = false
+      return
+    }
+    sink().push(unknownBlock(line, 'stray @end with no open @grid or @stack'))
   }
 
   for (const rawLine of String(source ?? '').split('\n')) {
@@ -140,20 +302,39 @@ export function parseAnvil(source: string, opts: { partial?: boolean } = {}): An
     if (!line || line.startsWith('#')) continue
 
     if (line.startsWith('@')) {
+      const kind = (HEADER.exec(line)?.[1] ?? '').toLowerCase()
+      if (kind === 'end') {
+        closeContainer(line)
+        continue
+      }
       close()
-      cur = openBlock(line)
+      if (isContainer(kind)) openContainer(line)
+      else cur = openBlock(line)
       continue
     }
 
     // Content before any @ header is an implicit note.
-    if (!cur) cur = { block: blank('note'), steps: DEFAULT_STEPS }
+    if (!cur) cur = { block: blank('note'), steps: DEFAULT_STEPS, attached: false }
     body.push(line)
 
-    const handler = LINES[line.charAt(0)]
+    const sigil = line.charAt(0)
+    const handler = Object.hasOwn(LINES, sigil) ? LINES[sigil] : undefined
+
+    // A container holds blocks and a `?` title, nothing else. Without this the
+    // row is parsed into a field layoutShell never reads and disappears without
+    // a trace -- the silent drop §11 forbids, in the same package whose board
+    // renderer goes out of its way to print "+N more".
+    if (isContainer(cur.block.kind) && sigil !== '?') {
+      cur.block.warnings.push(`@${cur.block.kind} holds blocks, not "${sigil}" rows; this line is not drawn`)
+      continue
+    }
+
     if (handler) handler(line.slice(1).trim(), cur)
     else cur.block.prompt = join(cur.block.prompt, line, '\n')
   }
 
+  // An unclosed container is not an error. A fence truncated mid-grid must
+  // render what arrived, the same way an unclosed ~~~ closes at the fence.
   close()
   return doc
 }

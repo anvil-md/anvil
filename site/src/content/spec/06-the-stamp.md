@@ -65,10 +65,30 @@ These are the ones.
 Craft, then speed, then cost.
 </stamp>
 
+<!-- @card ask= -- value is the task REF, because that is the stable handle -->
+<stamp block="ANV-114" kind="card" value="ANV-120" label="Runbook entry">
+Pick up the runbook entry next.
+</stamp>
+
+<!-- @message ask= -- the send gate. `sent` is the host's assertion, not the agent's -->
+<stamp block="intro-mail" kind="message" channel="email" value="send" sent="yes" at="14:04:20">
+Yes, send it.
+</stamp>
+<stamp block="intro-mail" kind="message" channel="email" value="hold">
+Not yet.
+</stamp>
+
 <!-- skipped / expired -->
 <stamp block="refs" kind="link" skipped="yes">Skipped that one.</stamp>
 <stamp block="mood" kind="gallery" expired="yes">That one timed out.</stamp>
 ```
+
+A card stamps its task **`ref`**, never the label: the ref is what survives
+somebody rewording a subtask. A message stamps `send` or `hold` and nothing
+else -- the body is already in the transcript above it, and repeating it in the
+tag gives an escaping bug somewhere to live. `sent="yes"` is written by the
+host **after** the send actually succeeded; an agent that writes it is claiming
+something it did not witness.
 
 Every tag may also carry `at=` and, where more than one human can act, `by=`.
 Always include `label`/`labels` alongside `value`/`values` -- whoever summarises

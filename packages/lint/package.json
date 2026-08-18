@@ -1,0 +1,29 @@
+{
+  "name": "@anvil-md/lint",
+  "version": "0.1.0",
+  "description": "A validator for ANVIL source. Parse warnings plus the rules a total parser cannot enforce: colliding ids, authored progress, a form hiding in a grid, a message with nobody to send it to.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anvil-md/anvil.git",
+    "directory": "packages/lint"
+  },
+  "homepage": "https://anvil-md.frst.dev",
+  "bugs": "https://github.com/anvil-md/anvil/issues",
+  "keywords": ["anvil", "lint", "validator", "dsl", "markdown", "agent"],
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "bin": {
+    "anvil-lint": "./src/cli.ts"
+  },
+  "files": ["src", "README.md"],
+  "sideEffects": false,
+  "scripts": {
+    "test": "bun test"
+  }
+}

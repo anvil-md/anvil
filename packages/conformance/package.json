@@ -1,0 +1,27 @@
+{
+  "name": "@anvil-md/conformance",
+  "version": "0.1.0",
+  "description": "The ANVIL conformance corpus: a language-level test suite any implementation can run, in any language. One JSON file of cases plus a runner for the reference implementation.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anvil-md/anvil.git",
+    "directory": "packages/conformance"
+  },
+  "homepage": "https://anvil-md.frst.dev",
+  "bugs": "https://github.com/anvil-md/anvil/issues",
+  "keywords": ["anvil", "conformance", "test-suite", "dsl", "spec"],
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./corpus.json": "./corpus.json"
+  },
+  "files": ["src", "corpus.json", "README.md"],
+  "sideEffects": false,
+  "scripts": {
+    "test": "bun test"
+  }
+}
