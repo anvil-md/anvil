@@ -36,7 +36,12 @@ describe('anvilMarkdownIt', () => {
 	})
 
 	test('a missing fallback is a loud error, not a silent empty render', () => {
-		const md = { renderer: { rules: {} } }
+		// Annotated, not inferred: a bare `{}` widens to a type with no `fence`
+		// at all, so the assertion below stops typechecking. This is a host that
+		// registered no fence renderer, which is the whole point of the test.
+		const md: { renderer: { rules: { fence?: (t: unknown[], i: number) => string } } } = {
+			renderer: { rules: {} },
+		}
 		anvilMarkdownIt()(md)
 		expect(() => md.renderer.rules.fence?.([{ info: 'ts', content: 'x' }], 0)).toThrow(/fall back/)
 	})
