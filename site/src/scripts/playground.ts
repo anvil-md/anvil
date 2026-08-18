@@ -9,7 +9,7 @@
  * The preset sources live here rather than in the page so the server-rendered
  * first paint and the client both read the same strings.
  */
-import { type AnvilDoc, parseAnvil } from '@anvil-md/parser'
+import { type AnvilBlock, type AnvilDoc, parseAnvil } from '@anvil-md/parser'
 import { renderAnvilFence } from '@anvil-md/render-html'
 
 /** The parser is microseconds; this exists to stop the layout thrashing. */
@@ -109,17 +109,115 @@ _       | text | a field row with no name either
 @input id=typed
 _ email | emial | a field type nobody has heard of`
 
+const CARD = `@card id=ANV-114 type=story status=flight as=14:02
+? Payment retry ladder
+: Three attempts, 1m / 10m / 2h, then dead-letter.
++ 5 pts | high | Sprint 24 | epic ANV-100
+- [x] ANV-115 | Retry scheduler      | Ana
+- [x] ANV-116 | Backoff policy table | Ana
+- [~] ANV-117 | Dead-letter queue    | Kit
+> Kit - two days in flight, three of five checks green.
+> Needs the SQS policy from infra before this can merge.
+- [!] ANV-118 | Alerting hook        | blocked on ANV-117
+- [ ] ANV-119 | Metrics
+- [ ] ANV-120 | Runbook entry
+
+# There is no progress= attribute. Delete a row and watch the bar move.`
+
+const EPIC = `@card id=ANV-100 type=epic as=14:02
+? Billing that survives a bad night
+: Every child carries its own count, and the parent sums them.
+- [~] ANV-114 | Payment retry ladder | 3/7
+- [x] ANV-130 | Idempotency keys     | 6/6
+- [ ] ANV-141 | Dunning emails       | 0/9
+
+@board id=sprint-24 max=2 as=14:02
+? Sprint 24
+- [ ] ANV-119 | Metrics
+- [ ] ANV-120 | Runbook entry
+- [ ] ANV-121 | Load test at 10x
+- [~] ANV-117 | Dead-letter queue
+- [x] ANV-115 | Retry scheduler`
+
+const LAYOUT = `# Drag the window narrower. Nothing here has a breakpoint:
+# cols= is a MAXIMUM, and the collapse is computed against the
+# container, not the viewport.
+
+@grid cols=3 min=15rem gap=normal
+@card id=ANV-114 type=story status=flight
+? Payment retry ladder
+- [x] ANV-115 | Retry scheduler
+- [~] ANV-117 | Dead-letter queue
+- [ ] ANV-119 | Metrics
+@card id=ANV-130 type=story status=done
+? Idempotency keys
+- [x] ANV-131 | Key derivation
+- [x] ANV-132 | Replay guard
+@stack gap=tight
+? Still to scope
+@note tone=warn
+> Staging shares the production database.
+@card id=ANV-141 type=story
+? Dunning emails
+- [ ] ANV-142 | Template set
+@end
+@end`
+
+const MESSAGE = `# A message an agent proposes to send. It renders as a DRAFT
+# until something asserts otherwise - flip sent=14:07 on and watch
+# the frame change.
+
+@message channel=email to="jonas@duplo.org" cc="ana@x.dev, kit@x.dev"
+         from="bot@frst.dev" ask="Send it?"
+? Re: the retry ladder
+> Hey Jonas,
+>
+> The retry ladder is in. Three attempts, then dead-letter. The
+> alerting hook is still blocked on the SQS policy from infra.
++ patch.diff | 4 KB
+
+@message channel=whatsapp to="+66945556292" sent=14:07
+> retry ladder is live. 2 of 7 subtasks done.
+
+@message channel=slack to="#eng-billing" ask="Post it?"
+? Deploy notice
+> Shipping the retry ladder to prod in ten minutes.`
+
 export const PRESETS: Preset[] = [
 	{ id: 'choice', label: '@choice', source: CHOICE },
 	{ id: 'gallery', label: '@gallery render=swatch', source: GALLERY },
 	{ id: 'scale', label: '@scale', source: SCALE },
 	{ id: 'input', label: '@input', source: INPUT },
 	{ id: 'note', label: '@note tone=warn', source: NOTE },
+	{ id: 'card', label: '@card', source: CARD },
+	{ id: 'epic', label: '@card type=epic + @board', source: EPIC },
+	{ id: 'message', label: '@message', source: MESSAGE },
+	{ id: 'layout', label: '@grid + @stack', source: LAYOUT },
 	{ id: 'broken', label: 'malformed', source: BROKEN },
 ]
 
+/**
+ * Depth-first, containers included.
+ *
+ * The report walks this rather than `doc.blocks`, because a container's
+ * children are not top-level any more -- and a diagnostics table that silently
+ * omits every block inside a @grid is exactly the kind of quiet truncation the
+ * spec spends §4.13 banning.
+ */
+export function flatten(doc: AnvilDoc): AnvilBlock[] {
+	const out: AnvilBlock[] = []
+	const walk = (blocks: AnvilBlock[], depth: number): void => {
+		for (const b of blocks) {
+			out.push(b)
+			if (b.children.length) walk(b.children, depth + 1)
+		}
+	}
+	walk(doc.blocks, 0)
+	return out
+}
+
 export function warningCount(doc: AnvilDoc): number {
-	return doc.blocks.reduce((n, b) => n + b.warnings.length, 0)
+	return flatten(doc).reduce((n, b) => n + b.warnings.length, 0)
 }
 
 function plural(n: number, word: string): string {
@@ -129,7 +227,7 @@ function plural(n: number, word: string): string {
 /** The status strip above the report. Shared with the server-rendered first paint. */
 export function summarise(doc: AnvilDoc, closed: boolean): string {
 	return [
-		plural(doc.blocks.length, 'block'),
+		plural(flatten(doc).length, 'block'),
 		plural(warningCount(doc), 'warning'),
 		closed ? 'fence closed' : 'fence still streaming',
 	].join('  ·  ')
@@ -148,7 +246,8 @@ function el<K extends keyof HTMLElementTagNameMap>(
 
 /** Markup here must stay in step with the static table in playground.astro. */
 function reportTable(doc: AnvilDoc): HTMLElement {
-	if (!doc.blocks.length) {
+	const blocks = flatten(doc)
+	if (!blocks.length) {
 		return el('p', 'pg-empty', 'Nothing parsed yet. The document is empty.')
 	}
 
@@ -159,12 +258,14 @@ function reportTable(doc: AnvilDoc): HTMLElement {
 	}
 
 	const body = table.createTBody()
-	for (const block of doc.blocks) {
+	for (const block of blocks) {
 		const row = body.insertRow()
 
 		const idCell = el('td', 'pg-id')
-		idCell.append(block.id)
-		if (block.derivedId) idCell.appendChild(el('span', 'pg-derived', 'derived'))
+		// A container has no id on purpose (§4.14 L5), so it shows a dash rather
+		// than an empty cell that reads like a bug.
+		idCell.append(block.id || '--')
+		if (block.derivedId && block.id) idCell.appendChild(el('span', 'pg-derived', 'derived'))
 		row.appendChild(idCell)
 
 		row.appendChild(el('td', 'pg-kind', `@${block.kind}`))

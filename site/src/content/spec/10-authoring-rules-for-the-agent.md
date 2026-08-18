@@ -22,6 +22,13 @@ summary: "How an agent should use this: what to reach for, what to avoid, and ho
   overtook.
 - Give reversible choices an exit row (`Not sure yet`). A two-option block with
   no exit is a trap, and people click it just to make it go away.
+- Emit a fresh `@card` when the work moves, instead of imagining the old one
+  updated. The transcript is a sequence of states, and that is the useful part.
+- Put a `@message` in front of anything that leaves the building, with `ask=`
+  set. It costs one turn and it is the difference between a draft and an
+  apology.
+- Use `@grid` when several records deserve the same glance: three cards, or a
+  card beside the note that explains it.
 
 **Do not**
 
@@ -35,6 +42,13 @@ summary: "How an agent should use this: what to reach for, what to avoid, and ho
 - Do not assume an answer will come.
 - Do not reference a block's answer in text written *before* that answer exists.
 - Do not write `<stamp>` tags. That channel belongs to the client.
+- **Do not put two questions side by side in a `@grid`.** A grid holds records.
+  Two ASK blocks in one row is a form, and §10's whole argument is that an
+  interview beats a form. One question per turn survives the layout.
+- Do not type a progress number. There is nowhere to put one, and that is
+  deliberate -- write the rows and let them count.
+- Do not mark a `@message` `sent` until it has been. The default exists so that
+  a lie takes an act of typing.
 
 ### Interviews
 

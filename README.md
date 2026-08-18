@@ -116,13 +116,35 @@ implemented here. Those two sections are the contract if you want to build it.
 ## The blocks
 
 ```
-   ASK  @choice  @gallery  @input  @upload  @link  @scale  @order
-   SHOW @note    @code     @example
-   CTRL @void
+   ASK   @choice  @gallery  @input  @upload  @link  @scale  @order
+   SHOW  @note    @code     @example  @board
+   BOTH  @card    @message           (records, until ask= makes them questions)
+   GRID  @grid    @stack    @end
+   CTRL  @void
 ```
 
-Ten blocks and one directive, and the set is **closed on purpose**. Nearly
-everything you will want to add is one of these with an attribute set.
+Thirteen blocks, two containers and one directive, and the set is **closed on
+purpose**. Nearly everything you will want to add is one of these with an
+attribute set.
+
+Two of them are worth naming here, because they are the reason the set grew:
+
+**`@card`** is a work item -- subtasks, status, a progress bar -- and the bar is
+**counted from the rows**. There is no `progress=` attribute, deliberately. An
+agent that writes `3/7` above nine subtasks is lying, and the format should not
+hand it the vocabulary. An epic is the same block whose rows carry their own
+counts.
+
+**`@message`** is a message the agent is *proposing* to send: an email, a
+WhatsApp, a Slack post, drawn with the chrome of the thing it will become. It
+renders as **`draft · not sent`** until something asserts otherwise, addresses
+are text rather than links, and with `ask=` it becomes an ordinary one-click
+stamp -- so "did the human approve this" is a question the transcript can still
+answer six months later.
+
+`@grid` and `@stack` lay blocks out with **no breakpoints anywhere**: the agent
+writing the fence cannot see the screen, `cols` is a maximum rather than a
+count, and the collapse is computed against the container.
 
 Full grammar, every attribute, and the ASCII of what each one renders as:
 **[SPEC.md](./SPEC.md)**.
@@ -138,7 +160,15 @@ becomes a warned note, an unknown sigil folds into the prompt, an unknown field
 type falls back to `text` and says so, and an over-long option list renders in
 full with a complaint rather than being truncated.
 
-The load-bearing test fuzzes **every prefix of every fixture**.
+The critical test fuzzes **every prefix of every fixture**, hostile inputs
+included.
+
+One more runs against this repo's own prose: every ```` ```anvil ```` fence in
+`SPEC.md` is parsed, and the ASCII picture underneath it is checked against what
+the parser actually computes. The first draft of §4.12 printed `3/7 · 43%` over
+five rows with two done -- the section arguing that hand-typed numbers are worth
+banning from the language, illustrated with a hand-typed number that lied. The
+argument was right; the document was the counter-example. Now it cannot be.
 
 ```sh
 bun test
@@ -148,9 +178,13 @@ bun test
 
 Three things this gets right, because they are easy to get wrong:
 
-- **Attribute-position values are allowlisted, not escaped.** `swatch`, `font`
-  and `img` land in `style` and `src`, where escaping is not sufficient. Hex
-  only, conservative family names, `http(s)` only -- anything else is dropped.
+- **Attribute-position values are allowlisted, not escaped.** `swatch`, `font`,
+  `img`, `href` and a grid's `min` land in `style`, `src` and `href`, where
+  escaping is not sufficient. Hex only, conservative family names, `http(s)`
+  only, plain lengths only -- anything else is dropped whole.
+- **Every map indexed by agent text uses `Object.hasOwn`.** `MAP[key] ?? default`
+  does not fall back for an inherited property, so `gap=constructor` substituted
+  a function's source text into a CSS custom property and collapsed the grid.
 - **Stamps are untrusted input.** They are free text somebody typed, and they sit
   right next to the agent's own markdown. Frame them as data, not instructions
   ([§8.1](./SPEC.md#81-a-stamp-is-untrusted-input)).
@@ -161,9 +195,15 @@ Three things this gets right, because they are easy to get wrong:
 ## Status
 
 v1 of the spec. The parser and renderer are implemented and tested; stamping is
-specified and not built. `@upload`, `@link`, `@order`, `@example`, `@void` and
-`@code` are specified; the shipped renderer covers `@choice`, `@gallery`,
-`@input`, `@scale` and `@note`.
+specified and not built.
+
+| | |
+|---|---|
+| **Built** | `@choice` `@gallery` `@input` `@scale` `@note` `@card` `@board` `@message` `@grid` `@stack` |
+| **Specified, not built** | `@upload` `@link` `@order` `@example` `@void` `@code` |
+
+That second row is asserted by a test, so it cannot quietly go stale: the day
+one of them lands, the suite fails until somebody deletes the entry.
 
 Anything not built is described in [SPEC.md](./SPEC.md) precisely enough to build
 against. [§14](./SPEC.md#14-conformance) lists what conformance means.

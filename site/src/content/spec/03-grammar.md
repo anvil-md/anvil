@@ -5,23 +5,32 @@ section: 3
 summary: "Sigils, the line shapes, and why the in-block literal delimiter is ~~~ rather than a nested backtick fence."
 ---
 
-Line-oriented, one level of nesting, no lookahead. Leading whitespace is
-insignificant.
+Line-oriented, no lookahead. Leading whitespace is insignificant. Blocks are
+flat; the only nesting is a layout container holding blocks, capped at two
+deep (§4.14).
 
 ### 3.1 Sigils
 
 | Sigil | Means | Appears in |
 |---|---|---|
 | `@` | block header: `@kind key=value key="quoted value"` | starts every block |
-| `?` | the prompt. Repeatable; lines join with a newline. | all |
+| `?` | the prompt, or a card's title, or a container's group label | all |
 | `:` | subtext / help, rendered smaller under the prompt | all |
 | `-` | an option row | `@choice` `@gallery` `@order` |
+| `- [ ]` | a task row. The box is the state. | `@card` `@board` |
 | `_` | a field row | `@input` |
 | `%` | a scale row | `@scale` |
+| `+` | the chip strip: `+ 5 pts \| high \| Sprint 24` | `@card` |
 | `=` | a prefill row: `field=value` | `@example` |
-| `>` | prose line (markdown) | `@note` |
+| `>` | prose line (markdown), or the detail of the task row above it | `@note` `@card` |
 | `#` | comment. Parsed, never rendered, never sent. | anywhere |
 | `~~~` | literal fence, opens and closes a verbatim body | `@code` `@example` |
+
+Two of those are the same sigil doing the same job in a second place, on
+purpose. `-` is a row in a list either way, and the checkbox is what says the
+row already has an answer. `>` is the sentence attached to the thing above it
+either way. A second sigil for each would be two things to remember where the
+language already had one.
 
 A line beginning with none of the above is treated as prose and appended to the
 current prompt. **This is deliberate**: an agent that forgets a sigil gets
@@ -38,6 +47,13 @@ option   = "-" , [ "!" ] , value , { "|" , cell } , NL ;
 cell     = label | hint | ( key , "=" , value ) ;       (* img= swatch= font= *)
 field    = "_" , name , [ "*" ] , "|" , type , { "|" , cell } , NL ;
 scale    = "%" , name , "|" , leftPole , "|" , rightPole , [ "|" , default ] , NL ;
+task     = "-" , box , ref , [ "|" , label ] , [ "|" , meta ] , NL ;
+box      = "[" , ( " " | "x" | "~" | "!" ) , "]" ;      (* "/" "-" alias "~"   *)
+meta     = text | rollup ;
+rollup   = digits , "/" , digits ;                      (* a child's own count *)
+detail   = ">" , text , NL ;                            (* attaches to the task above *)
+chips    = "+" , text , { "|" , text } , NL ;
+layout   = ( "@grid" | "@stack" ) , { ws , attr } , NL , block* , [ "@end" , NL ] ;
 literal  = "~~~" , NL , { any } , "~~~" , NL ;
 ```
 

@@ -33,7 +33,7 @@ const META: Record<string, { nav: string; summary: string }> = {
 	'2': {
 		nav: 'Vocabulary',
 		summary:
-			'The ten blocks and one directive, why the set is closed, and why @markdown deliberately does not exist.',
+			'Twelve blocks, two containers and one directive, why the set is closed, and why @markdown deliberately does not exist.',
 	},
 	'3': {
 		nav: 'Grammar',
@@ -43,7 +43,7 @@ const META: Record<string, { nav: string; summary: string }> = {
 	'4': {
 		nav: 'Blocks',
 		summary:
-			'Every block in turn: attributes, the rows it accepts, and what it renders as, open and stamped.',
+			'Every block in turn: attributes, the rows it accepts, and what it renders as, open and stamped. Including @card, @board, @message and the two layout containers.',
 	},
 	'5': {
 		nav: 'Streaming',
@@ -82,12 +82,12 @@ const META: Record<string, { nav: string; summary: string }> = {
 	},
 	'12': {
 		nav: 'Failure modes',
-		summary: 'Sixteen ways to get this wrong, ranked by how much each one hurts, with the guard for each.',
+		summary: 'Twenty-two ways to get this wrong, ranked by how much each one hurts, with the guard for each.',
 	},
 	'13': { nav: 'Reference card', summary: 'The whole language on one screen.' },
 	'14': {
 		nav: 'Conformance',
-		summary: 'The seven things an implementation must do to call itself ANVIL v1 conformant.',
+		summary: 'The ten things an implementation must do to call itself ANVIL v1 conformant.',
 	},
 }
 
