@@ -944,6 +944,388 @@
   color: var(--anvil-muted-fg);
 }
 
+/* ── chart ─────────────────────────────────────────────────────────────────
+ *
+ * THE NUMBER IS NEVER ONLY IN THE PIXELS. Every mode here prints its values as
+ * text beside the shape, and the shape itself is aria-hidden, so a chart read
+ * aloud is a list of labelled numbers rather than a decorative blank. That is
+ * also why there are no axes and no gridlines: a transcript chart is read at a
+ * glance for its SHAPE, and the precision lives in the text where it belongs. */
+
+/* Visually hidden, NOT display:none -- the second one is out of the
+   accessibility tree too, which would delete the data instead of hiding it. */
+.anvil-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.anvil-chart {
+  margin-top: 0.6rem;
+}
+
+.anvil-chart-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.anvil-chart-row {
+  display: grid;
+  grid-template-columns: minmax(3.5rem, 22%) 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85em;
+}
+
+.anvil-chart-label {
+  color: var(--anvil-muted-fg);
+  overflow-wrap: anywhere;
+}
+
+.anvil-chart-track {
+  position: relative;
+  display: block;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--anvil-surface);
+}
+
+.anvil-chart-track i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: inherit;
+  background: var(--anvil-primary);
+}
+
+/* A negative bar grows the other way from the same baseline, so its LENGTH is
+   still its magnitude. Colour says which way, length says how much. */
+.anvil-chart-neg .anvil-chart-track i,
+.anvil-chart-neg .anvil-chart-stem i {
+  background: var(--anvil-danger);
+}
+
+.anvil-chart-dot {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 999px;
+  background: var(--anvil-primary);
+}
+
+.anvil-chart[data-render='dot'] .anvil-chart-track {
+  height: 2px;
+  background: var(--anvil-border);
+}
+
+/* The reference marker, repeated per track. The gaps between tracks turn the
+   repeat into a dashed rule at no cost. */
+.anvil-chart-goal {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--anvil-warn);
+  border-radius: 1px;
+}
+
+.anvil-chart-value {
+  font-family: var(--anvil-mono);
+  font-size: 0.9em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.anvil-chart-note {
+  margin-left: 0.4rem;
+  font-family: var(--anvil-font);
+  font-size: 0.85em;
+  color: var(--anvil-muted-fg);
+}
+
+.anvil-chart-cols {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 0.4rem;
+  min-height: 8.5rem;
+}
+
+.anvil-chart-col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  text-align: center;
+}
+
+.anvil-chart-col .anvil-chart-value {
+  font-size: 0.72em;
+}
+
+.anvil-chart-col .anvil-chart-label {
+  font-size: 0.72em;
+  overflow-wrap: anywhere;
+}
+
+.anvil-chart-stem {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  min-height: 3rem;
+  border-radius: var(--anvil-radius-sm);
+  background: var(--anvil-surface);
+}
+
+.anvil-chart-stem i {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-radius: inherit;
+  background: var(--anvil-primary);
+}
+
+.anvil-chart-stem .anvil-chart-goal {
+  top: auto;
+  left: -2px;
+  right: -2px;
+  width: auto;
+  height: 2px;
+  margin: 0 0 -1px;
+}
+
+.anvil-spark {
+  height: 3.5rem;
+}
+
+.anvil-spark-tiny {
+  flex: 1;
+  height: 1.6rem;
+  min-width: 0;
+}
+
+.anvil-spark-line-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.anvil-spark-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.anvil-spark-line {
+  fill: none;
+  stroke: var(--anvil-primary);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.anvil-spark-area {
+  fill: color-mix(in srgb, var(--anvil-primary) 12%, transparent);
+  stroke: none;
+}
+
+.anvil-spark-goal {
+  stroke: var(--anvil-warn);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+
+/* The last point, because "where did it end up" is what a trend is read for.
+   Non-scaling would distort it, so it is a circle in the squashed box and the
+   radius is small enough that the distortion does not read as an error. */
+.anvil-spark-last {
+  fill: var(--anvil-primary);
+  stroke: var(--anvil-bg);
+  stroke-width: 1;
+}
+
+.anvil-chart-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  margin-top: 0.5rem;
+}
+
+.anvil-chart-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  font-size: 0.75em;
+}
+
+.anvil-chart-stat span {
+  color: var(--anvil-muted-fg);
+}
+
+.anvil-chart-stat b {
+  font-family: var(--anvil-mono);
+  font-weight: 600;
+}
+
+.anvil-chart-stat i {
+  color: var(--anvil-muted-fg);
+  font-style: normal;
+}
+
+.anvil-chart-scale {
+  margin: 0.5rem 0 0;
+  font-family: var(--anvil-mono);
+  font-size: 0.68em;
+  color: var(--anvil-muted-fg);
+}
+
+/* A TRUNCATED AXIS IS ANNOUNCED TWICE.
+ *
+ * Once in words, in the scale line, which is the part that survives being read
+ * aloud. Once in the drawing, as a notch at the origin end of every track, so a
+ * reader skimming the shape sees that the bars start somewhere other than zero
+ * without having to read anything. Both, because either alone is missable, and
+ * a bar chart whose floor is not zero measures differences while looking
+ * exactly like one that measures amounts. */
+.anvil-chart-truncated .anvil-chart-scale {
+  color: var(--anvil-warn);
+}
+
+/* The break mark sits OVER the fill, not under it. As a background it was
+   painted on the track and then covered by the very bar it was qualifying,
+   so it only ever appeared on the rows that least needed it. */
+.anvil-chart-truncated .anvil-chart-track::after,
+.anvil-chart-truncated .anvil-chart-stem::after {
+  content: '';
+  position: absolute;
+  background: repeating-linear-gradient(
+    -60deg,
+    var(--anvil-warn) 0 1.5px,
+    transparent 1.5px 4px
+  );
+}
+
+.anvil-chart-truncated .anvil-chart-track::after {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 6px;
+  border-radius: 999px 0 0 999px;
+}
+
+.anvil-chart-truncated .anvil-chart-stem::after {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 6px;
+  border-radius: 0 0 var(--anvil-radius-sm) var(--anvil-radius-sm);
+}
+
+/* ── flow ──────────────────────────────────────────────────────────────────
+ *
+ * The whole diagram is ONE svg with a computed viewBox, so it scales as a unit
+ * and the text scales with it. Sizing the boxes needs a character advance that
+ * is actually true, which is why the labels are pinned to the mono stack: the
+ * layout in blocks.ts measures in characters, and a proportional face would
+ * make every box the wrong width. */
+
+.anvil-flow {
+  margin-top: 0.6rem;
+  overflow-x: auto;
+}
+
+.anvil-flow-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  font-family: var(--anvil-mono);
+}
+
+.anvil-flow-box {
+  fill: var(--anvil-surface);
+  stroke: var(--anvil-border);
+  stroke-width: 1;
+}
+
+.anvil-flow-label {
+  fill: var(--anvil-fg);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.anvil-flow-note {
+  fill: var(--anvil-muted-fg);
+  font-size: 10px;
+}
+
+/* The same four accents the task rows use, because it is the same four states:
+   a flow node wearing a checkbox means what a card row wearing one means. */
+.anvil-flow-node[data-state='done'] .anvil-flow-box {
+  stroke: var(--anvil-ok);
+  fill: color-mix(in srgb, var(--anvil-ok) 10%, var(--anvil-bg));
+}
+
+.anvil-flow-node[data-state='flight'] .anvil-flow-box {
+  stroke: var(--anvil-primary);
+  fill: color-mix(in srgb, var(--anvil-primary) 10%, var(--anvil-bg));
+}
+
+.anvil-flow-node[data-state='blocked'] .anvil-flow-box {
+  stroke: var(--anvil-danger);
+  fill: color-mix(in srgb, var(--anvil-danger) 10%, var(--anvil-bg));
+}
+
+.anvil-flow-edge {
+  stroke: var(--anvil-muted-fg);
+  stroke-width: 1.4;
+  fill: none;
+}
+
+.anvil-flow-head {
+  fill: var(--anvil-muted-fg);
+  stroke: none;
+}
+
+/* A return reads as a return. Dashed and dimmed, routed in its own lane, so a
+   cycle is visibly a cycle rather than a mystery line crossing the diagram. */
+.anvil-flow-back {
+  stroke-dasharray: 5 4;
+  opacity: 0.75;
+}
+
+.anvil-flow-plain {
+  stroke-dasharray: none;
+}
+
+.anvil-flow-tag rect {
+  fill: var(--anvil-bg);
+  stroke: var(--anvil-border);
+  stroke-width: 1;
+}
+
+.anvil-flow-tag text {
+  fill: var(--anvil-muted-fg);
+  font-size: 10px;
+}
+
 /* ── message ───────────────────────────────────────────────────────────────
  *
  * The draft marker is not decoration. A message that has NOT been sent must be

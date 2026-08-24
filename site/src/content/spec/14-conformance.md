@@ -22,6 +22,10 @@ An implementation is **ANVIL v1 conformant** if:
    detail is reachable without a pointer.
 10. Layout collapses against its container, has no id, and never renders an
     interactive affordance of any kind.
+11. A `@chart` prints every value it draws, keeps every value inside its range
+    whatever `min=` and `max=` say, and announces a floor that is not zero.
+12. A `@flow` terminates on a cyclic graph, draws the back edges rather than
+    dropping them, and states the count of anything it did not draw.
 
 Reference implementation: [`packages/parser`](./packages/parser) and
 [`packages/render-html`](./packages/render-html).

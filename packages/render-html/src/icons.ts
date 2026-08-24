@@ -41,6 +41,11 @@ export type IconName =
   | 'hash'
   | 'paperclip'
   | 'send'
+  | 'chart-bar'
+  | 'chart-column'
+  | 'chart-line'
+  | 'chart-scatter'
+  | 'workflow'
 
 /** Inner markup only; wrapped by `icon()` below. */
 const GEOMETRY: Record<IconName, string> = {
@@ -78,6 +83,17 @@ const GEOMETRY: Record<IconName, string> = {
   paperclip:
     '<path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/>',
   send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/>',
+  // The five below came from lucide-static v1.33.0 rather than lucide-react
+  // v1.23.0. Same geometry, same ISC licence, different distribution -- noted
+  // because "refresh it from the matching file" above is only true if you know
+  // which package a given icon was taken out of.
+  'chart-bar': '<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 16h8"/><path d="M7 11h12"/><path d="M7 6h3"/>',
+  'chart-column': '<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>',
+  'chart-line': '<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="m19 9-5 5-4-4-3 3"/>',
+  'chart-scatter':
+    '<circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="18.5" cy="5.5" r=".5" fill="currentColor"/><circle cx="11.5" cy="11.5" r=".5" fill="currentColor"/><circle cx="7.5" cy="16.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="14.5" r=".5" fill="currentColor"/><path d="M3 3v16a2 2 0 0 0 2 2h16"/>',
+  workflow:
+    '<rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/>',
 }
 
 const NAMES = new Set<string>(Object.keys(GEOMETRY))

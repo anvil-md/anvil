@@ -37,3 +37,7 @@ summary: "Twenty-two ways to get this wrong, ranked by how much each one hurts, 
 | 28 | A send gate that vanishes when it stamps | it becomes the receipt, at the same height (§4.15.5.2, §9.2) |
 | 29 | A state transition that animates a box model | opacity and transform only, or the block reflows (§4.15.5.3) |
 | 30 | A wrapped `@` header losing half its attributes | headers are one line; the parser warns on a `key=` continuation (§3.2) |
+| 31 | A chart whose bar is shorter than the number printed on it | a bound may move the range, never exclude a value (§4.16.2) |
+| 32 | A bar chart floored above zero without saying so | announce it in the scale line **and** in the bars (§4.16.2) |
+| 33 | A chart you can see but cannot read a value off | every mode prints its numbers; the shape is `aria-hidden` (§4.16.1) |
+| 34 | A flow that drops the back edge, or hangs on it | cycles are lifted out of ranking and drawn as returns (§4.17.3) |

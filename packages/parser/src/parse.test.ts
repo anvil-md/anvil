@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { parseAnvil } from './parse'
-import { taskProgress } from './types'
+import { type AnvilBlock, chartDomain, chartNumber, chartPct, flowGraph, taskProgress } from './types'
 
 const CHOICE = `@choice id=deploy-target
 ? Where should I ship this?
@@ -301,9 +301,233 @@ describe('layout', () => {
   })
 })
 
+const CHART = `@chart id=signups render=bar unit=k
+? Signups by week
+- W21 | 3.2
+- W22 | 4.8 | launch
+- W23 | 4.1`
+
+const FLOW = `@flow id=retry dir=right
+? Payment retry ladder
+- [x] charge | Charge  | 1st attempt
+- [~] retry1 | Retry 1
+- [!] dlq    | Dead letter | shape=round
+- charge -> retry1 | fails
+- retry1 -> dlq | 2h
+- retry1 -> charge | recovered`
+
+describe('@chart', () => {
+  test('a data row is label, number, note -- and the raw text is kept', () => {
+    const [b] = parseAnvil(CHART).blocks
+    expect(b?.kind).toBe('chart')
+    expect(b?.data.map(d => d.label)).toEqual(['W21', 'W22', 'W23'])
+    expect(b?.data.map(d => d.value)).toEqual([3.2, 4.8, 4.1])
+    expect(b?.data[1]?.note).toBe('launch')
+    expect(b?.warnings).toEqual([])
+  })
+
+  test('a value cell with no number is refused, and says which row', () => {
+    const [b] = parseAnvil('@chart id=c\n- Mon | lots\n- Tue | 4').blocks
+    expect(b?.data.map(d => d.label)).toEqual(['Tue'])
+    // Drawing it at zero would claim Monday was nought rather than unreadable.
+    expect(b?.warnings.join()).toMatch(/"Mon" has no number/)
+  })
+
+  test('numbers: thousands, magnitude suffixes, percent, sign -- and nothing else', () => {
+    expect(chartNumber('1,204')).toBe(1204)
+    expect(chartNumber('4.8k')).toBe(4800)
+    expect(chartNumber('2M')).toBe(2_000_000)
+    expect(chartNumber('-3.5%')).toBe(-3.5)
+    // Narrow on purpose: a date and a ratio must not become magnitudes.
+    expect(chartNumber('24/12')).toBeNull()
+    expect(chartNumber('3/7')).toBeNull()
+    expect(chartNumber('lots')).toBeNull()
+    expect(chartNumber('')).toBeNull()
+  })
+
+  test('raw survives to the model, so 4.8k is not rewritten as 4800', () => {
+    const [b] = parseAnvil('@chart id=c\n- a | 4.8k').blocks
+    expect(b?.data[0]?.value).toBe(4800)
+    expect(b?.data[0]?.raw).toBe('4.8k')
+  })
+
+  test('a single numeric cell is an unlabelled series point', () => {
+    const [b] = parseAnvil('@chart id=c\n- 12\n- 14\n- 11').blocks
+    expect(b?.data.map(d => d.value)).toEqual([12, 14, 11])
+    expect(b?.data.every(d => d.label === '')).toBe(true)
+    expect(b?.warnings).toEqual([])
+  })
+
+  test('values= is sugar, and the rows win when both are present', () => {
+    const sugar = parseAnvil('@chart id=c values=3,5,4').blocks[0]
+    expect(sugar?.data.map(d => d.value)).toEqual([3, 5, 4])
+
+    const both = parseAnvil('@chart id=c values=3,5,4\n- a | 9').blocks[0]
+    expect(both?.data.map(d => d.value)).toEqual([9])
+    expect(both?.warnings.join()).toMatch(/values= is ignored/)
+  })
+
+  test('the floor is zero, so a bar length is a magnitude', () => {
+    const [b] = parseAnvil('@chart id=c\n- a | 96\n- b | 98').blocks
+    const d = chartDomain(b as AnvilBlock)
+    expect(d.floor).toBe(0)
+    expect(d.top).toBe(98)
+    // Floored at 96 this would draw 98 as twice 96. That is the oldest lie in
+    // data visualisation and the domain is what prevents it.
+    expect(chartPct(d, 96)).toBeCloseTo(97.96, 1)
+  })
+
+  test('negatives lower the floor and put zero inside the range', () => {
+    const [b] = parseAnvil('@chart id=c\n- a | -4\n- b | 8').blocks
+    const d = chartDomain(b as AnvilBlock)
+    expect(d.floor).toBe(-4)
+    expect(d.top).toBe(8)
+    expect(d.zeroPct).toBeCloseTo(33.33, 1)
+  })
+
+  test('max= widens the range but can never narrow it below the data', () => {
+    const wide = parseAnvil('@chart id=c max=100\n- a | 40').blocks[0]
+    expect(chartDomain(wide as AnvilBlock).top).toBe(100)
+    expect(wide?.warnings).toEqual([])
+
+    const clipped = parseAnvil('@chart id=c max=50\n- a | 90').blocks[0]
+    expect(chartDomain(clipped as AnvilBlock).top).toBe(90)
+    expect(clipped?.warnings.join()).toMatch(/below the largest value \(90\); using 90/)
+  })
+
+  test('min= lifts the floor off zero, and the domain records that it did', () => {
+    const src = '@chart id=c min=99 max=100\n- a | 99.21\n- b | 99.99'
+    const d = chartDomain(parseAnvil(src).blocks[0] as AnvilBlock)
+    // Against a zero floor these two bars are indistinguishable, which is a
+    // chart that has told the reader nothing.
+    expect(d.floor).toBe(99)
+    expect(d.top).toBe(100)
+    expect(d.authoredFloor).toBe(true)
+    expect(chartPct(d, 99.21)).toBeCloseTo(21, 5)
+  })
+
+  test('a floor of zero is never flagged as authored, even when min=0 says so', () => {
+    const d = chartDomain(parseAnvil('@chart id=c min=0\n- a | 4').blocks[0] as AnvilBlock)
+    expect(d.floor).toBe(0)
+    // Nothing to announce: zero is what a reader already assumes.
+    expect(d.authoredFloor).toBe(false)
+  })
+
+  test('neither bound may exclude a value it is supposed to contain', () => {
+    const low = parseAnvil('@chart id=c min=99.5\n- a | 99.21\n- b | 99.99').blocks[0]
+    expect(chartDomain(low as AnvilBlock).floor).toBe(99.21)
+    expect(low?.warnings.join()).toMatch(/min="99.5" is above the smallest value \(99.21\)/)
+
+    const high = parseAnvil('@chart id=c max=50\n- a | 90').blocks[0]
+    expect(chartDomain(high as AnvilBlock).top).toBe(90)
+    expect(high?.warnings.join()).toMatch(/max="50" is below the largest value \(90\)/)
+  })
+
+  test('goal= extends the range, because a target off screen is not a target', () => {
+    const [b] = parseAnvil('@chart id=c goal=120\n- a | 40').blocks
+    expect(chartDomain(b as AnvilBlock).top).toBe(120)
+  })
+
+  test('a checkbox on a chart row is warned about, and the row still draws', () => {
+    const [b] = parseAnvil('@chart id=c\n- [x] a | 4').blocks
+    expect(b?.data.map(d => d.value)).toEqual([4])
+    expect(b?.warnings.join()).toMatch(/a @chart row is a value, not a task/)
+  })
+})
+
+describe('@flow', () => {
+  test('the arrow decides: a row with one is an edge, a row without declares a node', () => {
+    const [b] = parseAnvil(FLOW).blocks
+    expect(b?.kind).toBe('flow')
+    expect(b?.nodes.map(n => n.id)).toEqual(['charge', 'retry1', 'dlq'])
+    expect(b?.nodes.map(n => n.state)).toEqual(['done', 'flight', 'blocked'])
+    expect(b?.nodes[2]?.shape).toBe('round')
+    expect(b?.edges.map(e => `${e.from}>${e.to}`)).toEqual(['charge>retry1', 'retry1>dlq', 'retry1>charge'])
+    expect(b?.edges[0]?.label).toBe('fails')
+    expect(b?.warnings).toEqual([])
+  })
+
+  test('a chain is one row and several edges', () => {
+    const [b] = parseAnvil('@flow id=f\n- a -> b -> c -> d').blocks
+    expect(b?.edges.map(e => `${e.from}>${e.to}`)).toEqual(['a>b', 'b>c', 'c>d'])
+  })
+
+  test('-- needs spaces, because it is one hyphen from dead-letter', () => {
+    const dashed = parseAnvil('@flow id=f\n- dead-letter -> sink').blocks[0]
+    expect(dashed?.edges[0]).toMatchObject({ from: 'dead-letter', to: 'sink', undirected: false })
+
+    const plain = parseAnvil('@flow id=f\n- a -- b').blocks[0]
+    expect(plain?.edges[0]).toMatchObject({ from: 'a', to: 'b', undirected: true })
+
+    // No spaces: this is an id, not a connection.
+    const id = parseAnvil('@flow id=f\n- multi--word | Label').blocks[0]
+    expect(id?.nodes[0]?.id).toBe('multi--word')
+    expect(id?.edges).toEqual([])
+  })
+
+  test('every arrow spelling reaches the same edge', () => {
+    for (const arrow of ['->', '-->', '=>', '→']) {
+      const [b] = parseAnvil(`@flow id=f\n- a ${arrow} b`).blocks
+      expect(b?.edges[0]).toMatchObject({ from: 'a', to: 'b' })
+    }
+  })
+
+  test('an edge may name a node nobody declared', () => {
+    const [b] = parseAnvil('@flow id=f\n- build -> test').blocks
+    const g = flowGraph(b as AnvilBlock)
+    expect(g.nodes.map(n => n.id)).toEqual(['build', 'test'])
+    expect(g.nodes.every(n => !n.declared)).toBe(true)
+    expect(g.nodes[0]?.label).toBe('build')
+  })
+
+  test('longest path: a step waiting on two things is drawn after both', () => {
+    const [b] = parseAnvil('@flow id=f\n- a -> b\n- b -> c\n- a -> c').blocks
+    const g = flowGraph(b as AnvilBlock)
+    // Shortest path would put c beside b. It waits on b, so it goes after it.
+    expect(g.ranks.map(r => r.map(n => n.id))).toEqual([['a'], ['b'], ['c']])
+  })
+
+  test('a cycle terminates, keeps its back edge, and ranks the rest', () => {
+    const [b] = parseAnvil('@flow id=f\n- a -> b\n- b -> c\n- c -> a').blocks
+    const g = flowGraph(b as AnvilBlock)
+    expect(g.ranks.map(r => r.map(n => n.id))).toEqual([['a'], ['b'], ['c']])
+    // Dropped, it would hide the loop. Ranked, it would not terminate.
+    expect(g.edges.filter(e => e.back).map(e => `${e.from}>${e.to}`)).toEqual(['c>a'])
+  })
+
+  test('a self-loop is refused as the typo it almost always is', () => {
+    const [b] = parseAnvil('@flow id=f\n- a -> a').blocks
+    expect(b?.edges).toEqual([])
+    expect(b?.warnings.join()).toMatch(/points at itself/)
+  })
+
+  test('a checkbox on an edge row is ignored, loudly', () => {
+    const [b] = parseAnvil('@flow id=f\n- [x] a -> b').blocks
+    expect(b?.edges.map(e => `${e.from}>${e.to}`)).toEqual(['a>b'])
+    expect(b?.warnings.join()).toMatch(/on an edge row is ignored/)
+  })
+
+  test('an unknown shape falls back to a box and says so', () => {
+    const [b] = parseAnvil('@flow id=f\n- a | A | shape=hexagon\n- a -> b').blocks
+    expect(b?.nodes[0]?.shape).toBe('box')
+    expect(b?.warnings.join()).toMatch(/unknown shape "hexagon"/)
+  })
+
+  test('nodes and edges past the cap are counted, never silently dropped', () => {
+    const edges = Array.from({ length: 60 }, (_, i) => `- n${i} -> n${i + 1}`).join('\n')
+    const [b] = parseAnvil(`@flow id=f\n${edges}`).blocks
+    expect(b?.warnings.join()).toMatch(/61 nodes is past the 40/)
+    const g = flowGraph(b as AnvilBlock)
+    expect(g.nodes.length).toBe(40)
+    expect(g.dropped).toBe(21)
+  })
+})
+
 export const FIXTURES = [
   CHOICE,
   CARD,
+  CHART,
+  FLOW,
   '@grid cols=3 min=16rem\n@card id=a\n? A\n- [x] one\n@stack\n@note\n> hi\n@end\n@end',
   '@board id=s max=2\n? Sprint\n- [ ] a | A\n- [~] b | B\n- [x] c | C',
   '@gallery id=m render=image\n- a | A | img=https://x.test/a.jpg',
@@ -345,6 +569,49 @@ export const HOSTILE = [
   '@grid min=100vw;background:url(x)\n@card id=a',
   `@grid\n${'@stack\n'.repeat(200)}@card id=a`,
   `@card\n${'- [x] a\n'.repeat(500)}`,
+  '@chart\n- ',
+  '@chart\n- a | b',
+  '@chart\n- | |',
+  '@chart values=',
+  '@chart values=,,,',
+  '@chart values=a,b,c',
+  '@chart max=constructor\n- a | 1',
+  '@chart min=__proto__ goal=toString\n- a | 1',
+  '@chart render=constructor\n- a | 1',
+  '@chart max=1e999\n- a | 1',
+  '@chart\n- a | 0\n- b | 0',
+  '@flow\n- ->',
+  '@flow\n- -> b',
+  '@flow\n- a ->',
+  '@flow\n- a -> a',
+  '@flow\n- a -> b -> a',
+  '@flow\n- a -- b -- a',
+  '@flow\n- a | A | shape=__proto__',
+  '@flow dir=constructor\n- a -> b',
+  '@flow\n- [x] a -> b',
+  '@flow\n- a -> b\n- a -> b\n- a -> b',
+  // A dense cycle: the ranking relaxation must terminate on every one of them.
+  `@flow\n${Array.from({ length: 60 }, (_, i) => `- n${i} -> n${(i + 7) % 60}`).join('\n')}`,
+]
+
+/**
+ * Inputs too big to walk prefix by prefix -- a megabyte of source is a million
+ * parses, and the fuzzer above would never finish.
+ *
+ * They are here rather than dropped because SIZE is its own failure mode, and a
+ * different one: these break by exceeding a limit rather than by malforming a
+ * line, so no amount of small hostile input finds them.
+ *
+ * The one that mattered: `Math.max(...values)` in chartClip, which runs inside
+ * the parser. A 200k-row chart is fine in Bun 1.4 and a RangeError in Node 22
+ * (measured 2026-08-24) -- so the suite would have run green, on Bun, on the
+ * exact input that took the totality contract down for anyone on Node.
+ */
+export const HUGE = [
+  `@chart max=1\n${'- x | 1\n'.repeat(200000)}`,
+  `@chart render=line\n${'- 1\n'.repeat(200000)}`,
+  `@flow\n${'- a -> b\n'.repeat(20000)}`,
+  `@flow\n${Array.from({ length: 4000 }, (_, i) => `- n${i} -> n${i + 1}`).join('\n')}`,
 ]
 
 describe('totality contract', () => {
@@ -373,6 +640,30 @@ describe('totality contract', () => {
     for (const src of HOSTILE) {
       expect(() => parseAnvil(src)).not.toThrow()
     }
+  })
+
+  test('a fence far bigger than anyone should write still parses without throwing', () => {
+    for (const src of HUGE) {
+      expect(() => parseAnvil(src)).not.toThrow()
+    }
+  })
+
+  test('a huge chart is folded rather than spread into an argument list', () => {
+    // This size is a RangeError out of `Math.max(...values)` in Node 22 and not
+    // in Bun 1.4, which is exactly why the extent is folded: the parser cannot
+    // promise totality on a limit that belongs to whoever installed it.
+    const [b] = parseAnvil(`@chart id=c max=1\n${'- x | 5\n'.repeat(200000)}`).blocks
+    expect(b?.data.length).toBe(200000)
+    expect(chartDomain(b as AnvilBlock).top).toBe(5)
+    expect(b?.warnings.join()).toMatch(/below the largest value \(5\)/)
+  })
+
+  test('a flow with twenty thousand edges is bounded before it is ranked', () => {
+    const [b] = parseAnvil(`@flow id=f\n${'- a -> b\n'.repeat(20000)}`).blocks
+    expect(b?.warnings.join()).toMatch(/20000 edges is past the 120/)
+    const g = flowGraph(b as AnvilBlock)
+    expect(g.edges.length).toBe(120)
+    expect(g.nodes.length).toBe(2)
   })
 
   test('a prototype key never reaches a value slot', () => {

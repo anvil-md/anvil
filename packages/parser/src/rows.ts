@@ -5,8 +5,8 @@
  * Every function here is total: a malformed row records a warning on the block
  * and returns, never throws.
  */
-import type { AnvilBlock, AnvilOption, FieldType, TaskState } from './types'
-import { FIELD_TYPES } from './types'
+import type { AnvilBlock, AnvilOption, FieldType, FlowShape, TaskState } from './types'
+import { chartNumber, FIELD_TYPES, FLOW_SHAPES } from './types'
 
 const FIELD_TYPE_SET = new Set<string>(FIELD_TYPES)
 
@@ -195,6 +195,156 @@ export function parseTask(state: TaskState, rest: string, block: AnvilBlock): vo
     meta: metaText,
     detail: '',
     ...(rolled ? { done, total } : {}),
+  })
+}
+
+/**
+ * `- Label | 42 | note` -- one datum in a @chart.
+ *
+ * A row whose value cell is not a number is REFUSED, loudly, and not drawn.
+ * Drawing it at zero would be worse than dropping it: zero is a claim, and a
+ * bar of length nothing sitting under "Mon" says the Monday number was nought
+ * rather than unreadable. Refusing it and naming the row is the only honest
+ * option (§11 -- warned, never silent).
+ */
+export function parseDatum(rest: string, block: AnvilBlock): void {
+  const parts = cells(rest)
+
+  // A single numeric cell is a bare series point: `- 42`. Legal, unlabelled,
+  // and what an agent writes when the x axis is just "in this order".
+  if (parts.length === 1) {
+    const only = parts[0] ?? ''
+    const bare = chartNumber(only)
+    if (bare !== null) {
+      block.data.push({ label: '', value: bare, note: '', raw: only.trim() })
+      return
+    }
+    block.warnings.push(`"${only}" has no value cell; write "- ${only} | 42"`)
+    return
+  }
+
+  const [label = '', raw = '', note = ''] = parts
+  const value = chartNumber(raw)
+  if (value === null) {
+    block.warnings.push(`"${label}" has no number in its value cell ("${raw}"); row not drawn`)
+    return
+  }
+  block.data.push({ label, value, note, raw: raw.trim() })
+}
+
+/**
+ * Split a flow row's first cell on its arrows.
+ *
+ * Hand-scanned rather than a split regex because the two arrow families need
+ * different delimiting rules, and getting that wrong eats real ids. `->` is
+ * unambiguous and needs no spaces; `--` is a HYPHEN AWAY from `dead-letter`, so
+ * it only counts as an arrow when whitespace sits on both sides of it.
+ *
+ * A chain is one row: `- a -> b -> c` is two edges, because that is how anyone
+ * writes a pipeline the first time.
+ */
+const DIRECTED = /^(-->|->|=>|→)/
+const UNDIRECTED = /^\s(--|—)\s/
+
+function splitArrows(s: string): { parts: string[]; undirected: boolean[] } {
+  const parts: string[] = []
+  const undirected: boolean[] = []
+  let cur = ''
+  let i = 0
+  while (i < s.length) {
+    const rest = s.slice(i)
+    const dir = DIRECTED.exec(rest)
+    if (dir) {
+      parts.push(cur.trim())
+      undirected.push(false)
+      cur = ''
+      i += (dir[0] ?? '').length
+      continue
+    }
+    const und = UNDIRECTED.exec(rest)
+    if (und) {
+      parts.push(cur.trim())
+      undirected.push(true)
+      cur = ''
+      i += (und[0] ?? '').length
+      continue
+    }
+    cur += s[i]
+    i++
+  }
+  parts.push(cur.trim())
+  return { parts, undirected }
+}
+
+const SHAPE_SET = new Set<string>(FLOW_SHAPES)
+const SHAPE_CELL = /^shape\s*=\s*(.*)$/i
+
+/**
+ * `- [x] id | Label | note` declares a node; `- a -> b | label` connects two.
+ *
+ * ONE SIGIL, and the arrow is what tells them apart -- the same trick §3.1 uses
+ * for `-` in a @choice versus a @card, where the checkbox is the discriminator.
+ * A second sigil for edges would be one more thing to remember in a language
+ * whose whole argument is that there is almost nothing to remember.
+ */
+export function parseFlowRow(state: TaskState, boxed: boolean, rest: string, block: AnvilBlock): void {
+  const parts = cells(rest)
+  const head = parts.shift() ?? ''
+  const { parts: hops, undirected } = splitArrows(head)
+
+  if (hops.length > 1) {
+    if (boxed) {
+      // The box means "this step already has an answer", and an edge is not a
+      // step. It belongs on the node row that declares one side of the arrow.
+      block.warnings.push('a [ ] state on an edge row is ignored; put it on the node row instead')
+    }
+    const label = parts.find(c => !SHAPE_CELL.test(c)) ?? ''
+    let made = 0
+    for (let i = 0; i < hops.length - 1; i++) {
+      const from = hops[i] ?? ''
+      const to = hops[i + 1] ?? ''
+      if (!from || !to) continue
+      // `a -> a` ranks fine and draws as a loop on one node, but it is almost
+      // always a copy-paste rather than a deliberate self-transition.
+      if (from === to) {
+        block.warnings.push(`"${from} -> ${to}" points at itself`)
+        made++
+        continue
+      }
+      // A chain shares one label across its segments. Repeating `on green` is
+      // less surprising than silently attaching it to one hop of three.
+      block.edges.push({ from, to, label, undirected: undirected[i] === true })
+      made++
+    }
+    if (!made) block.warnings.push(`"${head}" is an arrow with nothing on one side of it`)
+    return
+  }
+
+  if (!head) {
+    block.warnings.push('flow row with no node id')
+    return
+  }
+
+  let shape: FlowShape = 'box'
+  const positional: string[] = []
+  for (const cell of parts) {
+    const m = SHAPE_CELL.exec(cell)
+    if (!m) {
+      positional.push(cell)
+      continue
+    }
+    const want = (m[1] ?? '').trim().toLowerCase()
+    if (SHAPE_SET.has(want)) shape = want as FlowShape
+    else block.warnings.push(`unknown shape "${want}", drawn as a box. Known: ${FLOW_SHAPES.join(', ')}`)
+  }
+
+  block.nodes.push({
+    id: head,
+    label: positional[0] || head,
+    note: positional[1] ?? '',
+    state,
+    shape,
+    declared: true,
   })
 }
 

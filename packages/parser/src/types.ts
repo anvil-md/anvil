@@ -18,6 +18,8 @@ export type AnvilKind =
   | 'card'
   | 'board'
   | 'message'
+  | 'chart'
+  | 'flow'
   | 'grid'
   | 'stack'
 
@@ -30,6 +32,8 @@ export const ANVIL_KINDS: readonly AnvilKind[] = [
   'card',
   'board',
   'message',
+  'chart',
+  'flow',
   'grid',
   'stack',
 ]
@@ -170,6 +174,130 @@ export interface AnvilProgress {
   rollup: boolean
 }
 
+/* ── chart ───────────────────────────────────────────────────────────────── */
+
+/** How a @chart draws its data. Closed, like every other render list. */
+export type ChartRender = 'bar' | 'column' | 'line' | 'spark' | 'dot'
+
+export const CHART_RENDERS: readonly ChartRender[] = ['bar', 'column', 'line', 'spark', 'dot']
+
+/**
+ * A `- Label | 42 | note` row.
+ *
+ * `raw` is kept beside the parsed number because the two say different things:
+ * the number is what the bar is drawn from, and the raw is what the human wrote
+ * and therefore what gets PRINTED. An agent writing `4.8k` gets `4.8k` back, not
+ * `4800`, and the bar is still the right length.
+ */
+export interface AnvilDatum {
+  label: string
+  value: number
+  /** Third cell: free text shown beside the value. */
+  note: string
+  /** The text the value was parsed out of. Always printed in preference to `value`. */
+  raw: string
+}
+
+/**
+ * The range a chart is drawn against.
+ *
+ * THE RENDERER NEVER INVENTS A SCALE. The top is the largest datum unless an
+ * author supplied a bigger one, the floor is zero unless something is negative,
+ * and an authored bound that would CLIP a row loses to the row -- clipping is
+ * how a bar chart tells the same lie a hand-typed `3/7` tells (§4.12.1), and it
+ * is harder to spot because the number that is wrong was never written down.
+ */
+export interface AnvilDomain {
+  /** Bottom of the drawn range. Zero, unless the data or `min=` moved it. */
+  floor: number
+  /** Top of the drawn range. The largest datum unless `max=` raised it. */
+  top: number
+  /** Where zero sits across the domain, 0-100. The baseline a bar grows from. */
+  zeroPct: number
+  /** True when `max=` set the top rather than the data. */
+  authoredTop: boolean
+  /**
+   * True when `min=` lifted the floor off zero.
+   *
+   * A renderer MUST say so where the reader can see it. A truncated axis is
+   * legitimate -- four uptimes between 99.2 and 99.99 are four identical bars
+   * against a zero floor, which is a chart that has told you nothing -- but an
+   * unlabelled one is the oldest deception in the subject.
+   */
+  authoredFloor: boolean
+}
+
+/* ── flow ────────────────────────────────────────────────────────────────── */
+
+/** A node's outline. Three shapes carry every flow worth drawing in a sentence. */
+export type FlowShape = 'box' | 'round' | 'diamond'
+
+export const FLOW_SHAPES: readonly FlowShape[] = ['box', 'round', 'diamond']
+
+/**
+ * A `- [x] id | Label | note` row in a @flow.
+ *
+ * The checkbox is the SAME checkbox a @card task row carries, meaning the same
+ * thing: this step already has an answer. A deploy pipeline drawn with two green
+ * stages and one blocked one is the single most useful diagram an agent can put
+ * in a transcript, and it costs no new vocabulary.
+ */
+export interface AnvilNode {
+  id: string
+  label: string
+  /** Second line in the chip. */
+  note: string
+  state: TaskState
+  shape: FlowShape
+  /** False when the node was never declared, only named by an edge. */
+  declared: boolean
+}
+
+/** A `- a -> b | label` row. `--` gives the undirected form. */
+export interface AnvilEdge {
+  from: string
+  to: string
+  label: string
+  /** Written `--` rather than `->`: a relation with no direction. */
+  undirected: boolean
+}
+
+/** An edge with the two facts the layout adds: which ranks it spans, and whether it goes backwards. */
+export interface FlowEdge extends AnvilEdge {
+  fromRank: number
+  toRank: number
+  /** True when this edge closes a cycle and was excluded from ranking. */
+  back: boolean
+}
+
+export interface FlowLayout {
+  /** Every node, declared or implied, after the cap. */
+  nodes: AnvilNode[]
+  /** Nodes grouped by rank, in draw order within each rank. */
+  ranks: AnvilNode[][]
+  edges: FlowEdge[]
+  /** Nodes dropped by MAX_FLOW_NODES. Never silent -- the renderer says the count. */
+  dropped: number
+}
+
+/**
+ * How big a graph this draws before it stops being a sentence and starts being
+ * a document. Past this it is an architecture diagram, and §4.14 L2 already drew
+ * that line for layout.
+ */
+export const MAX_FLOW_NODES = 40
+
+/**
+ * And how many arrows between them.
+ *
+ * A separate cap because the node count does not bound it: forty nodes admit
+ * sixteen hundred edges, and the ranking relaxation is O(nodes x edges). A fence
+ * of sixty thousand `- a -> b` rows is the same shape of input that once made
+ * `parseAnvil` quadratic on `@grid`, and the answer is the same -- bound it, and
+ * say out loud what was not drawn.
+ */
+export const MAX_FLOW_EDGES = 120
+
 export type NoteTone = 'info' | 'warn' | 'danger'
 
 export interface AnvilBlock {
@@ -190,6 +318,12 @@ export interface AnvilBlock {
   dials: AnvilDial[]
   /** `- [ ]` rows, for @card and @board. */
   tasks: AnvilTask[]
+  /** `- Label | 42` rows, for @chart. */
+  data: AnvilDatum[]
+  /** `- id | Label` rows, for @flow. Implied nodes are added by flowGraph, not here. */
+  nodes: AnvilNode[]
+  /** `- a -> b | label` rows, for @flow. */
+  edges: AnvilEdge[]
   /**
    * `+` rows, one entry per LINE, split into cells.
    *
@@ -398,4 +532,322 @@ export function cardStatus(block: AnvilBlock): TaskState {
   const authored = attrString(block, 'status').toLowerCase()
   if (!TASK_STATE_SET.has(authored)) return countedStatus(block)
   return statusConflict(block) ? countedStatus(block) : (authored as TaskState)
+}
+
+/* ── chart derivations ───────────────────────────────────────────────────── */
+
+const CHART_RENDER_SET = new Set<string>(CHART_RENDERS)
+
+/** Unknown modes fall back to `bar`, the one that survives any label length. */
+export function chartRender(block: AnvilBlock): ChartRender {
+  const v = attrString(block, 'render', 'bar').toLowerCase()
+  return CHART_RENDER_SET.has(v) ? (v as ChartRender) : 'bar'
+}
+
+/**
+ * `4.8k` -> 4800. `1,204` -> 1204. `-3.5%` -> -3.5. `lots` -> null.
+ *
+ * Deliberately narrow. A permissive number parser reaches into text it has no
+ * business reading -- `24/12` is a date, `3/7` is a ratio, and either one
+ * silently becoming a magnitude is exactly the failure rows.ts already fought
+ * over in parseTask. Anything this does not recognise is REFUSED and warned
+ * about, never guessed at.
+ */
+const NUMBER = /^([+-]?)(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?\s*([kmb])?\s*%?$/i
+const SCALE: Record<string, number> = { k: 1e3, m: 1e6, b: 1e9 }
+
+export function chartNumber(text: string): number | null {
+  const t = String(text ?? '').trim()
+  const m = NUMBER.exec(t)
+  if (!m) return null
+  const digits = `${m[2] ?? ''}`.replace(/,/g, '')
+  const n = Number.parseFloat(`${digits}${m[3] ?? ''}`)
+  if (!Number.isFinite(n)) return null
+  const mult = m[4] ? (SCALE[m[4].toLowerCase()] ?? 1) : 1
+  return (m[1] === '-' ? -1 : 1) * n * mult
+}
+
+/** An attribute that must be a number to mean anything. Absent and unparseable read alike. */
+function numberAttr(block: AnvilBlock, key: string): number | null {
+  const raw = block.attrs[key]
+  return typeof raw === 'string' ? chartNumber(raw) : null
+}
+
+/** `goal=` draws a reference marker. It has to be inside the domain or it is not on screen. */
+export function chartGoal(block: AnvilBlock): number | null {
+  return numberAttr(block, 'goal')
+}
+
+/**
+ * The range the bars are drawn against.
+ *
+ * One rule, applied three times: THE RANGE MUST CONTAIN EVERY VALUE IT DRAWS.
+ *
+ * 1. The floor defaults to zero, so a bar's LENGTH is its magnitude. A chart
+ *    that quietly floors at its smallest datum makes 98 look twice 96, which is
+ *    the oldest deception in the subject. Negative data lowers the floor to
+ *    reach the data, never to flatter it.
+ * 2. `min=` may lift the floor off zero, and the renderer must then SAY so.
+ *    Four uptimes between 99.2 and 99.99 are four identical full-height bars
+ *    against a zero floor -- a chart that has told the reader nothing. A
+ *    truncated axis is legitimate; an unlabelled truncated axis is not.
+ * 3. NEITHER BOUND MAY EXCLUDE A VALUE. `max=100` over a 99.4 is context;
+ *    `max=50` over a 90 could only be drawn by clipping, which prints a number
+ *    at the end of a bar too short to be that number. Same for a `min=` above
+ *    the smallest datum. The data wins, and the parser has already said so.
+ * 4. `goal=` extends the range if it sits outside, because a target you cannot
+ *    see is not a target.
+ *
+ * `data` defaults to the block's rows and is overridable because a renderer that
+ * caps a long series must scale the shape to WHAT IT DREW. Scaling the visible
+ * tail against a peak that scrolled off the front draws a flat line under a
+ * ceiling nothing reaches, which is the axis lying by omission.
+ */
+export function chartDomain(block: AnvilBlock, data: AnvilDatum[] = block.data): AnvilDomain {
+  const values = data.map(d => d.value)
+  const goal = chartGoal(block)
+  if (goal !== null) values.push(goal)
+
+  const { lowest, highest } = extent(values)
+
+  const authoredMin = numberAttr(block, 'min')
+  const authoredMax = numberAttr(block, 'max')
+
+  // An authored bound is CLAMPED to the data rather than discarded. The agent
+  // asking for `min=99.5` over a 99.21 wants a truncated axis and got the
+  // arithmetic slightly wrong; answering that with a zero floor throws away the
+  // intent as well as the number. So the bound moves just far enough to contain
+  // every value -- the same thing `max=` does from the other end -- and the
+  // parser says which number it actually used.
+  const floor = authoredMin !== null ? Math.min(authoredMin, lowest) : Math.min(lowest, 0)
+  let top = authoredMax !== null ? Math.max(authoredMax, highest) : highest
+  // A flat series still needs a span, or every position divides by zero.
+  if (top <= floor) top = floor + 1
+
+  const span = top - floor
+  const zeroPct = Math.min(100, Math.max(0, ((0 - floor) / span) * 100))
+  // Both flags track WHERE THE RANGE ENDED UP, not whether the attribute was
+  // taken verbatim. A clamped `min=` still truncates the axis and still has to
+  // announce it; a `max=` that lost to the data set no scale worth mentioning.
+  return {
+    floor,
+    top,
+    zeroPct,
+    authoredTop: authoredMax !== null && top > highest,
+    authoredFloor: authoredMin !== null && floor !== 0,
+  }
+}
+
+/**
+ * Does an authored `max=` sit below the data it is supposed to contain?
+ *
+ * This is §4.12.1 arriving at a second block. A card cannot author its progress
+ * because the rows would contradict it; a chart CAN author its ceiling, because
+ * `max=100` over a 99.4 is real context nothing in the rows knows. What it must
+ * not do is author a ceiling BELOW the data, because the only way to draw that
+ * is to clip a bar -- and a bar drawn shorter than the number printed at the end
+ * of it is a lie that nobody has to type out, which makes it worse than the one
+ * @card was invented to stop.
+ *
+ * The data wins, exactly as the rows win over `status=`, and it says so.
+ */
+export function chartClip(block: AnvilBlock): string | null {
+  if (!block.data.length) return null
+  const { lowest, highest } = extent(block.data.map(d => d.value))
+
+  const rawMax = block.attrs.max
+  if (typeof rawMax === 'string') {
+    const authored = chartNumber(rawMax)
+    if (authored !== null && authored < highest) {
+      return `max="${rawMax}" is below the largest value (${highest}); using ${highest} so nothing is clipped`
+    }
+  }
+
+  const rawMin = block.attrs.min
+  if (typeof rawMin === 'string') {
+    const authored = chartNumber(rawMin)
+    if (authored !== null && authored > lowest) {
+      return `min="${rawMin}" is above the smallest value (${lowest}); using ${lowest} so nothing is clipped`
+    }
+  }
+
+  return null
+}
+
+/**
+ * Smallest and largest, by fold rather than by spread.
+ *
+ * `Math.max(...values)` passes every element as an ARGUMENT, and past some
+ * engine-specific count that is a RangeError rather than a number. chartClip
+ * runs INSIDE the parser, so the throw would come straight out of `parseAnvil`
+ * -- the one thing parse.ts promises can never happen.
+ *
+ * The count is the reason this is a fold and not a bigger guard: measured
+ * 2026-08-24, a 200k-row chart is fine in Bun 1.4 and dead in Node 22. A limit
+ * that moves with the host is one this package cannot reason about, and every
+ * consumer picks its own host. A fold has no argument limit at all, so the
+ * question stops existing.
+ */
+function extent(values: number[]): { lowest: number; highest: number } {
+  let lowest = Number.POSITIVE_INFINITY
+  let highest = Number.NEGATIVE_INFINITY
+  for (const v of values) {
+    if (v < lowest) lowest = v
+    if (v > highest) highest = v
+  }
+  return values.length ? { lowest, highest } : { lowest: 0, highest: 0 }
+}
+
+/** Where a value sits across the domain, 0-100. The one place the arithmetic lives. */
+export function chartPct(domain: AnvilDomain, value: number): number {
+  const span = domain.top - domain.floor
+  if (span <= 0) return 0
+  return Math.min(100, Math.max(0, ((value - domain.floor) / span) * 100))
+}
+
+/* ── flow derivations ────────────────────────────────────────────────────── */
+
+function impliedNode(id: string): AnvilNode {
+  return { id, label: id, note: '', state: 'todo', shape: 'box', declared: false }
+}
+
+/**
+ * Resolve the node set: everything declared, plus everything an edge names.
+ *
+ * An edge to an undeclared node is LEGAL and common -- `- build -> test` on its
+ * own is the whole diagram most of the time, and forcing two declaration rows
+ * first would make the useful case the verbose one. The implied node takes its
+ * id as its label and `todo` as its state.
+ */
+function resolveNodes(block: AnvilBlock): Map<string, AnvilNode> {
+  const byId = new Map<string, AnvilNode>()
+  for (const n of block.nodes) {
+    // A second declaration of the same id updates it rather than duplicating.
+    byId.set(n.id, { ...(byId.get(n.id) ?? n), ...n })
+  }
+  for (const e of block.edges) {
+    if (!byId.has(e.from)) byId.set(e.from, impliedNode(e.from))
+    if (!byId.has(e.to)) byId.set(e.to, impliedNode(e.to))
+  }
+  return byId
+}
+
+/**
+ * Which edges close a cycle, by DFS colouring. A grey target is a back edge.
+ *
+ * A cycle is not an error -- retry ladders and state machines have them, and
+ * they are exactly what an agent wants to draw. It is only a problem for
+ * RANKING, which is why the back edges are lifted out here and drawn afterwards
+ * as returns rather than being dropped or, worse, sent into an infinite layout.
+ */
+function backEdges(nodes: Map<string, AnvilNode>, edges: AnvilEdge[]): Set<number> {
+  const out = new Map<string, number[]>()
+  edges.forEach((e, i) => {
+    const list = out.get(e.from)
+    if (list) list.push(i)
+    else out.set(e.from, [i])
+  })
+
+  const back = new Set<number>()
+  const colour = new Map<string, 0 | 1 | 2>()
+
+  // Iterative, not recursive: a 40-node chain is fine either way, but a parser
+  // that must never throw must also never blow a stack on agent-authored input.
+  for (const start of nodes.keys()) {
+    if (colour.get(start)) continue
+    const stack: Array<{ id: string; next: number }> = [{ id: start, next: 0 }]
+    colour.set(start, 1)
+    while (stack.length) {
+      const frame = stack[stack.length - 1]
+      if (!frame) break
+      const outgoing = out.get(frame.id) ?? []
+      if (frame.next >= outgoing.length) {
+        colour.set(frame.id, 2)
+        stack.pop()
+        continue
+      }
+      const idx = outgoing[frame.next++] as number
+      const to = (edges[idx] as AnvilEdge).to
+      const seen = colour.get(to)
+      if (seen === 1) {
+        back.add(idx)
+        continue
+      }
+      if (seen === 2) continue
+      colour.set(to, 1)
+      stack.push({ id: to, next: 0 })
+    }
+  }
+  return back
+}
+
+/**
+ * Longest-path layering, then one barycentre pass to settle the order inside
+ * each rank.
+ *
+ * Longest path rather than shortest, so a node sits one column after its LAST
+ * dependency: a step that waits on two things is drawn after both of them,
+ * which is the thing a reader is looking for. The barycentre pass is one sweep,
+ * stable, and broken to source order on ties -- deterministic output matters
+ * more here than a perfect crossing count, because this string ends up in a
+ * test.
+ */
+export function flowGraph(block: AnvilBlock): FlowLayout {
+  const byId = resolveNodes(block)
+  const dropped = Math.max(0, byId.size - MAX_FLOW_NODES)
+  const kept = [...byId.values()].slice(0, MAX_FLOW_NODES)
+  const live = new Set(kept.map(n => n.id))
+
+  const edges = block.edges.filter(e => live.has(e.from) && live.has(e.to)).slice(0, MAX_FLOW_EDGES)
+  const back = backEdges(new Map(kept.map(n => [n.id, n])), edges)
+
+  const rank = new Map<string, number>(kept.map(n => [n.id, 0]))
+  const forward = edges.filter((_, i) => !back.has(i))
+
+  // Relax until stable. Bounded by the node count on a DAG, and the back edges
+  // are already out, so this cannot spin.
+  for (let pass = 0; pass < kept.length; pass++) {
+    let moved = false
+    for (const e of forward) {
+      const want = (rank.get(e.from) ?? 0) + 1
+      if (want > (rank.get(e.to) ?? 0)) {
+        rank.set(e.to, want)
+        moved = true
+      }
+    }
+    if (!moved) break
+  }
+
+  const depth = kept.reduce((m, n) => Math.max(m, rank.get(n.id) ?? 0), 0)
+  const ranks: AnvilNode[][] = Array.from({ length: depth + 1 }, () => [])
+  const order = new Map<string, number>(kept.map((n, i) => [n.id, i]))
+  for (const n of kept) (ranks[rank.get(n.id) ?? 0] as AnvilNode[]).push(n)
+
+  const rowOf = new Map<string, number>()
+  ranks.forEach(row => row.forEach((n, i) => rowOf.set(n.id, i)))
+  for (let r = 1; r < ranks.length; r++) {
+    const row = ranks[r] as AnvilNode[]
+    const bary = new Map<string, number>()
+    for (const n of row) {
+      const parents = forward.filter(e => e.to === n.id).map(e => rowOf.get(e.from) ?? 0)
+      bary.set(n.id, parents.length ? parents.reduce((a, b) => a + b, 0) / parents.length : Number.POSITIVE_INFINITY)
+    }
+    row.sort((a, b) => {
+      const d = (bary.get(a.id) as number) - (bary.get(b.id) as number)
+      return d !== 0 && Number.isFinite(d) ? d : (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0)
+    })
+    row.forEach((n, i) => rowOf.set(n.id, i))
+  }
+
+  return {
+    nodes: kept,
+    ranks,
+    edges: edges.map((e, i) => ({
+      ...e,
+      fromRank: rank.get(e.from) ?? 0,
+      toRank: rank.get(e.to) ?? 0,
+      back: back.has(i),
+    })),
+    dropped,
+  }
 }

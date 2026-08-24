@@ -10,13 +10,27 @@
  * Row parsing lives in rows.ts; this file is the line dispatch and the block
  * assembly, nothing else.
  */
-import { parseDial, parseField, parseMeta, parseOption, parseTask, TASK_BOX, taskState } from './rows'
+import {
+  parseDatum,
+  parseDial,
+  parseField,
+  parseFlowRow,
+  parseMeta,
+  parseOption,
+  parseTask,
+  TASK_BOX,
+  taskState,
+} from './rows'
 import {
   ANVIL_KINDS,
   type AnvilBlock,
   type AnvilDoc,
   type AnvilKind,
+  chartClip,
+  chartNumber,
   isContainer,
+  MAX_FLOW_EDGES,
+  MAX_FLOW_NODES,
   MAX_LAYOUT_DEPTH,
   statusConflict,
 } from './types'
@@ -33,7 +47,7 @@ const WRAPPED_HEADER = /^[A-Za-z_][\w-]*=/
 const TASK_KINDS = new Set<AnvilKind>(['card', 'board'])
 
 /** The kinds that draw a `+` row. Everywhere else it would be parsed and dropped. */
-const META_KINDS = new Set<AnvilKind>(['card', 'board', 'message'])
+const META_KINDS = new Set<AnvilKind>(['card', 'board', 'message', 'chart', 'flow'])
 
 /** `key=value`, `key="quoted value"`, or a bare `key` meaning true. */
 function parseAttrs(s: string): Record<string, string | boolean> {
@@ -70,6 +84,9 @@ function blank(kind: AnvilKind): AnvilBlock {
     fields: [],
     dials: [],
     tasks: [],
+    data: [],
+    nodes: [],
+    edges: [],
     meta: [],
     children: [],
     prose: '',
@@ -98,6 +115,22 @@ function dashRow(rest: string, block: AnvilBlock): void {
   const wantsTasks = TASK_KINDS.has(block.kind)
   const boxed = TASK_BOX.exec(rest)
   const state = boxed ? taskState(boxed[1] ?? '') : null
+
+  // A chart row is a magnitude, and a magnitude has no todo/done. A checkbox
+  // here is an agent reaching for @card; the row still draws.
+  if (block.kind === 'chart') {
+    if (boxed) block.warnings.push(`[${boxed[1]}] state ignored: a @chart row is a value, not a task`)
+    parseDatum(boxed ? (boxed[2] ?? '') : rest, block)
+    return
+  }
+
+  // A flow row is a node or an edge, and the arrow decides which. The checkbox
+  // means on a node exactly what it means on a card: this step has an answer.
+  if (block.kind === 'flow') {
+    if (boxed && !state) block.warnings.push(`unknown task state "[${boxed[1]}]", using todo`)
+    parseFlowRow(state ?? 'todo', boxed !== null, boxed ? (boxed[2] ?? '') : rest, block)
+    return
+  }
 
   if (boxed && state) {
     if (wantsTasks) {
@@ -201,6 +234,43 @@ function finish(block: AnvilBlock, body: string[]): AnvilBlock {
   // the one that is part of the language rather than a convenience.
   if (block.kind === 'message' && !block.prompt && typeof block.attrs.subject === 'string') {
     block.prompt = block.attrs.subject
+  }
+
+  // `values=3,5,4,9` is the one-line sparkline: a series with no labels, which
+  // is what a trend actually is. Rows are the real grammar and win outright --
+  // an agent that wrote both meant the rows, and the attribute is the shorthand
+  // it forgot to delete.
+  if (block.kind === 'chart' && typeof block.attrs.values === 'string') {
+    if (block.data.length) {
+      block.warnings.push('values= is ignored when the block has - rows; the rows are the data')
+    } else {
+      for (const raw of block.attrs.values.split(',')) {
+        const cell = raw.trim()
+        if (!cell) continue
+        const n = chartNumber(cell)
+        if (n === null) block.warnings.push(`values= entry "${cell}" is not a number; skipped`)
+        else block.data.push({ label: '', value: n, note: '', raw: cell })
+      }
+    }
+  }
+
+  // An authored ceiling that would draw a bar shorter than its own printed
+  // number is the chart version of a hand-typed progress count (§4.12.1).
+  if (block.kind === 'chart') {
+    const clip = chartClip(block)
+    if (clip) block.warnings.push(clip)
+  }
+
+  if (block.kind === 'flow') {
+    const named = new Set<string>()
+    for (const n of block.nodes) named.add(n.id)
+    for (const e of block.edges) named.add(e.from), named.add(e.to)
+    if (named.size > MAX_FLOW_NODES) {
+      block.warnings.push(`${named.size} nodes is past the ${MAX_FLOW_NODES} a flow draws; the rest are not shown`)
+    }
+    if (block.edges.length > MAX_FLOW_EDGES) {
+      block.warnings.push(`${block.edges.length} edges is past the ${MAX_FLOW_EDGES} a flow draws; the rest are not shown`)
+    }
   }
 
   const authored = block.attrs.id

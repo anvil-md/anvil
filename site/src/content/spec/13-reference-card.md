@@ -18,6 +18,9 @@ summary: "The whole language on one screen."
    │ @code lang= label=   @example for=<id>   @void id= reason=           │
    │ @card type= status= as= ask=      @board max= as=                    │
    │ the bar is COUNTED from the rows. there is no progress=              │
+   │ @chart render=bar|column|line|spark|dot  unit= max= min= goal=       │
+   │        values=3,5,4   one series · no axes · no sort · floor is 0    │
+   │ @flow  dir=right|down   arrow makes a row an edge, else it is a node │
    ├── LAYOUT ────────────────────────────────────────────────────────────┤
    │ @grid cols=<max, 1-6> min= gap=tight|normal|loose frame              │
    │ @stack gap=            @end  (or the end of the fence)               │
@@ -26,6 +29,8 @@ summary: "The whole language on one screen."
    │ ? prompt          : subtext          # comment (never rendered)      │
    │ - value | Label | hint | img= swatch= font= sample=   (! = danger)   │
    │ - [ ] ref | Label | meta    [ ]todo [~]flight [x]done [!]blocked     │
+   │ - Label | 42 | note           a @chart datum                         │
+   │ - a -> b | label   - a -- b   a @flow edge  (-> --> => → )           │
    │ _ name[*] | type | Label | placeholder                               │
    │ % name | leftPole | rightPole | default                              │
    │ + chip | chip | chip          (a card's meta strip)                  │

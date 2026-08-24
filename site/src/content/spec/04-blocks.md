@@ -718,3 +718,220 @@ Two constraints on that animation, and they are not stylistic:
   state must still be legible with every animation switched off, which it is,
   because the state is carried by colour, glyph and words -- not by the
   movement between them.
+
+### 4.16 `@chart`
+
+Numbers, as a shape. The block an agent reaches for when it has just measured
+something and the interesting part is the *outline* rather than any one value.
+
+```anvil
+@chart id=signups render=bar unit=k as=14:02
+? Signups by week
+: Week 22 is the launch.
+- W21 | 3.2
+- W22 | 4.8 | launch
+- W23 | 4.1
+- W24 | 4.4
+```
+
+```
+   ╭─ Signups by week ───────────────────── signups · 4 values ──╮
+   │  Week 22 is the launch.                                     │
+   │                                                             │
+   │  W21   ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░        3.2k              │
+   │  W22   ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓        4.8k   launch     │
+   │  W23   ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░        4.1k              │
+   │  W24   ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░        4.4k              │
+   ╰───────────────────────────── as of 14:02 · snapshot ────────╯
+```
+
+Row: `- Label | value | note`. The value cell must be a number; the note is free
+text shown beside it.
+
+| Attribute | Default | Meaning |
+|---|---|---|
+| `render` | `bar` | `bar` `column` `line` `spark` `dot` |
+| `unit` | -- | suffix printed after every value. `ms`, `%`, `GB` |
+| `max` `min` | derived | move the range. **Neither may exclude a value** (§4.16.2). |
+| `goal` | -- | a reference marker, and it extends the range so it is on screen |
+| `values` | -- | `3,5,4,9` -- a series with no labels, for the one-line case |
+| `as` | -- | the timestamp the data was read, exactly as on a `@card` |
+
+**4.16.1 The number is never only in the pixels.**
+
+Every mode prints its values as text, the bars carry `aria-hidden`, and a mode
+that cannot print every number (a line of thirty points) carries the full series
+in a visually hidden list and prints the four numbers a trend is read for:
+first, last, lowest, highest.
+
+A chart nobody can read the values off is a picture of data. This is the same
+rule §4.12.3 applies to subtask detail, and it fails the same way: on a
+screen reader the block is simply empty.
+
+The printed value is **what the agent typed**. `4.8k` renders as `4.8k`, not as
+`4800`, because the row is the record and rounding it into a canonical form
+edits the record.
+
+**4.16.2 The renderer never invents a scale.**
+
+One rule, applied three times: **the range must contain every value it draws.**
+
+- **The floor defaults to zero**, so a bar's length is its magnitude. A chart
+  that quietly floors at its smallest value makes 98 look twice 96. Negative
+  data lowers the floor to *reach* the data, never to flatter it, and a negative
+  bar grows the other way from the same baseline so its length is still its
+  magnitude.
+
+- **`min=` may lift the floor, and the block must then say so.** Four uptimes
+  between 99.2 and 99.99 are four identical full-height bars against a zero
+  floor -- a chart that has told the reader nothing. Truncating an axis is
+  legitimate. Truncating it *silently* is the oldest deception in the subject,
+  so the announcement is not optional and it happens twice: in words, in the
+  scale line, which survives being read aloud -- and in the drawing, as a notch
+  at the origin end of every bar, for anyone skimming the shape.
+
+```
+   scale from 99%, not zero · to 100% · goal 99.9%
+```
+
+- **Neither bound may exclude a value.** `max=100` over a 99.4 is real context
+  and nothing in the rows knows it. `max=50` over a 90 could only be drawn by
+  clipping the bar -- which prints a number at the end of a bar too short to be
+  that number. That is the §4.12.1 lie with nobody's fingerprints on it, so the
+  data wins and the parser says so:
+
+```
+   max="50" is below the largest value (90); using 90 so nothing is clipped
+   min="99.5" is above the smallest value (99.21); using 99.21 so nothing is clipped
+```
+
+- **A row whose value cell is not a number is refused, loudly, and not drawn.**
+  Drawing it at zero would be worse: zero is a claim, and a bar of length
+  nothing under `Mon` says Monday was nought rather than unreadable.
+
+There is no `sort=`. The rows are already in the order the agent chose, and a
+chart that reorders a time series is lying about sequence.
+
+**4.16.3 No axes, no gridlines, no legend, no tooltips.**
+
+A chart in a transcript is read in one glance, next to the sentence that
+explains it, in a column that may be 380px wide. Axis furniture costs most of
+that width to restate numbers that are already printed on the rows, and a
+tooltip is §4.12.3's hover failure again: it does not exist on a keyboard and it
+does not exist on a phone.
+
+One series per block, for the same reason. Two series need a legend, a legend
+needs colour to carry meaning, and colour carrying meaning alone is where
+accessibility goes to die. Put two charts side by side in a `@grid`.
+
+**4.16.4 `render=spark` is the one-line case.**
+
+```anvil
+@chart render=spark values=12,14,11,19,24,22,31 unit=ms goal=20
+? p95 latency, 7d
+```
+
+```
+   ╭─ p95 latency, 7d ──────────────────────────────  7 values ──╮
+   │                                        ╭╮                   │
+   │  ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈╭─╮┈┈┈┈┈╭──╯╰──● 31 ms                 │
+   │  ╰─╮ ╭──╯ ╰──────────╯  ╰─────╯                             │
+   │                                                             │
+   ╰───────────────────────────────────────────  snapshot ───────╯
+```
+
+`values=` is sugar and the rows are the grammar: a block with both keeps the
+rows and warns, because an agent that wrote both meant the rows and forgot to
+delete the shorthand. The dashed rule is `goal=`.
+
+### 4.17 `@flow`
+
+A process, drawn. Pipelines, retry ladders, state machines, approval chains --
+the shape an agent otherwise renders as five lines of arrows in a code fence.
+
+```anvil
+@flow id=retry dir=right as=14:02
+? Payment retry ladder
+- [x] charge | Charge      | 1st attempt
+- [~] retry1 | Retry 1     | 1m backoff
+- [!] dlq    | Dead letter | shape=round
+- charge -> retry1 | fails
+- retry1 -> dlq    | 2h
+- retry1 -> charge | recovered
+```
+
+```
+   ╭─ Payment retry ladder ─────────────────── retry · 3 steps ──╮
+   │                                                             │
+   │   ╭────────────╮  fails   ╭────────────╮  2h  ╭───────────╮ │
+   │   │ Charge     │ ───────► │ Retry 1    │ ───► │Dead letter│ │
+   │   │ 1st attempt│          │ 1m backoff │      ╰───────────╯ │
+   │   ╰────────────╯          ╰────────────╯                    │
+   │         ▲                        ┊                          │
+   │         └┈┈┈┈┈┈┈ recovered ┈┈┈┈┈┈┘                          │
+   ╰───────────────────────────── as of 14:02 · snapshot ────────╯
+```
+
+**One sigil, and the arrow decides what the row is.** A row with an arrow is an
+edge; a row without one declares a node. This is §3.1's `-` trick a third time:
+in a `@choice` a dash is an option, in a `@card` the checkbox makes it a task,
+and here the arrow makes it a connection.
+
+```
+   node  - [state] id | Label | note | shape=box|round|diamond
+   edge  - from -> to | label            (also --> => →)
+         - a -> b -> c                   a chain is one row, two edges
+         - a -- b                        undirected. Spaces required, because
+                                         `--` is one hyphen from `dead-letter`.
+```
+
+| Attribute | Default | Meaning |
+|---|---|---|
+| `dir` | `right` | `right` or `down`. A long chain reads better `down` in a chat column. |
+| `as` | -- | the timestamp, as everywhere else |
+
+**4.17.1 The checkbox means what it means everywhere else.**
+
+`[ ]` `[~]` `[x]` `[!]` on a node are the four `@card` states, wearing the four
+`@card` accents. A deploy pipeline with two green stages and one blocked one is
+the single most useful diagram an agent can put in a transcript, and it costs no
+new vocabulary to say so.
+
+There is no progress bar on a flow, and no `n/m`. A graph is not a checklist:
+its steps are not equal, several may be optional, and only one path through it
+will actually be taken. Counting them would produce exactly the number §4.12.1
+exists to ban. If you want the count, the block for it is `@card`.
+
+**4.17.2 An edge may name a node nobody declared.**
+
+`- build -> test` on its own is a complete diagram, and it draws two boxes. The
+implied node takes its id as its label and `todo` as its state. Forcing two
+declaration rows first would make the common case the verbose one.
+
+The cost is that a typo in an id silently grows a box instead of failing, so
+`anvil-lint` reports a *declared* node no arrow touches -- `retry-1` declared
+and `retry1` wired up is the shape of that mistake.
+
+**4.17.3 Cycles are legitimate, and they are drawn as returns.**
+
+A retry ladder is a cycle. So is every state machine worth drawing. The layout
+lifts the back edges out before ranking, draws them dashed in a lane outside the
+body, and ranks everything else by longest path -- so a step that waits on two
+things is drawn after both of them.
+
+A renderer that dropped the back edge would be hiding the loop that is the whole
+point of the diagram, and one that fed it to the ranker would not terminate.
+Neither is acceptable in a total pipeline.
+
+**4.17.4 The layout is computed, never measured.**
+
+This renders to a string in a pipeline that has no DOM and no layout pass, so
+box widths come from a **character count against a monospace advance** -- what
+an ASCII diagram has always done, and exact for the font the stylesheet pins.
+Labels past the cap are cut with an ellipsis and carried in full in a `title`.
+The gutter between ranks is sized from the widest edge label in the graph, or a
+label longer than the gap lies across the boxes it describes.
+
+Past forty nodes a flow stops being a sentence and becomes a document, which is
+the line §4.14 L2 already drew for layout. Nodes past the cap are not drawn and
+the count is printed, exactly like a `@board` lane's `+N more`.

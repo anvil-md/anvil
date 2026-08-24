@@ -43,9 +43,32 @@ const MESSAGE = `@message channel=email to="j@duplo.org" cc="ana@x.dev, kit@x.de
 > The retry ladder is in. Three attempts, then dead-letter.
 + patch.diff | 4 KB`
 
+const CHART = `@chart id=signups render=bar unit=k as=14:02
+? Signups by week
+: Week 22 is the launch.
+- W21 | 3.2
+- W22 | 4.8 | launch
+- W23 | 4.1`
+
+const FLOW = `@flow id=retry dir=right as=14:02
+? Payment retry ladder
+- [x] charge | Charge | 1st attempt
+- [~] retry1 | Retry 1
+- [!] dlq | Dead letter | shape=round
+- charge -> retry1 | fails
+- retry1 -> dlq | 2h
+- retry1 -> charge | recovered`
+
 const FIXTURES = [
   CHOICE,
   MESSAGE,
+  CHART,
+  FLOW,
+  '@chart render=spark values=12,14,11,19,24,22,31 unit=ms goal=20',
+  '@chart render=column\n- a | -4\n- b | 8',
+  '@chart render=dot\n- a | 1\n- b | 2',
+  '@flow dir=down\n- a -> b -> c\n- c -> a',
+  '@flow\n- lonely | Lonely',
   '@message channel=whatsapp to="+66900" sent=14:07\n> shipped',
   '@message channel=nope danger phrase=SEND\n? x\n> y',
   '@gallery id=m render=image\n- a | A | img=https://x.test/a.jpg',
@@ -505,6 +528,141 @@ describe('regressions', () => {
 
   test('a + row outside a block that draws it is a warning, not a silent drop', () => {
     expect(renderAnvilFence('@choice id=c\n+ chip\n- a | A', true)).toContain('only drawn on')
+  })
+})
+
+describe('chart', () => {
+  test('every value it draws is printed as text beside the shape', () => {
+    const html = renderAnvilFence(CHART, true)
+    for (const v of ['3.2k', '4.8k', '4.1k']) expect(html).toContain(v)
+    // The bar carries no information a screen reader can reach, so it says so
+    // rather than announcing a second, worse version of the number (§4.16.1).
+    expect(html).toContain('class="anvil-chart-track" aria-hidden="true"')
+  })
+
+  test('the printed value is what the agent typed, not a canonical form', () => {
+    const html = renderAnvilFence('@chart id=c\n- a | 4.8k', true)
+    expect(html).toContain('4.8k')
+    expect(html).not.toContain('4800')
+  })
+
+  test('a unit is a word or a symbol, and a magnitude letter is neither', () => {
+    // `3.2 k` reads as three point two of something.
+    expect(renderAnvilFence('@chart id=c unit=k\n- a | 3.2', true)).toContain('3.2k')
+    expect(renderAnvilFence('@chart id=c unit=ms\n- a | 31', true)).toContain('31 ms')
+    expect(renderAnvilFence('@chart id=c unit=%\n- a | 12', true)).toContain('12%')
+  })
+
+  test('the floor is zero, so the bar length is the magnitude', () => {
+    const html = renderAnvilFence('@chart id=c\n- a | 96\n- b | 98', true)
+    // Floored at 96, the first bar would be zero-width and 98 would read as
+    // twice 96. It is 98% of the second instead.
+    expect(html).toMatch(/left:0\.00%;width:97\.9\d%/)
+    expect(html).toMatch(/left:0\.00%;width:100\.00%/)
+  })
+
+  test('a negative bar grows the other way from the same baseline', () => {
+    const html = renderAnvilFence('@chart id=c\n- a | -4\n- b | 8', true)
+    expect(html).toContain('anvil-chart-neg')
+    // Zero sits a third of the way across, and the negative bar runs from 0 to it.
+    expect(html).toMatch(/left:0\.00%;width:33\.3\d%/)
+  })
+
+  test('max= below the data is refused in the picture as well as in the warning', () => {
+    const html = renderAnvilFence('@chart id=c max=50\n- a | 90', true)
+    expect(html).toContain('below the largest value (90)')
+    // Not clipped: the longest bar is still full width.
+    expect(html).toMatch(/width:100\.00%/)
+  })
+
+  test('a truncated axis is announced in words and in the drawing', () => {
+    const html = renderAnvilFence('@chart id=c unit=% min=99 max=100\n- a | 99.21\n- b | 99.99', true)
+    // In words, for anyone reading it aloud...
+    expect(html).toContain('scale from 99%, not zero')
+    // ...and in ink, for anyone skimming the shape.
+    expect(html).toContain('anvil-chart-truncated')
+  })
+
+  test('a chart floored at zero says nothing about its scale, because there is nothing to say', () => {
+    const html = renderAnvilFence('@chart id=c\n- a | 4\n- b | 9', true)
+    expect(html).not.toContain('anvil-chart-truncated')
+    expect(html).not.toContain('anvil-chart-scale')
+  })
+
+  test('a long series keeps its recent end and says how much it dropped', () => {
+    const rows = Array.from({ length: 460 }, (_, i) => `- ${i}`).join('\n')
+    const html = renderAnvilFence(`@chart id=c render=line\n${rows}`, true)
+    expect(html).toContain('+60 earlier')
+    // Scaled to what is drawn, so the peak of the visible line reaches the top.
+    expect(html).toContain('100.00,0.00')
+  })
+
+  test('a bar chart past the cap counts what it did not draw', () => {
+    const rows = Array.from({ length: 30 }, (_, i) => `- r${i} | ${i + 1}`).join('\n')
+    expect(renderAnvilFence(`@chart id=c\n${rows}`, true)).toContain('+6 more')
+  })
+
+  test('a line carries its whole series in text for anyone not looking', () => {
+    const html = renderAnvilFence('@chart id=c render=spark values=1,2,3 unit=ms', true)
+    expect(html).toContain('class="anvil-sr"')
+    expect(html).toContain('<li>Point 2: 2 ms</li>')
+  })
+
+  test('an empty chart is an empty chart, not a frame with a shape in it', () => {
+    expect(renderAnvilFence('@chart id=c', true)).toContain('No data.')
+  })
+})
+
+describe('flow', () => {
+  test('nodes carry the four card states, and the arrows connect them', () => {
+    const html = renderAnvilFence(FLOW, true)
+    expect(html).toContain('data-state="done"')
+    expect(html).toContain('data-state="flight"')
+    expect(html).toContain('data-state="blocked"')
+    expect(html).toContain('Dead letter')
+    expect(html).toContain('anvil-flow-edge')
+  })
+
+  test('the back edge is drawn as a return rather than dropped', () => {
+    expect(renderAnvilFence(FLOW, true)).toContain('anvil-flow-back')
+  })
+
+  test('the arrow marker id is unique per block', () => {
+    const html = renderAnvilFence('@flow id=one\n- a -> b\n\n@flow id=two\n- c -> d', true)
+    expect(html).toContain('id="anvil-arrow-one"')
+    expect(html).toContain('id="anvil-arrow-two"')
+  })
+
+  test('a marker id built from agent text is slugged, never injected', () => {
+    const html = renderAnvilFence('@flow id="a\\"><script>x</script>"\n- a -> b', true)
+    expect(html).not.toContain('<script>')
+  })
+
+  test('the gutter grows to fit the widest edge label', () => {
+    // A fixed gutter drew a long label across the boxes it described.
+    const tight = renderAnvilFence('@flow id=f\n- a -> b | x', true)
+    const wide = renderAnvilFence('@flow id=f\n- a -> b | a much longer label', true)
+    // Anchored on the flow's own svg: the block icon is a 24x24 viewBox and
+    // comes first in the string, so a loose match reads the icon every time.
+    const width = (h: string): number =>
+      Number(/anvil-flow-svg" viewBox="[-\d.]+ [-\d.]+ ([\d.]+)/.exec(h)?.[1] ?? 0)
+    expect(width(wide)).toBeGreaterThan(width(tight))
+  })
+
+  test('a long label is cut in the box and kept in full in a title', () => {
+    const html = renderAnvilFence('@flow id=f\n- a | An extremely long node label that will not fit\n- a -> b', true)
+    expect(html).toContain('…')
+    expect(html).toContain('<title>An extremely long node label that will not fit</title>')
+  })
+
+  test('the diagram is also a list, because an svg has no reading order', () => {
+    const html = renderAnvilFence(FLOW, true)
+    expect(html).toContain('Step 1: Charge')
+    expect(html).toContain('charge leads to retry1, fails')
+  })
+
+  test('an empty flow is an empty flow', () => {
+    expect(renderAnvilFence('@flow id=f', true)).toContain('No steps.')
   })
 })
 

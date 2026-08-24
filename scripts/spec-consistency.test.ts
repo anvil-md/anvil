@@ -14,7 +14,7 @@ import { describe, expect, test } from 'bun:test'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { lintMarkdown } from '../packages/lint/src/index'
-import { type AnvilBlock, type AnvilDoc, parseAnvil, taskProgress } from '../packages/parser/src/index'
+import { type AnvilBlock, type AnvilDoc, flowGraph, parseAnvil, taskProgress } from '../packages/parser/src/index'
 
 const ROOT = new URL('..', import.meta.url).pathname
 const src = await readFile(join(ROOT, 'SPEC.md'), 'utf8')
@@ -165,6 +165,77 @@ describe('SPEC.md examples', () => {
       ),
     )
     expect(real.map(d => `${d.rule}: ${d.message}`)).toEqual([])
+  })
+
+  /**
+   * The same rule for §4.16, arriving from the other direction.
+   *
+   * A `@card` picture can lie by printing a count the rows do not add up to.
+   * A `@chart` picture can lie by printing a VALUE no row contains -- and it is
+   * an easier mistake, because the numbers in the ASCII are typed next to bars
+   * whose lengths were also typed by hand. §4.16.1 says the printed value is
+   * what the agent wrote, so the check is exact: every number beside a bar must
+   * be a number in the source.
+   */
+  test('every value in a chart picture is a value in its source', () => {
+    const wrong: string[] = []
+
+    for (const ex of EXAMPLES) {
+      if (!ex.picture) continue
+      const charts = flatten(parseAnvil(ex.source)).filter(b => b.kind === 'chart' && b.data.length > 0)
+      if (!charts.length) continue
+
+      const honest = new Set<string>()
+      for (const b of charts) {
+        const unit = typeof b.attrs.unit === 'string' ? b.attrs.unit : ''
+        for (const d of b.data) {
+          honest.add(d.raw)
+          if (unit) honest.add(`${d.raw}${unit}`)
+        }
+      }
+
+      // Numbers that carry the chart's unit, or sit alone in a value column.
+      // Bare integers elsewhere in a picture are frame decoration, not claims.
+      for (const b of charts) {
+        const unit = typeof b.attrs.unit === 'string' ? b.attrs.unit : ''
+        if (!unit) continue
+        for (const m of ex.picture.matchAll(new RegExp(`([\\d.,]+)\\s?${unit}\\b`, 'g'))) {
+          const claim = `${m[1]}${unit}`
+          if (!honest.has(claim)) {
+            wrong.push(`SPEC.md:${ex.line} picture prints ${claim}, source has ${[...honest].join(', ')}`)
+          }
+        }
+      }
+    }
+
+    expect(wrong).toEqual([])
+  })
+
+  /**
+   * And that a flow picture draws the steps the source declares.
+   *
+   * The failure this catches is editing a fence and forgetting the ASCII beside
+   * it, which is exactly how §4.12 ended up printing `3/7` over five rows.
+   */
+  test('every box in a flow picture is a node in its source', () => {
+    const missing: string[] = []
+
+    for (const ex of EXAMPLES) {
+      if (!ex.picture) continue
+      const flows = flatten(parseAnvil(ex.source)).filter(b => b.kind === 'flow')
+      for (const b of flows) {
+        for (const n of flowGraph(b).nodes) {
+          // The picture draws LABELS, and a long one is legitimately cut, so
+          // the check is on a prefix rather than the whole string.
+          const drawn = n.label.slice(0, 10)
+          if (!ex.picture.includes(drawn)) {
+            missing.push(`SPEC.md:${ex.line} flow picture never draws "${n.label}"`)
+          }
+        }
+      }
+    }
+
+    expect(missing).toEqual([])
   })
 
   test('a lane count in a picture matches the rows in its source', () => {

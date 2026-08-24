@@ -243,6 +243,112 @@ _ nda     | bool     | We need an NDA first`,
 		],
 	},
 	{
+		id: 'pictures',
+		title: 'Pictures',
+		blurb:
+			'Numbers as a shape, and a process as a diagram. Both are records: neither one ever stamps, and neither one refreshes itself. Every value a chart draws is also printed, because a shape you cannot read a number off is a picture of data rather than data.',
+		examples: [
+			{
+				id: 'chart-bar',
+				title: '@chart',
+				spec: '4.16',
+				note: 'The range starts at zero, always. A chart floored at its smallest value makes 98 look twice 96, which is the oldest trick in the book -- and the one thing an agent that cannot see the screen should never be trusted to decide.',
+				source: `@chart id=signups render=bar unit=k as=14:02
+? Signups by week
+: Week 22 is the launch.
+- W21 | 3.2
+- W22 | 4.8 | launch
+- W23 | 4.1
+- W24 | 4.4`,
+			},
+			{
+				id: 'chart-goal',
+				title: 'A truncated axis, announced',
+				spec: '4.16.2',
+				note: 'Four uptimes between 99.2 and 99.99 are four identical full-height bars against a zero floor -- a chart that has told you nothing. `min=` lifts the floor, and the block then says **`scale from 99%, not zero`** in warning ink and notches every bar at the origin. Truncating is fine. Truncating silently is the oldest deception in the subject.',
+				source: `@chart id=uptime render=column unit=% min=99 max=100 goal=99.9 as=14:02
+? Uptime by service
+- api      | 99.98
+- workers  | 99.94
+- webhooks | 99.21 | two incidents
+- search   | 99.99`,
+			},
+			{
+				id: 'chart-spark',
+				title: 'render=spark',
+				spec: '4.16.4',
+				note: 'The one-line case. `values=` is shorthand for a series with no labels, which is what a trend actually is -- and the full series still goes into the page as text, so the block is not empty to a screen reader.',
+				source: `@chart id=p95 render=spark values=12,14,11,19,24,22,31 unit=ms goal=20
+? p95 latency, 7d
+: The dashed rule is the SLO.`,
+			},
+			{
+				id: 'chart-negative',
+				title: 'Negative values',
+				spec: '4.16.2',
+				note: 'A negative bar grows the other way from the same baseline, so its **length** is still its magnitude and only its direction changed. Zero moves to wherever zero actually is.',
+				source: `@chart id=delta render=bar unit=% as=14:02
+? Week on week
+- signups   | 12.4
+- activated | 4.1
+- churn     | -2.8 | good
+- revenue   | -0.4`,
+			},
+			{
+				id: 'flow',
+				title: '@flow',
+				spec: '4.17',
+				note: 'One sigil, and the arrow decides. A row with an arrow is an edge, a row without one declares a node -- the same trick a `@card` plays with the checkbox. The four states are the four `@card` states, wearing the same accents.',
+				wide: true,
+				source: `@flow id=retry dir=right as=14:02
+? Payment retry ladder
+- [x] charge | Charge      | 1st attempt
+- [x] retry1 | Retry 1     | 1m backoff
+- [~] retry2 | Retry 2     | 10m backoff
+- [!] dlq    | Dead letter | shape=round
+- charge -> retry1 | fails
+- retry1 -> retry2 | still failing
+- retry2 -> dlq    | after 2h
+- retry2 -> charge | recovered`,
+			},
+			{
+				id: 'flow-decision',
+				title: 'Shapes, and a cycle',
+				spec: '4.17.3',
+				note: 'A cycle is legitimate -- a retry ladder is a cycle, and so is every state machine worth drawing. The back edge is lifted out of the ranking and drawn dashed in its own lane, because dropping it would hide the loop that is the whole point of the diagram.',
+				wide: true,
+				source: `@flow id=review dir=down as=14:02
+? Pull request review
+- [x] open   | PR opened  | shape=round
+- [~] review | Approved?  | shape=diamond
+- [ ] merge  | Merge      | squash
+- [ ] fix    | Push fixes
+- open -> review
+- review -> merge | yes
+- review -> fix   | changes requested
+- fix -> review   | re-request`,
+			},
+			{
+				id: 'chart-beside-a-card',
+				title: 'A picture next to the thing it is about',
+				spec: '4.14',
+				note: 'This is what the two blocks are for. The card is the work, the chart is the reason -- side by side in the sentence where the question was asked, rather than in a dashboard somebody has to go and find.',
+				wide: true,
+				source: `@grid cols=2 min=18rem
+@card id=ANV-140 type=bug status=flight as=14:02
+? Webhook retries are hammering the origin
++ !P1 | Sprint 24
+- [x] ANV-141 | Reproduce in staging | Ana
+- [~] ANV-142 | Add a retry budget   | Kit
+- [ ] ANV-143 | Backfill the alert
+@chart id=webhook-rate render=spark values=210,240,260,890,1240,1180,1330 unit=/min goal=300
+? Origin requests, 7d
+: The step is when the retry loop went out.
+@end`,
+			},
+		],
+	},
+	{
 		id: 'layout',
 		title: 'Layout',
 		blurb:

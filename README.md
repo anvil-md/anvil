@@ -119,17 +119,17 @@ implemented here. Those two sections are the contract if you want to build it.
 
 ```
    ASK   @choice  @gallery  @input  @upload  @link  @scale  @order
-   SHOW  @note    @code     @example  @board
+   SHOW  @note    @code     @example  @board  @chart  @flow
    BOTH  @card    @message           (records, until ask= makes them questions)
    GRID  @grid    @stack    @end
    CTRL  @void
 ```
 
-Thirteen blocks, two containers and one directive, and the set is **closed on
+Fifteen blocks, two containers and one directive, and the set is **closed on
 purpose**. Nearly everything you will want to add is one of these with an
 attribute set.
 
-Two of them are worth naming here, because they are the reason the set grew:
+Four of them are worth naming here, because they are the reason the set grew:
 
 **`@card`** is a work item -- subtasks, status, a progress bar -- and the bar is
 **counted from the rows**. There is no `progress=` attribute, deliberately. An
@@ -143,6 +143,24 @@ renders as **`draft · not sent`** until something asserts otherwise, addresses
 are text rather than links, and with `ask=` it becomes an ordinary one-click
 stamp -- so "did the human approve this" is a question the transcript can still
 answer six months later.
+
+**`@chart`** is numbers as a shape -- a bar, a column, a line, a sparkline, a dot
+plot. It obeys `@card`'s rule from the other side: a card may not *author* a
+number the rows could contradict, and a chart may not *draw* one the rows do not
+contain. So the range starts at zero, an authored `max=` may widen it and never
+narrow it, and every value is printed as text beside the shape. A chart floored
+at its smallest value makes 98 look twice 96; a chart with a `max=` under its
+data prints a number at the end of a bar too short to be that number. No axes,
+no gridlines, no tooltips: this goes in a 380px chat column next to the sentence
+that explains it.
+
+**`@flow`** is a process -- a pipeline, a retry ladder, a state machine. **One
+sigil, and the arrow decides**: a row with an arrow is an edge, a row without one
+declares a node. The four `@card` checkbox states work on a node and mean the
+same thing, so a deploy pipeline with two green stages and one blocked one costs
+no new vocabulary. Cycles are drawn rather than dropped, the layout is computed
+from a character count rather than measured, and the whole graph is emitted as
+text alongside the SVG because an SVG has no reading order of its own.
 
 `@grid` and `@stack` lay blocks out with **no breakpoints anywhere**: the agent
 writing the fence cannot see the screen, `cols` is a maximum rather than a
@@ -163,7 +181,10 @@ type falls back to `text` and says so, and an over-long option list renders in
 full with a complaint rather than being truncated.
 
 The critical test fuzzes **every prefix of every fixture**, hostile inputs
-included.
+included -- and a separate list for inputs too big to walk prefix by prefix,
+because size is its own failure mode. `Math.max(...values)` over a 200,000-row
+`@chart` is a number in Bun and a `RangeError` in Node, and it ran inside the
+parser: totality cannot depend on which runtime somebody installed this into.
 
 One more runs against this repo's own prose: every ```` ```anvil ```` fence in
 `SPEC.md` is parsed, and the ASCII picture underneath it is checked against what
@@ -201,7 +222,7 @@ specified and not built.
 
 | | |
 |---|---|
-| **Built** | `@choice` `@gallery` `@input` `@scale` `@note` `@card` `@board` `@message` `@grid` `@stack` |
+| **Built** | `@choice` `@gallery` `@input` `@scale` `@note` `@card` `@board` `@message` `@chart` `@flow` `@grid` `@stack` |
 | **Specified, not built** | `@upload` `@link` `@order` `@example` `@void` `@code` |
 
 That second row is asserted by a test, so it cannot quietly go stale: the day

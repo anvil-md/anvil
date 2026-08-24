@@ -31,6 +31,21 @@ export interface BlockExpectation {
   taskRollups?: (string | null)[]
   meta?: string[][]
   progress?: { done?: number; total?: number; pct?: number; rollup?: boolean }
+  /** @chart rows. `dataRaw` is the text the value was parsed out of (§4.16.1). */
+  dataLabels?: string[]
+  dataValues?: number[]
+  dataRaw?: string[]
+  /** The range the bars are drawn against, after §4.16.2 has had its say. */
+  domain?: { floor?: number; top?: number; zeroPct?: number; authoredTop?: boolean }
+  /** @flow nodes AFTER implied ones are resolved, in rank order. */
+  nodeIds?: string[]
+  nodeStates?: string[]
+  /** Ranks as id lists, so a layering rule can be pinned without pixels. */
+  ranks?: string[][]
+  /** Every edge as `from>to`, in source order. */
+  edges?: string[]
+  /** The subset of `edges` the layout had to lift out of ranking (§4.17.3). */
+  backEdges?: string[]
 }
 
 export interface TreeExpectation {

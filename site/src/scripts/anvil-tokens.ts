@@ -144,8 +144,11 @@ export const SIGIL_BODY: Record<string, AnvilTokenName> = {
 /** Rows whose first cell is a machine key rather than prose. */
 export const ROW_SIGILS = new Set(['-', '_', '%'])
 
-/** Cell-position `key=` settings on an option row. Mirrors rows.ts CELL_KV. */
-export const CELL_KEYS: readonly string[] = ['img', 'swatch', 'font', 'sample']
+/**
+ * Cell-position `key=` settings on a row. Mirrors rows.ts CELL_KV, plus
+ * `shape`, which is the same idea on a @flow node row rather than an option.
+ */
+export const CELL_KEYS: readonly string[] = ['img', 'swatch', 'font', 'sample', 'shape']
 
 export const KINDS: readonly string[] = ANVIL_KINDS
 export const TYPES: readonly string[] = FIELD_TYPES

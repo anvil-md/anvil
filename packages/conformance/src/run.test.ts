@@ -12,7 +12,7 @@
  * case added for a feature also becomes a totality case, for free.
  */
 import { describe, expect, test } from 'bun:test'
-import { type AnvilBlock, type AnvilDoc, parseAnvil, taskProgress } from '@anvil-md/parser'
+import { type AnvilBlock, type AnvilDoc, chartDomain, flowGraph, parseAnvil, taskProgress } from '@anvil-md/parser'
 import { renderAnvilFence } from '@anvil-md/render-html'
 import { type BlockExpectation, cases, coveredSections, CORPUS } from './index'
 
@@ -69,6 +69,30 @@ function checkBlock(actual: AnvilBlock, want: BlockExpectation, where: string): 
       expect(p[k as keyof typeof p], at(`progress.${k}`)).toBe(v as never)
     }
   }
+
+  if (want.dataLabels) expect(actual.data.map(d => d.label), at('data labels')).toEqual(want.dataLabels)
+  if (want.dataValues) expect(actual.data.map(d => d.value), at('data values')).toEqual(want.dataValues)
+  if (want.dataRaw) expect(actual.data.map(d => d.raw), at('data raw')).toEqual(want.dataRaw)
+  if (want.domain) {
+    const d = chartDomain(actual)
+    for (const [k, v] of Object.entries(want.domain)) {
+      expect(d[k as keyof typeof d], at(`domain.${k}`)).toBe(v as never)
+    }
+  }
+
+  // The flow expectations read the RESOLVED graph, not the raw rows: implied
+  // nodes, ranking and cycle-breaking are all things §4.17 requires of an
+  // implementation, and none of them are visible in the parsed edge list.
+  if (want.nodeIds || want.nodeStates || want.ranks || want.backEdges) {
+    const g = flowGraph(actual)
+    if (want.nodeIds) expect(g.nodes.map(n => n.id), at('node ids')).toEqual(want.nodeIds)
+    if (want.nodeStates) expect(g.nodes.map(n => String(n.state)), at('node states')).toEqual(want.nodeStates)
+    if (want.ranks) expect(g.ranks.map(r => r.map(n => n.id)), at('ranks')).toEqual(want.ranks)
+    if (want.backEdges) {
+      expect(g.edges.filter(e => e.back).map(e => `${e.from}>${e.to}`), at('back edges')).toEqual(want.backEdges)
+    }
+  }
+  if (want.edges) expect(actual.edges.map(e => `${e.from}>${e.to}`), at('edges')).toEqual(want.edges)
 }
 
 describe('conformance corpus', () => {
@@ -113,13 +137,23 @@ describe('conformance corpus', () => {
     expect(() => checkBlock(block, { taskStates: ['todo', 'todo'] }, 'self')).toThrow()
     expect(() => checkBlock(block, { progress: { done: 9 } }, 'self')).toThrow()
     expect(() => checkBlock(block, { taskRollups: ['1/2', null] }, 'self')).toThrow()
+
+    const chart = parseAnvil('@chart id=c\n- a | 4\n- b | 9').blocks[0] as AnvilBlock
+    expect(() => checkBlock(chart, { dataValues: [4, 9], domain: { top: 9 } }, 'self')).not.toThrow()
+    expect(() => checkBlock(chart, { dataValues: [4, 8] }, 'self')).toThrow()
+    expect(() => checkBlock(chart, { domain: { floor: 4 } }, 'self')).toThrow()
+
+    const flow = parseAnvil('@flow id=f\n- a -> b\n- b -> a').blocks[0] as AnvilBlock
+    expect(() => checkBlock(flow, { nodeIds: ['a', 'b'], backEdges: ['b>a'] }, 'self')).not.toThrow()
+    expect(() => checkBlock(flow, { backEdges: [] }, 'self')).toThrow()
+    expect(() => checkBlock(flow, { ranks: [['a', 'b']] }, 'self')).toThrow()
   })
 
   test('the corpus covers every section that defines a block', () => {
     const covered = coveredSections()
     // Not "every section" -- §6 and §7 are stamping, which the reference
     // implementation does not ship. These are the ones it can be held to.
-    for (const s of ['4.1', '4.3', '4.5', '4.8', '4.12.1', '4.13', '4.14', '4.15.1', '8.3', '11']) {
+    for (const s of ['4.1', '4.3', '4.5', '4.8', '4.12.1', '4.13', '4.14', '4.15.1', '4.16.2', '4.17.3', '8.3', '11']) {
       expect(covered, `no case pins §${s}`).toContain(s)
     }
   })

@@ -452,6 +452,202 @@
       "title": "every sigil with no payload survives",
       "source": "@\n- \n_ \n% \n+ \n? \n> \n@end\n~~~",
       "expect": { "neverThrows": true }
+    },
+    {
+      "id": "chart-basic",
+      "spec": "4.16",
+      "title": "a chart row is label, number, note, and the number is printed",
+      "source": "@chart id=signups render=bar unit=k\n? Signups by week\n- W21 | 3.2\n- W22 | 4.8 | launch\n- W23 | 4.1",
+      "expect": {
+        "blocks": [
+          {
+            "kind": "chart",
+            "id": "signups",
+            "prompt": "Signups by week",
+            "dataLabels": ["W21", "W22", "W23"],
+            "dataValues": [3.2, 4.8, 4.1]
+          }
+        ],
+        "warnings": [],
+        "htmlContains": ["3.2k", "4.8k", "4.1k", "launch"]
+      }
+    },
+    {
+      "id": "chart-raw-value-is-not-rewritten",
+      "spec": "4.16.1",
+      "title": "4.8k is drawn as 4800 and printed as 4.8k",
+      "source": "@chart id=c\n? Q\n- a | 4.8k\n- b | 1,204",
+      "expect": {
+        "blocks": [{ "dataValues": [4800, 1204], "dataRaw": ["4.8k", "1,204"] }],
+        "htmlContains": ["4.8k", "1,204"],
+        "htmlExcludes": ["4800"]
+      }
+    },
+    {
+      "id": "chart-non-number-is-refused",
+      "spec": "4.16.2",
+      "title": "a value cell with no number is warned about and not drawn at zero",
+      "source": "@chart id=c\n? Q\n- Mon | lots\n- Tue | 4",
+      "expect": {
+        "blocks": [{ "dataLabels": ["Tue"] }],
+        "warningsContain": ["has no number in its value cell"]
+      }
+    },
+    {
+      "id": "chart-floor-is-zero",
+      "spec": "4.16.2",
+      "title": "the range starts at zero, so a bar length is a magnitude",
+      "source": "@chart id=c\n? Q\n- a | 96\n- b | 98",
+      "expect": { "blocks": [{ "domain": { "floor": 0, "top": 98 } }] }
+    },
+    {
+      "id": "chart-negative-lowers-the-floor",
+      "spec": "4.16.2",
+      "title": "negative data widens the range downwards and puts zero inside it",
+      "source": "@chart id=c\n? Q\n- a | -4\n- b | 8",
+      "expect": { "blocks": [{ "domain": { "floor": -4, "top": 8 } }] }
+    },
+    {
+      "id": "chart-max-below-data-warns",
+      "spec": "4.16.2",
+      "title": "max= under the largest value is a warning, and nothing is clipped",
+      "source": "@chart id=c max=50\n? Q\n- a | 90",
+      "expect": {
+        "blocks": [{ "domain": { "top": 90, "authoredTop": false } }],
+        "warningsContain": ["below the largest value (90)"]
+      }
+    },
+    {
+      "id": "chart-truncated-axis-is-announced",
+      "spec": "4.16.2",
+      "title": "min= may lift the floor, and the block must say that it did",
+      "source": "@chart id=c unit=% min=99 max=100\n? Q\n- a | 99.21\n- b | 99.99",
+      "expect": {
+        "blocks": [{ "domain": { "floor": 99, "top": 100, "authoredFloor": true } }],
+        "warnings": [],
+        "htmlContains": ["not zero"]
+      }
+    },
+    {
+      "id": "chart-min-cannot-exclude-data",
+      "spec": "4.16.2",
+      "title": "a floor above the smallest value would clip it, so the value wins",
+      "source": "@chart id=c min=99.5\n? Q\n- a | 99.21\n- b | 99.99",
+      "expect": {
+        "blocks": [{ "domain": { "floor": 99.21 } }],
+        "warningsContain": ["is above the smallest value (99.21)"]
+      }
+    },
+    {
+      "id": "chart-max-above-data-widens",
+      "spec": "4.16.2",
+      "title": "max= above the largest value is context and is kept",
+      "source": "@chart id=c max=100\n? Q\n- a | 40",
+      "expect": { "blocks": [{ "domain": { "top": 100, "authoredTop": true } }], "warnings": [] }
+    },
+    {
+      "id": "chart-values-attribute-is-sugar",
+      "spec": "4.16.4",
+      "title": "values= builds an unlabelled series, and rows win when both are given",
+      "source": "@chart id=c render=spark values=3,5,4\n? Q",
+      "expect": { "blocks": [{ "dataValues": [3, 5, 4], "dataLabels": ["", "", ""] }], "warnings": [] }
+    },
+    {
+      "id": "chart-rows-beat-values",
+      "spec": "4.16.4",
+      "title": "a block with both keeps the rows and says the attribute was dropped",
+      "source": "@chart id=c values=3,5,4\n? Q\n- a | 9",
+      "expect": {
+        "blocks": [{ "dataValues": [9] }],
+        "warningsContain": ["values= is ignored"]
+      }
+    },
+    {
+      "id": "chart-series-is-readable-without-the-picture",
+      "spec": "4.16.1",
+      "title": "a line carries every value in text, because the shape is aria-hidden",
+      "source": "@chart id=c render=line unit=ms values=1,2,3\n? Q",
+      "expect": { "htmlContains": ["Point 1: 1 ms", "Point 3: 3 ms"] }
+    },
+    {
+      "id": "flow-arrow-decides-the-row",
+      "spec": "4.17",
+      "title": "a row with an arrow is an edge; a row without declares a node",
+      "source": "@flow id=f\n? Q\n- [x] charge | Charge\n- [~] retry | Retry\n- charge -> retry | fails",
+      "expect": {
+        "blocks": [
+          {
+            "kind": "flow",
+            "nodeIds": ["charge", "retry"],
+            "nodeStates": ["done", "flight"],
+            "edges": ["charge>retry"]
+          }
+        ],
+        "warnings": [],
+        "htmlContains": ["fails"]
+      }
+    },
+    {
+      "id": "flow-implied-node",
+      "spec": "4.17.2",
+      "title": "an edge may name a node nobody declared",
+      "source": "@flow id=f\n? Q\n- build -> test",
+      "expect": { "blocks": [{ "nodeIds": ["build", "test"], "ranks": [["build"], ["test"]] }], "warnings": [] }
+    },
+    {
+      "id": "flow-chain-is-one-row",
+      "spec": "4.17",
+      "title": "a -> b -> c is one row and two edges",
+      "source": "@flow id=f\n? Q\n- a -> b -> c",
+      "expect": { "blocks": [{ "edges": ["a>b", "b>c"] }], "warnings": [] }
+    },
+    {
+      "id": "flow-undirected-needs-spaces",
+      "spec": "4.17",
+      "title": "dead-letter is an id; a -- b is a connection",
+      "source": "@flow id=f\n? Q\n- dead-letter -> sink\n- sink -- audit",
+      "expect": { "blocks": [{ "edges": ["dead-letter>sink", "sink>audit"] }], "warnings": [] }
+    },
+    {
+      "id": "flow-longest-path-layering",
+      "spec": "4.17.3",
+      "title": "a step waiting on two things is drawn after both of them",
+      "source": "@flow id=f\n? Q\n- a -> b\n- b -> c\n- a -> c",
+      "expect": { "blocks": [{ "ranks": [["a"], ["b"], ["c"]] }] }
+    },
+    {
+      "id": "flow-cycle-terminates",
+      "spec": "4.17.3",
+      "title": "a cycle ranks the forward edges and keeps the back edge as a return",
+      "source": "@flow id=f\n? Q\n- a -> b\n- b -> c\n- c -> a",
+      "expect": {
+        "blocks": [{ "ranks": [["a"], ["b"], ["c"]], "backEdges": ["c>a"] }],
+        "htmlContains": ["anvil-flow-back"]
+      }
+    },
+    {
+      "id": "flow-self-loop-is-refused",
+      "spec": "4.17.2",
+      "title": "an arrow pointing at its own source is the typo it looks like",
+      "source": "@flow id=f\n? Q\n- a -> a\n- a -> b",
+      "expect": { "blocks": [{ "edges": ["a>b"] }], "warningsContain": ["points at itself"] }
+    },
+    {
+      "id": "flow-truncation-is-counted",
+      "spec": "4.17.4",
+      "title": "nodes past the cap are counted rather than silently dropped",
+      "source": "@flow id=f\n? Q\n- n0 -> n1 -> n2 -> n3 -> n4 -> n5 -> n6 -> n7 -> n8 -> n9 -> n10 -> n11 -> n12 -> n13 -> n14 -> n15 -> n16 -> n17 -> n18 -> n19 -> n20 -> n21 -> n22 -> n23 -> n24 -> n25 -> n26 -> n27 -> n28 -> n29 -> n30 -> n31 -> n32 -> n33 -> n34 -> n35 -> n36 -> n37 -> n38 -> n39 -> n40 -> n41 -> n42",
+      "expect": {
+        "warningsContain": ["is past the 40"],
+        "htmlContains": ["+3 more"]
+      }
+    },
+    {
+      "id": "flow-diagram-has-a-reading-order",
+      "spec": "4.17",
+      "title": "the svg is accompanied by the same graph as text",
+      "source": "@flow id=f\n? Q\n- [x] build | Build\n- build -> test",
+      "expect": { "htmlContains": ["Step 1: Build", "build leads to test"] }
     }
   ]
 }

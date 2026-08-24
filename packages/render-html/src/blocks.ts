@@ -13,13 +13,23 @@
  */
 import {
   type AnvilBlock,
+  type AnvilDatum,
+  type AnvilDomain,
   type AnvilField,
   type AnvilKind,
+  type AnvilNode,
   type AnvilOption,
   type AnvilTask,
   attrNumber,
   attrString,
+  type ChartRender,
+  chartDomain,
+  chartGoal,
+  chartPct,
+  chartRender,
   type FieldType,
+  type FlowEdge,
+  flowGraph,
   type GalleryRender,
   galleryRender,
   isMulti,
@@ -403,7 +413,7 @@ export function renderChips(b: AnvilBlock): string {
  * The ordering is the whole rule: before the rows it belongs to the card,
  * after them it belongs to the row above it (§4.12.3).
  */
-function cardProse(b: AnvilBlock): string {
+export function cardProse(b: AnvilBlock): string {
   if (!b.prose.trim()) return ''
   const paras = b.prose
     .split('\n')
@@ -457,6 +467,480 @@ export function renderBoard(b: AnvilBlock): string {
     .join('')
 
   return `<div class="anvil-lanes anvil-auto" style="--anvil-cols:${lanes.length};--anvil-min:9rem">${cols}</div>${renderChips(b)}`
+}
+
+/* ── chart ───────────────────────────────────────────────────────────────── */
+
+/**
+ * How many rows a bar, column or dot chart draws before it stops being a shape
+ * you read in one glance. `line` and `spark` are uncapped: a long series is the
+ * entire point of them.
+ */
+const CHART_ROW_CAP = 24
+
+/**
+ * And how long a series a line draws.
+ *
+ * Uncapped, a fence of sixty thousand `- x | 1` rows produces a `points`
+ * attribute most of a megabyte long and a hidden list of sixty thousand `<li>`,
+ * which wedges the transcript just as thoroughly as the throw the parser is
+ * forbidden from making. Higher than the row cap because a long series is what
+ * `line` is FOR; bounded because nothing here may be unbounded.
+ */
+const CHART_SERIES_CAP = 400
+
+/**
+ * The printed number.
+ *
+ * `raw` in preference to `value`, always: an agent that wrote `4.8k` gets
+ * `4.8k` back rather than `4800`. THE NUMBER IS NEVER ONLY IN THE PIXELS -- a
+ * bar you cannot read the value off is a picture of data rather than data, and
+ * it is unreadable to anyone using a screen reader.
+ */
+function valueText(d: AnvilDatum, unit: string): string {
+  const raw = d.raw || String(d.value)
+  if (!unit) return raw
+  // A WORD takes a space, a SYMBOL does not, and a single letter is a
+  // magnitude rather than a word: `31 ms`, `4 GB`, `12%`, `4.8k`. Spacing `k`
+  // like a unit produced `3.2 k`, which reads as three point two of something.
+  return /^[A-Za-z]{2,}/.test(unit) ? `${raw} ${unit}` : `${raw}${unit}`
+}
+
+/** Start and length of a bar, as a share of the domain, measured from zero. */
+function span(domain: AnvilDomain, value: number): { start: number; size: number; negative: boolean } {
+  const pos = chartPct(domain, value)
+  const zero = domain.zeroPct
+  return { start: Math.min(pos, zero), size: Math.abs(pos - zero), negative: value < 0 }
+}
+
+/**
+ * The reference marker, drawn INSIDE every track rather than as one rule across
+ * the plot. A single overlay would have to be positioned against a box that
+ * also contains the labels, and the gaps between tracks turn the repeat into a
+ * dashed line for free.
+ */
+function goalMark(goal: number | null, domain: AnvilDomain, axis: 'left' | 'bottom'): string {
+  if (goal === null) return ''
+  return `<b class="anvil-chart-goal" style="${axis}:${chartPct(domain, goal).toFixed(2)}%"></b>`
+}
+
+/**
+ * Rows past the cap are COUNTED, never quietly dropped -- the same rule a board
+ * lane follows, for the same reason: a truncated chart reads as a whole one.
+ */
+function more(hidden: number): string {
+  return hidden > 0 ? `<p class="anvil-more">+${hidden} more</p>` : ''
+}
+
+/**
+ * What actually gets drawn, and how much did not.
+ *
+ * The two families truncate from opposite ends and that is deliberate. A bar
+ * chart is a ranked list, so the FIRST rows are the ones the agent put first. A
+ * line is a history, so the LAST points are the recent end anybody is reading
+ * the trend for -- and keeping the tail is also what makes the printed "last"
+ * value the actual last value.
+ *
+ * The domain is computed from THIS array rather than from every row, because a
+ * shape scaled against a peak that is not on screen draws a flat line under a
+ * ceiling nothing reaches.
+ */
+interface Visible {
+  data: AnvilDatum[]
+  /** Rows cut off the front, for a series. */
+  before: number
+  /** Rows cut off the back, for a list. */
+  after: number
+}
+
+function visible(b: AnvilBlock, mode: ChartRender): Visible {
+  if (mode === 'line' || mode === 'spark') {
+    const before = Math.max(0, b.data.length - CHART_SERIES_CAP)
+    return { data: before ? b.data.slice(before) : b.data, before, after: 0 }
+  }
+  const after = Math.max(0, b.data.length - CHART_ROW_CAP)
+  return { data: after ? b.data.slice(0, CHART_ROW_CAP) : b.data, before: 0, after }
+}
+
+function renderBars(v: Visible, domain: AnvilDomain, goal: number | null, unit: string, dots: boolean): string {
+  const rows = v.data
+    .map(d => {
+      const { start, size, negative } = span(domain, d.value)
+      // A dot plot marks the value and draws no ink between it and zero. Same
+      // arithmetic, one CSS class apart.
+      const fill = dots
+        ? `<i class="anvil-chart-dot" style="left:${chartPct(domain, d.value).toFixed(2)}%"></i>`
+        : `<i style="left:${start.toFixed(2)}%;width:${size.toFixed(2)}%"></i>`
+      const note = d.note ? `<span class="anvil-chart-note">${esc(d.note)}</span>` : ''
+      return `<li class="anvil-chart-row${negative ? ' anvil-chart-neg' : ''}">
+        <span class="anvil-chart-label">${esc(d.label)}</span>
+        <span class="anvil-chart-track" aria-hidden="true">${fill}${goalMark(goal, domain, 'left')}</span>
+        <span class="anvil-chart-value">${esc(valueText(d, unit))}${note}</span>
+      </li>`
+    })
+    .join('')
+  return `<ul class="anvil-chart-rows">${rows}</ul>${more(v.after)}`
+}
+
+function renderColumns(v: Visible, domain: AnvilDomain, goal: number | null, unit: string): string {
+  const cols = v.data
+    .map(d => {
+      const { start, size, negative } = span(domain, d.value)
+      return `<li class="anvil-chart-col${negative ? ' anvil-chart-neg' : ''}">
+        <span class="anvil-chart-value">${esc(valueText(d, unit))}</span>
+        <span class="anvil-chart-stem" aria-hidden="true"><i style="bottom:${start.toFixed(2)}%;height:${size.toFixed(2)}%"></i>${goalMark(goal, domain, 'bottom')}</span>
+        <span class="anvil-chart-label">${esc(d.label)}</span>
+      </li>`
+    })
+    .join('')
+  return `<ol class="anvil-chart-cols">${cols}</ol>${more(v.after)}`
+}
+
+/**
+ * The series, in text, for anyone not looking at the picture.
+ *
+ * A line of thirty points cannot print thirty numbers without becoming a table,
+ * so the visible chart prints the ends and the extremes and this carries the
+ * rest. Visually hidden, never `display:none`: the second one is not in the
+ * accessibility tree either, which would make the whole block a shape with no
+ * data in it.
+ */
+function seriesText(data: AnvilDatum[], unit: string): string {
+  const items = data.map((d, i) => `<li>${esc(d.label || `Point ${i + 1}`)}: ${esc(valueText(d, unit))}</li>`).join('')
+  return `<ul class="anvil-sr">${items}</ul>`
+}
+
+/**
+ * A polyline over a 0-100 box.
+ *
+ * `preserveAspectRatio="none"` so the shape fills whatever width the transcript
+ * gives it, and `vector-effect="non-scaling-stroke"` so the line keeps its
+ * weight while that happens. Without the second one a wide sparkline draws a
+ * hairline and a narrow one draws a slab.
+ */
+function polyline(data: AnvilDatum[], domain: AnvilDomain, goal: number | null, area: boolean): string {
+  const n = data.length
+  const xs = (i: number): number => (n > 1 ? (i / (n - 1)) * 100 : 50)
+  const ys = (v: number): number => 100 - chartPct(domain, v)
+  const pts = data.map((d, i) => `${xs(i).toFixed(2)},${ys(d.value).toFixed(2)}`).join(' ')
+
+  const fill = area && n > 1 ? `<polygon class="anvil-spark-area" points="0,100 ${pts} 100,100"></polygon>` : ''
+  const rule =
+    goal === null
+      ? ''
+      : `<line class="anvil-spark-goal" x1="0" x2="100" y1="${ys(goal).toFixed(2)}" y2="${ys(goal).toFixed(2)}" vector-effect="non-scaling-stroke"></line>`
+  const last = n ? `<circle class="anvil-spark-last" cx="${xs(n - 1).toFixed(2)}" cy="${ys((data[n - 1] as AnvilDatum).value).toFixed(2)}" r="2.5"></circle>` : ''
+
+  return `<svg class="anvil-spark-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+    ${fill}${rule}<polyline class="anvil-spark-line" points="${pts}" vector-effect="non-scaling-stroke"></polyline>${last}
+  </svg>`
+}
+
+/** First, last and the two extremes. The four numbers a trend is actually read for. */
+function seriesSummary(data: AnvilDatum[], unit: string): string {
+  if (!data.length) return ''
+  const first = data[0] as AnvilDatum
+  const last = data[data.length - 1] as AnvilDatum
+  const lowest = data.reduce((a, d) => (d.value < a.value ? d : a), first)
+  const highest = data.reduce((a, d) => (d.value > a.value ? d : a), first)
+  const cell = (name: string, d: AnvilDatum): string =>
+    `<span class="anvil-chart-stat"><span>${name}</span><b>${esc(valueText(d, unit))}</b>${d.label ? `<i>${esc(d.label)}</i>` : ''}</span>`
+  return `<div class="anvil-chart-stats">${cell('first', first)}${cell('last', last)}${cell('low', lowest)}${cell('high', highest)}</div>`
+}
+
+function renderLine(v: Visible, domain: AnvilDomain, goal: number | null, unit: string, spark: boolean): string {
+  const earlier = v.before > 0 ? `<p class="anvil-more">+${v.before} earlier</p>` : ''
+  const chart = `<div class="anvil-spark${spark ? ' anvil-spark-tiny' : ''}">${polyline(v.data, domain, goal, !spark)}</div>`
+  if (spark) {
+    const last = v.data[v.data.length - 1] as AnvilDatum | undefined
+    const now = last ? `<span class="anvil-chart-value">${esc(valueText(last, unit))}</span>` : ''
+    return `<div class="anvil-spark-line-row">${chart}${now}</div>${seriesText(v.data, unit)}${earlier}`
+  }
+  return `${chart}${seriesSummary(v.data, unit)}${seriesText(v.data, unit)}${earlier}`
+}
+
+/** One entry per render mode. A sixth mode is one line here plus one renderer. */
+const CHART_MODES: Record<ChartRender, (v: Visible, d: AnvilDomain, g: number | null, u: string) => string> = {
+  bar: (v, d, g, u) => renderBars(v, d, g, u, false),
+  dot: (v, d, g, u) => renderBars(v, d, g, u, true),
+  column: renderColumns,
+  line: (v, d, g, u) => renderLine(v, d, g, u, false),
+  spark: (v, d, g, u) => renderLine(v, d, g, u, true),
+}
+
+export function renderChart(b: AnvilBlock): string {
+  if (!b.data.length) return '<p class="anvil-empty">No data.</p>'
+  const mode = chartRender(b)
+  const v = visible(b, mode)
+  const domain = chartDomain(b, v.data)
+  const goal = chartGoal(b)
+  const unit = attrString(b, 'unit')
+  const body = (CHART_MODES[mode] ?? CHART_MODES.bar)(v, domain, goal, unit)
+  // AN AXIS THAT IS NOT WHAT A READER ASSUMES MUST SAY SO. A bar chart is read
+  // as "length is magnitude", and both of these break that read: a raised floor
+  // means the bars are differences rather than amounts, and an authored ceiling
+  // means the longest bar is not the maximum. Neither is dishonest labelled;
+  // both are dishonest silent, and the truncated floor is the one that has been
+  // fooling people since printed newspapers.
+  const parts = [
+    domain.authoredFloor ? `scale from ${esc(String(domain.floor))}${esc(unit)}, not zero` : '',
+    domain.authoredTop ? `to ${esc(String(domain.top))}${esc(unit)}` : '',
+    goal !== null ? `goal ${esc(String(goal))}${esc(unit)}` : '',
+  ].filter(Boolean)
+  const scale = parts.length ? `<p class="anvil-chart-scale">${parts.join(' · ')}</p>` : ''
+  const truncated = domain.authoredFloor ? ' anvil-chart-truncated' : ''
+  return `<div class="anvil-chart${truncated}" data-render="${esc(mode)}">${body}${scale}</div>${renderChips(b)}`
+}
+
+/* ── flow ────────────────────────────────────────────────────────────────── */
+
+/**
+ * Type metrics, estimated rather than measured.
+ *
+ * This renderer emits a STRING. There is no DOM to measure against, no layout
+ * pass to wait for, and there must never be -- so the node boxes are sized from
+ * a character count against a monospace advance, which is exactly what an ASCII
+ * diagram does and is exact for the font stack the CSS pins. Generous padding
+ * absorbs the error; `<title>` carries any label the box had to cut.
+ */
+const FONT_PX = 12
+const CHAR_PX = 7.1
+const PAD_X = 12
+const NODE_MIN_W = 68
+const NODE_MAX_CHARS = 26
+const EDGE_MAX_CHARS = 20
+const ROW_H = 17
+const GUTTER_MIN = 46
+const GAP = 16
+const LANE = 26
+
+/** The widest edge label, in pixels, once clipping has had its say. */
+function widestLabel(edges: FlowEdge[]): number {
+  const chars = edges.reduce((m, e) => Math.max(m, clip(e.label, EDGE_MAX_CHARS).length), 0)
+  return chars ? chars * CHAR_PX + 10 : 0
+}
+
+/**
+ * The gutter has to fit the labels that sit in it, ALONG THE AXIS IT RUNS.
+ *
+ * A fixed gutter drew `still failing` as a 102px pill across a 46px gap, so the
+ * label lay on top of the two boxes it described. Sizing every gutter by label
+ * WIDTH then overcorrected the other way: a `dir=down` gutter runs vertically,
+ * a label crossing it is 16px tall however many characters it has, and
+ * `re-request` opened a 150px canyon between two ranks. Width for a rightward
+ * flow, height for a downward one.
+ */
+function gutterFor(edges: FlowEdge[], down: boolean): number {
+  if (down) return GUTTER_MIN
+  const widest = widestLabel(edges)
+  return widest ? Math.max(GUTTER_MIN, widest + 12) : GUTTER_MIN
+}
+
+function clip(s: string, max: number): string {
+  return s.length > max ? `${s.slice(0, max - 1)}…` : s
+}
+
+interface Placed {
+  node: AnvilNode
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+function nodeWidth(n: AnvilNode): number {
+  const chars = Math.max(clip(n.label, NODE_MAX_CHARS).length, clip(n.note, NODE_MAX_CHARS).length)
+  const base = Math.max(NODE_MIN_W, chars * CHAR_PX + PAD_X * 2)
+  // A diamond wastes its corners, so it needs more box to hold the same text.
+  return n.shape === 'diamond' ? base * 1.45 : base
+}
+
+function nodeHeight(n: AnvilNode): number {
+  return n.note ? ROW_H * 2 + 14 : ROW_H + 15
+}
+
+/**
+ * Rank index -> pixel offset, and the size of each band.
+ *
+ * `dir` is applied by SWAPPING the axes at the end rather than by writing the
+ * layout twice. Two copies of this arithmetic would drift the first time
+ * somebody fixed a spacing bug in one of them.
+ */
+function place(
+  ranks: AnvilNode[][],
+  down: boolean,
+  gutter: number,
+): { placed: Map<string, Placed>; w: number; h: number } {
+  const bands = ranks.map(row => Math.max(0, ...row.map(n => (down ? nodeHeight(n) : nodeWidth(n)))))
+  const runs = ranks.map(row =>
+    row.reduce((sum, n) => sum + (down ? nodeWidth(n) : nodeHeight(n)) + GAP, -GAP),
+  )
+  const longest = Math.max(0, ...runs)
+
+  const placed = new Map<string, Placed>()
+  let along = 0
+  ranks.forEach((row, r) => {
+    const band = bands[r] as number
+    // Centre each rank against the tallest one, so a chain reads as a spine
+    // rather than as a staircase hanging off the top edge.
+    let across = (longest - (runs[r] as number)) / 2
+    for (const n of row) {
+      const w = nodeWidth(n)
+      const h = nodeHeight(n)
+      const acrossSize = down ? w : h
+      const alongPos = along + (band - (down ? h : w)) / 2
+      placed.set(n.id, {
+        node: n,
+        x: down ? across : alongPos,
+        y: down ? alongPos : across,
+        w,
+        h,
+      })
+      across += acrossSize + GAP
+    }
+    along += band + gutter
+  })
+
+  const total = along - gutter
+  return {
+    placed,
+    w: down ? longest : total,
+    h: down ? total : longest,
+  }
+}
+
+/** The three outlines. A shape nobody wrote a path for cannot reach this map. */
+function nodeShape(p: Placed): string {
+  const { x, y, w, h } = p
+  if (p.node.shape === 'diamond') {
+    const pts = `${x + w / 2},${y} ${x + w},${y + h / 2} ${x + w / 2},${y + h} ${x},${y + h / 2}`
+    return `<polygon class="anvil-flow-box" points="${pts}"></polygon>`
+  }
+  const rx = p.node.shape === 'round' ? h / 2 : 6
+  return `<rect class="anvil-flow-box" x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}"></rect>`
+}
+
+function nodeText(p: Placed): string {
+  const cx = p.x + p.w / 2
+  const label = clip(p.node.label, NODE_MAX_CHARS)
+  const full = p.node.note ? `${p.node.label} — ${p.node.note}` : p.node.label
+  const title = full === label ? '' : `<title>${esc(full)}</title>`
+  if (!p.node.note) {
+    return `${title}<text class="anvil-flow-label" x="${cx}" y="${p.y + p.h / 2}" text-anchor="middle" dominant-baseline="central">${esc(label)}</text>`
+  }
+  return `${title}<text class="anvil-flow-label" x="${cx}" y="${p.y + p.h / 2 - 6}" text-anchor="middle" dominant-baseline="central">${esc(label)}</text><text class="anvil-flow-note" x="${cx}" y="${p.y + p.h / 2 + 9}" text-anchor="middle" dominant-baseline="central">${esc(clip(p.node.note, NODE_MAX_CHARS))}</text>`
+}
+
+/** Where an edge leaves and enters a box, given the flow direction. */
+function ports(from: Placed, to: Placed, down: boolean): { x1: number; y1: number; x2: number; y2: number } {
+  return down
+    ? { x1: from.x + from.w / 2, y1: from.y + from.h, x2: to.x + to.w / 2, y2: to.y }
+    : { x1: from.x + from.w, y1: from.y + from.h / 2, x2: to.x, y2: to.y + to.h / 2 }
+}
+
+/**
+ * An orthogonal connector: out of the box, across the gutter, into the next
+ * box. Three segments, never a curve, because a right angle survives being
+ * scaled down to a chat column and a bezier turns into a smudge.
+ */
+function connector(x1: number, y1: number, x2: number, y2: number, down: boolean): string {
+  const mid = down ? (y1 + y2) / 2 : (x1 + x2) / 2
+  return down ? `M ${x1} ${y1} V ${mid} H ${x2} V ${y2}` : `M ${x1} ${y1} H ${mid} V ${y2} H ${x2}`
+}
+
+/**
+ * A back edge, routed round the outside in its own lane.
+ *
+ * Cycles are legitimate -- a retry ladder is a cycle, and so is every state
+ * machine worth drawing -- so they are neither dropped nor allowed to break the
+ * ranking. They leave the far side of the source, run along a lane outside the
+ * body, and come back into the near side of the target, dashed, so the return
+ * reads as a return.
+ */
+function backConnector(from: Placed, to: Placed, lane: number, down: boolean): string {
+  return down
+    ? `M ${from.x} ${from.y + from.h / 2} H ${lane} V ${to.y + to.h / 2} H ${to.x}`
+    : `M ${from.x + from.w / 2} ${from.y + from.h} V ${lane} H ${to.x + to.w / 2} V ${to.y + to.h}`
+}
+
+function edgeLabel(text: string, x: number, y: number): string {
+  if (!text) return ''
+  const t = clip(text, EDGE_MAX_CHARS)
+  const w = t.length * CHAR_PX + 10
+  return `<g class="anvil-flow-tag"><rect x="${(x - w / 2).toFixed(1)}" y="${(y - 8).toFixed(1)}" width="${w.toFixed(1)}" height="16" rx="4"></rect><text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" dominant-baseline="central">${esc(t)}</text></g>`
+}
+
+export function renderFlow(b: AnvilBlock): string {
+  const graph = flowGraph(b)
+  if (!graph.nodes.length) return '<p class="anvil-empty">No steps.</p>'
+
+  const down = attrString(b, 'dir', 'right').toLowerCase() === 'down'
+  const { placed, w, h } = place(graph.ranks, down, gutterFor(graph.edges, down))
+
+  // A unique marker id per block: two flows on one page sharing `#anvil-arrow`
+  // would both point at whichever rendered first, and the second would inherit
+  // the first's colour.
+  const arrow = `anvil-arrow-${slugId(b.id)}`
+
+  // Back edges need a lane OUTSIDE the body to run in, so the viewBox grows on
+  // exactly one side: left of a rightward flow, below a downward one.
+  //
+  // The lane carries the return's own label, and that label is centred ON the
+  // lane -- so the box has to clear half of it or the text is sliced off at the
+  // edge. `re-request` rendered as `equest` before this was accounted for.
+  const hasBack = graph.edges.some(e => e.back)
+  const backLabel = widestLabel(graph.edges.filter(e => e.back))
+  const lane = down ? -LANE : h + LANE
+  const pad = 8
+  const clearance = LANE + backLabel / 2 + pad
+  const minX = down && hasBack ? -clearance : -pad
+  const minY = -pad
+  const maxY = !down && hasBack ? h + clearance : h + pad
+  const viewW = w + pad - minX
+  const viewH = maxY - minY
+
+  const wires = graph.edges
+    .map((e: FlowEdge) => {
+      const from = placed.get(e.from)
+      const to = placed.get(e.to)
+      if (!from || !to) return ''
+      const cls = `anvil-flow-edge${e.back ? ' anvil-flow-back' : ''}${e.undirected ? ' anvil-flow-plain' : ''}`
+      const head = e.undirected ? '' : ` marker-end="url(#${arrow})"`
+      if (e.back) {
+        return `<path class="${cls}" d="${backConnector(from, to, lane, down)}" fill="none"${head}></path>${edgeLabel(e.label, down ? lane : (from.x + to.x) / 2 + from.w / 2, down ? (from.y + to.y) / 2 + from.h / 2 : lane)}`
+      }
+      const { x1, y1, x2, y2 } = ports(from, to, down)
+      // The label sits on the gutter crossing, which is the midpoint of the
+      // middle segment whichever way the flow runs.
+      return `<path class="${cls}" d="${connector(x1, y1, x2, y2, down)}" fill="none"${head}></path>${edgeLabel(e.label, (x1 + x2) / 2, (y1 + y2) / 2)}`
+    })
+    .join('')
+
+  const boxes = graph.nodes
+    .map(n => {
+      const p = placed.get(n.id)
+      if (!p) return ''
+      return `<g class="anvil-flow-node" data-state="${n.state}" data-shape="${n.shape}">${nodeShape(p)}${nodeText(p)}</g>`
+    })
+    .join('')
+
+  // Every node, in text, in rank order. The picture is an SVG with no reading
+  // order of its own; this is the diagram for anybody who cannot see it.
+  const list = graph.ranks
+    .map((row, r) => row.map(n => `<li>Step ${r + 1}: ${esc(n.label)}${n.note ? ` — ${esc(n.note)}` : ''} (${STATE_LABEL[n.state].toLowerCase()})</li>`).join(''))
+    .join('')
+  const links = graph.edges
+    .map(e => `<li>${esc(e.from)} ${e.undirected ? 'is connected to' : 'leads to'} ${esc(e.to)}${e.label ? `, ${esc(e.label)}` : ''}</li>`)
+    .join('')
+
+  return `<div class="anvil-flow" data-dir="${down ? 'down' : 'right'}">
+    <svg class="anvil-flow-svg" viewBox="${minX.toFixed(1)} ${minY.toFixed(1)} ${viewW.toFixed(1)} ${viewH.toFixed(1)}" style="max-width:${Math.ceil(viewW)}px" font-size="${FONT_PX}" role="img" aria-label="${esc(b.prompt || 'Flow diagram')}">
+      <defs><marker id="${arrow}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="anvil-flow-head" d="M 0 0 L 10 5 L 0 10 z"></path></marker></defs>
+      ${wires}${boxes}
+    </svg>
+    <ul class="anvil-sr">${list}${links}</ul>
+    ${graph.dropped > 0 ? `<p class="anvil-more">+${graph.dropped} more</p>` : ''}
+  </div>${renderChips(b)}`
 }
 
 /* ── message ─────────────────────────────────────────────────────────────── */
@@ -561,6 +1045,11 @@ const NEEDS_SUBMIT: Record<AnvilKind, (b: AnvilBlock) => boolean> = {
   card: b => askable(b) && isMulti(b),
   // A board is a record. Layout is not answerable at all (§4.14 L5).
   board: () => false,
+  // A picture of data and a picture of a process. Neither is a question, and
+  // neither carries an `ask=` -- if the human is meant to choose one of the
+  // things drawn here, the block for that is @choice, next to it.
+  chart: () => false,
+  flow: () => false,
   // Sending is one deliberate act, never a click-to-select -- and only while
   // the message is still a draft. A locked message keeps the question on
   // screen (§9.2) but the button is gone, because it has been answered.

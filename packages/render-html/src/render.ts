@@ -17,6 +17,8 @@ import {
   attrNumber,
   attrString,
   cardStatus,
+  type ChartRender,
+  chartRender,
   type GalleryRender,
   galleryRender,
   isLocked,
@@ -32,11 +34,14 @@ import {
   taskProgress,
 } from '@anvil-md/parser'
 import {
+  cardProse,
   CHANNEL_ICON,
   esc,
   renderBoard,
   renderCard,
+  renderChart,
   renderChoice,
+  renderFlow,
   renderGallery,
   renderInput,
   renderMessage,
@@ -63,6 +68,8 @@ const BODIES: Partial<Record<AnvilKind, BodyRenderer>> = {
   card: renderCard,
   board: renderBoard,
   message: renderMessage,
+  chart: renderChart,
+  flow: renderFlow,
 }
 
 /**
@@ -78,6 +85,8 @@ const KIND_ICON: Record<AnvilKind, IconName> = {
   card: 'ticket',
   board: 'columns-3',
   message: 'mail',
+  chart: 'chart-bar',
+  flow: 'workflow',
   grid: 'layout-grid',
   stack: 'layout-grid',
 }
@@ -90,6 +99,15 @@ const GALLERY_ICON: Record<GalleryRender, IconName> = {
   card: 'layout-grid',
 }
 
+/** And a chart's follows its render mode, for the same reason. */
+const CHART_ICON: Record<ChartRender, IconName> = {
+  bar: 'chart-bar',
+  column: 'chart-column',
+  line: 'chart-line',
+  spark: 'chart-line',
+  dot: 'chart-scatter',
+}
+
 /** A card's icon follows what kind of ticket it claims to be. */
 const CARD_ICON: Record<string, IconName> = {
   epic: 'layers',
@@ -100,6 +118,7 @@ const CARD_ICON: Record<string, IconName> = {
 function blockIcon(block: AnvilBlock): IconName {
   let base = KIND_ICON[block.kind]
   if (block.kind === 'gallery') base = GALLERY_ICON[galleryRender(block)]
+  if (block.kind === 'chart') base = CHART_ICON[chartRender(block)]
   // pick(), not `?? fallback`: `type=__proto__` inherits rather than falls back.
   if (block.kind === 'card') base = pick(CARD_ICON, attrString(block, 'type').toLowerCase(), 'ticket')
   return resolveIcon(block.attrs.icon, base)
@@ -184,6 +203,43 @@ function recordShell(block: AnvilBlock, partial: boolean): string {
   // it does not claim one.
   return `<section class="anvil-block anvil-card-block" data-anvil-id="${esc(block.id)}" data-anvil-kind="${esc(block.kind)}"${board ? '' : ` data-state="${status}"`}>
     ${head}${heading}${sub}${(BODIES[block.kind] ?? renderNote)(block)}${warnings(block)}${submitBar(block)}
+    <footer class="anvil-foot"><span>${esc(foot)}</span></footer>
+  </section>`
+}
+
+/* ── chart and flow ──────────────────────────────────────────────────────── */
+
+/**
+ * The frame shared by @chart and @flow.
+ *
+ * Same footer as a card, and for the same reason (§4.12.2): both are pictures
+ * of something that was true when the sentence around them was written. A chart
+ * that quietly refetched would turn the transcript into a claim about today.
+ * `as=` is the agent's own timestamp and this renderer supplies no clock.
+ *
+ * The count in the header corner is DERIVED -- values for a chart, steps for a
+ * flow -- so like every other number in this language it cannot disagree with
+ * what is drawn underneath it.
+ */
+function dataShell(block: AnvilBlock, partial: boolean): string {
+  const chart = block.kind === 'chart'
+  const n = chart ? block.data.length : new Set([...block.nodes.map(x => x.id), ...block.edges.flatMap(e => [e.from, e.to])]).size
+  const noun = chart ? 'value' : 'step'
+  const rawRef = block.derivedId ? '' : block.id
+
+  const head = `<header class="anvil-card-head">
+    <span class="anvil-icon">${icon(blockIcon(block))}</span>
+    <span class="anvil-card-title">${esc(block.prompt)}</span>
+    ${rawRef ? `<span class="anvil-ref">${esc(rawRef)}</span>` : ''}
+    ${n > 0 ? `<span class="anvil-card-count">${n} ${noun}${n === 1 ? '' : 's'}</span>` : ''}
+  </header>`
+
+  const sub = block.subtext ? `<div class="anvil-subtext">${esc(block.subtext)}</div>` : ''
+  const as = attrString(block, 'as')
+  const foot = [partial ? 'streaming' : 'snapshot', as ? `as of ${as}` : ''].filter(Boolean).join(' · ')
+
+  return `<section class="anvil-block anvil-card-block anvil-data-block" data-anvil-id="${esc(block.id)}" data-anvil-kind="${esc(block.kind)}">
+    ${head}${sub}${cardProse(block)}${(BODIES[block.kind] ?? renderNote)(block)}${warnings(block)}
     <footer class="anvil-foot"><span>${esc(foot)}</span></footer>
   </section>`
 }
@@ -380,6 +436,8 @@ function layoutShell(block: AnvilBlock, partial: boolean): string {
 const SHELLS: Partial<Record<AnvilKind, (b: AnvilBlock, partial: boolean) => string>> = {
   card: recordShell,
   board: recordShell,
+  chart: dataShell,
+  flow: dataShell,
   message: messageShell,
   grid: layoutShell,
   stack: layoutShell,

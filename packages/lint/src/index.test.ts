@@ -184,6 +184,49 @@ describe('warnings', () => {
   })
 })
 
+describe('chart and flow', () => {
+  test('a unit printed twice is caught before the renderer prints it', () => {
+    // The renderer prints `raw` (§4.16.1), so a suffix in the cell AND a unit=
+    // both reach the page: `12%` under `unit=%` comes out `12% %`. Guessing
+    // which of the two was meant would edit the value the agent wrote.
+    expect(rules('@chart id=c unit=%\n? Q\n- a | 12%\n- b | 51%')).toContain('chart-unit-is-not-in-the-values')
+    expect(rules('@chart id=c unit=k\n? Q\n- a | 4.8k')).toContain('chart-unit-is-not-in-the-values')
+    expect(rules('@chart id=c unit=%\n? Q\n- a | 12\n- b | 51')).not.toContain('chart-unit-is-not-in-the-values')
+    // No unit= at all: whatever the rows carry is the whole story.
+    expect(rules('@chart id=c\n? Q\n- a | 12%')).not.toContain('chart-unit-is-not-in-the-values')
+  })
+
+  test('a unit spelled out in the cell is not a number, and is refused upstream', () => {
+    // `42ms` never reaches the rule above, because it never becomes a value:
+    // chartNumber is narrow on purpose (§4.16.2) and the parser says so.
+    const out = lint('@chart id=c unit=ms\n? Q\n- a | 42ms')
+    expect(out.diagnostics.some(d => d.message.includes('has no number in its value cell'))).toBe(true)
+  })
+
+  test('an attribute neither block reads is still a silent no-op', () => {
+    expect(rules('@chart id=c sort=desc\n? Q\n- a | 1')).toContain('unknown-attribute')
+    expect(messageFor('@chart id=c sort=desc\n? Q\n- a | 1', 'unknown-attribute')).toContain('"sort="')
+    expect(rules('@flow id=f layout=dagre\n? Q\n- a -> b')).toContain('unknown-attribute')
+    // And the ones they do read are silent.
+    expect(rules('@chart id=c render=bar unit=k max=9 min=0 goal=5 as=1\n? Q\n- a | 1')).not.toContain(
+      'unknown-attribute',
+    )
+    expect(rules('@flow id=f dir=down as=1\n? Q\n- a -> b')).not.toContain('unknown-attribute')
+  })
+
+  test('neither block is a question, so an ASK attribute on one is meaningless', () => {
+    expect(messageFor('@chart id=c select=many\n? Q\n- a | 1', 'unknown-attribute')).toContain('not asking anything')
+  })
+
+  test('an empty chart or flow is an empty frame', () => {
+    expect(rules('@chart id=c\n? Q')).toContain('no-empty-block')
+    expect(rules('@flow id=f\n? Q')).toContain('no-empty-block')
+    expect(rules('@chart id=c\n? Q\n- a | 1')).not.toContain('no-empty-block')
+    // Edges alone are enough: §4.17.2 lets an edge imply both its nodes.
+    expect(rules('@flow id=f\n? Q\n- a -> b')).not.toContain('no-empty-block')
+  })
+})
+
 describe('info', () => {
   test('a grid of one', () => {
     expect(rules('@grid\n@note\n> x\n@end')).toContain('grid-of-one')
@@ -198,6 +241,26 @@ describe('info', () => {
   test('a rollup mixed with bare rows', () => {
     expect(rules('@card id=e\n- [~] A | a | 3/7\n- [x] B | b')).toContain('epic-rollup-is-consistent')
     expect(rules('@card id=e\n- [~] A | a | 3/7\n- [x] B | b | 6/6')).not.toContain('epic-rollup-is-consistent')
+  })
+
+  test('a chart past the row cap is told which mode carries a long series', () => {
+    const long = `@chart id=c\n? Q\n${Array.from({ length: 30 }, (_, i) => `- r${i} | ${i}`).join('\n')}`
+    expect(rules(long)).toContain('chart-is-scannable')
+    expect(rules(`${long.replace('@chart id=c', '@chart id=c render=line')}`)).not.toContain('chart-is-scannable')
+  })
+
+  test('two points is a slope, not a trend', () => {
+    expect(rules('@chart id=c render=spark values=1,2\n? Q')).toContain('spark-needs-a-series')
+    expect(rules('@chart id=c render=spark values=1,2,3\n? Q')).not.toContain('spark-needs-a-series')
+    // A two-row BAR chart is a perfectly good comparison and must not fire.
+    expect(rules('@chart id=c\n? Q\n- a | 1\n- b | 2')).not.toContain('spark-needs-a-series')
+  })
+
+  test('a declared node no arrow reaches is usually a mistyped id', () => {
+    expect(rules('@flow id=f\n? Q\n- retry-1 | Retry\n- build -> test')).toContain('flow-node-is-orphaned')
+    expect(rules('@flow id=f\n? Q\n- retry1 | Retry\n- build -> retry1')).not.toContain('flow-node-is-orphaned')
+    // A flow with no edges at all is a list, and this rule has nothing to say.
+    expect(rules('@flow id=f\n? Q\n- a | A\n- b | B')).not.toContain('flow-node-is-orphaned')
   })
 
   test('option counts', () => {

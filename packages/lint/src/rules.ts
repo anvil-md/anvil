@@ -77,6 +77,8 @@ const KIND_ATTRS: Record<string, Set<string>> = {
   card: new Set(['type', 'status', 'href', 'ask']),
   board: new Set(['max', 'ask']),
   message: new Set(['channel', 'to', 'cc', 'bcc', 'from', 'subject', 'sent', 'state', 'at', 'by', 'error', 'ask']),
+  chart: new Set(['render', 'unit', 'min', 'max', 'goal', 'values']),
+  flow: new Set(['dir']),
   grid: new Set(['cols', 'min', 'gap', 'frame']),
   stack: new Set(['gap', 'frame']),
 }
@@ -271,7 +273,8 @@ export const RULES: Rule[] = [
     run(blocks, report) {
       for (const b of blocks) {
         if (b.kind === 'note' || b.kind === 'message' || isContainer(b.kind)) continue
-        const rows = b.options.length + b.fields.length + b.dials.length + b.tasks.length
+        const rows =
+          b.options.length + b.fields.length + b.dials.length + b.tasks.length + b.data.length + b.nodes.length + b.edges.length
         if (rows > 0) continue
         report(b, `@${b.kind} has no rows and renders as an empty frame`)
       }
@@ -391,6 +394,72 @@ export const RULES: Rule[] = [
       for (const b of blocks) {
         if (b.kind !== 'card' || b.tasks.length <= 12) continue
         report(b, `${b.tasks.length} subtasks; an epic of cards reads better than one very long checklist`)
+      }
+    },
+  },
+  {
+    id: 'chart-is-scannable',
+    severity: 'info',
+    spec: '4.16',
+    about: 'Past two dozen rows a bar chart is a table; a line is the shape you wanted.',
+    run(blocks, report) {
+      for (const b of blocks) {
+        if (b.kind !== 'chart' || b.data.length <= 24) continue
+        const mode = attrString(b, 'render', 'bar').toLowerCase()
+        if (mode === 'line' || mode === 'spark') continue
+        report(b, `${b.data.length} rows: only the first 24 are drawn. render=line carries a long series`)
+      }
+    },
+  },
+  {
+    id: 'spark-needs-a-series',
+    severity: 'info',
+    spec: '4.16',
+    about: 'Two points make a slope, not a trend.',
+    run(blocks, report) {
+      for (const b of blocks) {
+        if (b.kind !== 'chart' || b.data.length >= 3) continue
+        const mode = attrString(b, 'render', 'bar').toLowerCase()
+        if (mode !== 'spark' && mode !== 'line') continue
+        report(b, `render=${mode} with ${b.data.length} point(s) draws a line nobody can read a trend off`)
+      }
+    },
+  },
+  {
+    id: 'chart-unit-is-not-in-the-values',
+    severity: 'warn',
+    spec: '4.16',
+    about: 'A unit written into every value cell prints twice once unit= is set.',
+    run(blocks, report) {
+      for (const b of blocks) {
+        if (b.kind !== 'chart' || !attrString(b, 'unit')) continue
+        // The renderer prints `raw`, so a row written `42ms` under `unit=ms`
+        // comes out `42ms ms`. Caught here rather than papered over there:
+        // guessing which one the agent meant is how a value stops being what
+        // was typed.
+        const suffixed = b.data.filter(d => /[a-z%°]$/i.test(d.raw))
+        if (!suffixed.length) continue
+        report(b, `unit="${attrString(b, 'unit')}" with ${suffixed.length} value(s) that already carry a suffix ("${suffixed[0]?.raw}")`)
+      }
+    },
+  },
+  {
+    id: 'flow-node-is-orphaned',
+    severity: 'info',
+    spec: '4.17',
+    about: 'A declared node no arrow touches is usually a typo in an id.',
+    run(blocks, report) {
+      for (const b of blocks) {
+        if (b.kind !== 'flow' || !b.edges.length) continue
+        const touched = new Set<string>()
+        for (const e of b.edges) touched.add(e.from), touched.add(e.to)
+        // A flow with no edges at all is a list, and `no-empty-block` has
+        // nothing to say about it either -- but one orphan among six connected
+        // nodes is almost always `retry-1` declared and `retry1` wired up.
+        for (const n of b.nodes) {
+          if (touched.has(n.id)) continue
+          report(b, `"${n.id}" is declared but no arrow reaches it; check the id against the edge rows`)
+        }
       }
     },
   },
