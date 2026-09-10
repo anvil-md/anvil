@@ -4,3 +4,8 @@ dist/
 *.log
 .DS_Store
 .rclaude/
+
+# Swift
+.build/
+.swiftpm/
+Package.resolved
