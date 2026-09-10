@@ -30,6 +30,12 @@ public struct AnvilDocument: Sendable {
         public let data: [AnvilDatum]
         /// The range `data` is drawn against. Nil when the block is not a chart.
         public let domain: AnvilDomain?
+        /// `@flow` edges, in source order. Self-loops are refused, not listed.
+        public let edges: [AnvilEdge]
+        /// Counted off the rows. There is no `progress=` to disagree with it.
+        public let progress: AnvilProgress?
+        /// Per-task rollup, nil where the row had none or it was refused.
+        public let rollups: [AnvilRollup?]
         public let prose: [String]
         public let literal: String?
         /// Blocks inside a `@grid` or `@stack`. Empty for everything else.
@@ -122,6 +128,8 @@ public enum AnvilParser {
         func closeCurrent() {
             guard let builder = current else { return }
             warnings.append(contentsOf: builder.finishChart(line: builder.headerLine))
+            warnings.append(contentsOf: builder.statusWarnings(line: builder.headerLine))
+            warnings.append(contentsOf: builder.flowWarnings(line: builder.headerLine))
             let finished = builder.build()
             if containers.isEmpty { blocks.append(finished) } else { containers[containers.count - 1].children.append(finished) }
             current = nil
@@ -253,6 +261,8 @@ public enum AnvilParser {
         private var tasks: [AnvilDocument.Task] = []
         private var data: [AnvilDatum] = []
         private var domain: AnvilDomain?
+        private var edges: [AnvilEdge] = []
+        private var rollups: [AnvilRollup?] = []
 
         init(header: String, line: Int) {
             headerLine = line
@@ -297,6 +307,16 @@ public enum AnvilParser {
             let destructive = text.hasPrefix("!")
             if destructive { text = String(text.dropFirst()).trimmingCharacters(in: .whitespaces) }
 
+            // A `@flow` row is an edge when it carries an arrow. A `- [x] id`
+            // row in a flow is a NODE and falls through to the box branch.
+            if resolvedKind == .flow, AnvilParser.boxState(text) == nil {
+                let (found, selfLoops) = AnvilParser.edges(in: text)
+                edges.append(contentsOf: found)
+                return selfLoops.map {
+                    AnvilWarning("the edge \($0) -> \($0) points at itself, so it is not drawn", line: line)
+                }
+            }
+
             // A `@chart` row is a datum, not an option.
             if resolvedKind == .chart {
                 let cells = AnvilParser.cells(text)
@@ -326,6 +346,14 @@ public enum AnvilParser {
                 let cells = AnvilParser.cells(box.rest)
                 let ref = cells.first ?? ""
                 let label = cells.count > 1 ? cells[1] : ref
+                let meta = cells.count > 2 ? cells[2] : nil
+
+                // SPEC 4.12.1: a count read off the END of the meta cell, and
+                // only when it is genuinely separated.
+                let (rolled, complaint) = meta.map(AnvilParser.rollup(in:)) ?? (nil, nil)
+                rollups.append(rolled)
+                if let complaint { warnings.append(AnvilWarning(complaint, line: line)) }
+
                 tasks.append(
                     AnvilDocument.Task(
                         id: ref,
@@ -486,6 +514,60 @@ public enum AnvilParser {
             return warnings + domainWarnings
         }
 
+        /// SPEC 4.17.4: past the cap the diagram is truncated, and it counts
+        /// what it dropped. Parsed and then not drawn is a bug -- `+N more`
+        /// exists so the drop is visible rather than silent.
+        func flowWarnings(line: Int?) -> [AnvilWarning] {
+            guard resolvedKind == .flow else { return [] }
+            var seen: [String] = []
+            for edge in edges {
+                for node in [edge.from, edge.to] where !seen.contains(node) { seen.append(node) }
+            }
+            let over = seen.count - AnvilParser.flowNodeCap
+            guard over > 0 else { return [] }
+            return [
+                AnvilWarning(
+                    "the diagram is past the \(AnvilParser.flowNodeCap) node cap; "
+                        + "\(over) more \(over == 1 ? "node is" : "nodes are") not drawn",
+                    line: line
+                ),
+            ]
+        }
+
+        /// Counted off the rows, never authored. A child with its own rollup
+        /// contributes that rollup; a plain row contributes one.
+        var progress: AnvilProgress? {
+            guard resolvedKind == .card || resolvedKind == .board, !tasks.isEmpty else { return nil }
+            var done = 0
+            var total = 0
+            for (index, task) in tasks.enumerated() {
+                if index < rollups.count, let rollup = rollups[index] {
+                    done += rollup.done
+                    total += rollup.total
+                } else {
+                    done += task.state == .done ? 1 : 0
+                    total += 1
+                }
+            }
+            return AnvilProgress(done: done, total: total)
+        }
+
+        /// SPEC 4.12.1: `status=` exists because a card can be blocked at any
+        /// progress, which the rows cannot know. But `status=done` above two
+        /// open subtasks is a hand-typed claim the rows contradict, so the
+        /// count wins.
+        func statusWarnings(line: Int?) -> [AnvilWarning] {
+            guard let claimed = attributes["status"], let counted = progress else { return [] }
+            let impliedDone = counted.total > 0 && counted.done == counted.total
+            guard claimed == "done", !impliedDone else { return [] }
+            return [
+                AnvilWarning(
+                    "status=\"done\" contradicts \(counted.done)/\(counted.total); using \"todo\"",
+                    line: line
+                ),
+            ]
+        }
+
         func build() -> AnvilDocument.Parsed {
             AnvilDocument.Parsed(
                 // A container has no identity at all -- not a derived one
@@ -501,6 +583,9 @@ public enum AnvilParser {
                 tasks: tasks,
                 data: data,
                 domain: domain,
+                edges: edges,
+                progress: progress,
+                rollups: rollups,
                 prose: prose,
                 literal: literal,
                 children: children

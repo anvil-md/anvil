@@ -20,29 +20,22 @@ swift test
 | What the corpus checks | State |
 |---|---|
 | **Totality** -- no throw on every prefix of every source | **77 / 77** |
-| **Block model** -- `blocks`, kinds, ids, prompts, option values | **38 / 38** |
-| **Warnings** -- `warningsContain` | **8 / 17** |
+| **Block model** -- kinds, ids, prompts, options, chart data, flow edges, domain | **38 / 38** |
+| **Warnings** -- `warningsContain` | **17 / 17** |
 
 `AnvilParser.parse` has no throwing path at all, so totality is enforced by the
 type system rather than by discipline. That is the rule CLAUDE.md cares about
 most and it is met by construction.
 
-### What is not done
+### What is not covered
 
-Nine warning cases remain, and each needs a feature rather than a warning
-string:
+The corpus's `html*` keys name substrings the reference renderer must emit.
+They are a renderer's contract, not a parser's, and this package draws nothing.
+Everything under `blocks`, `warnings` and totality is met.
 
-- **`@card` rollups (§4.12.1)** -- `3/7` counted off the rows, a `status=` that
-  contradicts them, `more done than total`, and a rollup that needs a separator.
-- **`@chart` domain (§4.16.2, §4.16.4)** -- a `max=` below the largest value, a
-  `min=` above the smallest, a non-numeric value cell, and `values=` losing to
-  the rows.
-- **`@flow` edges (§4.17.2, §4.17.4)** -- an edge that points at itself, and
-  counting what truncation dropped.
-
-The block kinds those cases need -- chart data rows, flow nodes and edges, card
-task rollups -- are parsed as ordinary options today. They do not crash and they
-do not silently vanish, but they are not modelled.
+`tree`, `topLevelKinds` and `maxDepth` are parsed -- containers nest and the
+depth cap is enforced -- but are not yet asserted here, because no case pins
+them without also pinning html.
 
 ## Why `Package.swift` is at the repository root
 

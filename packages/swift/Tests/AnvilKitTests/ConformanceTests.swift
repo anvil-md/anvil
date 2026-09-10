@@ -53,7 +53,8 @@ struct ConformanceTests {
         }
     }
 
-    /// The document model. This is the real bar and it is NOT met yet.
+    /// The document model.
+    ///
     /// A case that pins `warnings` or `tree` and nothing else is not this
     /// test's business, so those are filtered out of the arguments rather than
     /// failed. `documentModelCoverageIsVisible` prints how many that leaves, so
@@ -98,6 +99,9 @@ struct ConformanceTests {
             }
             if let raw = want.dataRaw {
                 #expect(got.data.map(\.raw) == raw, "\(testCase.id): block \(index) dataRaw")
+            }
+            if let edges = want.edges {
+                #expect(got.edges.map(\.wire) == edges, "\(testCase.id): block \(index) edges")
             }
             if let domain = want.domain {
                 let got = try #require(got.domain, "\(testCase.id): block \(index) has no domain")
