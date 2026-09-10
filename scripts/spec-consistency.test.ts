@@ -70,6 +70,85 @@ function flatten(doc: AnvilDoc): AnvilBlock[] {
 
 const EXAMPLES = examples(src)
 
+/** Everything from a `## N.` heading up to the next one. */
+function section(md: string, heading: string): string {
+  const start = md.indexOf(heading)
+  if (start < 0) return ''
+  const rest = md.slice(start + heading.length)
+  const end = rest.search(/\n## /)
+  return end < 0 ? rest : rest.slice(0, end)
+}
+
+/** The first fenced block inside a section. */
+function firstFence(md: string): string {
+  const m = /```[a-z]*\n([\s\S]*?)```/.exec(md)
+  return m?.[1] ?? ''
+}
+
+function kindsIn(text: string): string[] {
+  return [...text.matchAll(/@(\w+)/g)].map(m => m[1] as string)
+}
+
+/**
+ * Not blocks: layout HOLDS blocks, and neither `@end` nor `@void` is a thing
+ * that gets drawn. This is the split §2's own count sentence makes.
+ */
+const NOT_A_BLOCK = new Set(['grid', 'stack', 'end', 'void'])
+
+const NUMERAL: Record<string, number> = {
+  Ten: 10,
+  Eleven: 11,
+  Twelve: 12,
+  Thirteen: 13,
+  Fourteen: 14,
+  Fifteen: 15,
+  Sixteen: 16,
+  Seventeen: 17,
+  Eighteen: 18,
+  Nineteen: 19,
+  Twenty: 20,
+}
+
+/**
+ * §2 must list every block §4 documents, and its count must be arithmetic.
+ *
+ * This drift has already shipped once. The @chart / @flow commit (3a18f4b)
+ * added §4.16, §4.17 and the §13 reference card, and never touched §2 -- so
+ * the vocabulary block a reader meets FIRST was missing two blocks, and the
+ * "Thirteen blocks" underneath it had been wrong ever since.
+ *
+ * §13 is a cheatsheet somebody checks. §2 is the list they LEARN THE LANGUAGE
+ * from, and "the set is closed on purpose" is the document's own argument --
+ * which a stale list quietly undermines, because the closed set it shows is
+ * not the set the spec defines.
+ *
+ * Only the FENCE is scanned, never the prose beneath it: that prose names
+ * `@confirm`, `@yesno`, `@palette` and friends precisely to say they do NOT
+ * exist, and counting them would invert the test.
+ */
+describe('SPEC.md vocabulary', () => {
+  const listed = new Set(kindsIn(firstFence(section(src, '## 2. Vocabulary'))))
+  const documented = [...src.matchAll(/^### 4\.\d+ (.+)$/gm)].flatMap(m => kindsIn(m[1] ?? ''))
+
+  test('§2 lists every block §4 documents', () => {
+    expect([...new Set(documented)].filter(k => !listed.has(k)).sort()).toEqual([])
+  })
+
+  test('§2 documents nothing §4 never defines', () => {
+    const defined = new Set(documented)
+    // `@end` closes a container and earns no section of its own.
+    expect([...listed].filter(k => k !== 'end' && !defined.has(k)).sort()).toEqual([])
+  })
+
+  test('the count under §2 is the number of blocks in it', () => {
+    const m = /^(\w+) blocks, (\w+) containers and (\w+) directive/m.exec(src)
+    expect(m).not.toBeNull()
+
+    const blocks = [...listed].filter(k => !NOT_A_BLOCK.has(k))
+    expect(NUMERAL[m?.[1] ?? '']).toBe(blocks.length)
+  })
+})
+
 describe('SPEC.md examples', () => {
   test('the document contains examples to check', () => {
     expect(EXAMPLES.length).toBeGreaterThan(8)

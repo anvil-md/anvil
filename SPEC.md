@@ -101,6 +101,8 @@ transcript containing ANVIL blocks reads truthfully after the fact.
      @code      a verbatim literal, inside the block
      @example   a canned value that fills an ASK block
      @board     task rows grouped into lanes
+     @chart     one series of numbers, drawn as a shape
+     @flow      steps and arrows, drawn as a diagram
 
    SHOW, until ask= (a record; with ask= it is an ASK block and stamps once)
      @card      one work item: subtasks, counted progress, status
@@ -115,7 +117,7 @@ transcript containing ANVIL blocks reads truthfully after the fact.
      @void      retract an unanswered block the conversation moved past
 ```
 
-Thirteen blocks, two containers and one directive. The set is **closed on
+Fifteen blocks, two containers and one directive. The set is **closed on
 purpose**. Almost everything an implementer is tempted to add (`@confirm`,
 `@yesno`, `@palette`, `@rate`, `@multi`, `@markdown`) is one of these with an
 attribute set.
