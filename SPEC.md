@@ -95,6 +95,7 @@ transcript containing ANVIL blocks reads truthfully after the fact.
      @link      paste a URL, get a fetched preview card
      @scale     one or more sliders between two named poles
      @order     drag N items into a ranking
+     @connect   a key to somewhere the agent cannot reach on its own
 
    SHOW (never produce a stamp, never freeze)
      @note      prose, hints, warnings. Body is markdown.
@@ -117,7 +118,7 @@ transcript containing ANVIL blocks reads truthfully after the fact.
      @void      retract an unanswered block the conversation moved past
 ```
 
-Fifteen blocks, two containers and one directive. The set is **closed on
+Sixteen blocks, two containers and one directive. The set is **closed on
 purpose**. Almost everything an implementer is tempted to add (`@confirm`,
 `@yesno`, `@palette`, `@rate`, `@multi`, `@markdown`) is one of these with an
 attribute set.
@@ -1150,6 +1151,180 @@ Past forty nodes a flow stops being a sentence and becomes a document, which is
 the line §4.14 L2 already drew for layout. Nodes past the cap are not drawn and
 the count is printed, exactly like a `@board` lane's `+N more`.
 
+### 4.18 `@connect`
+
+An agent asking for a key to somewhere it cannot reach on its own: a Drive, a
+mailbox, a Stripe account, a repo. The moment where an assistant stops being a
+conversation and starts being something with hands, and the moment a human most
+deserves to know exactly what they are handing over.
+
+```anvil
+@connect id=gdrive provider=google-drive submit=Connect
+? Connect Google Drive
+: So I can read Products and Brand
+- drive.readonly | Read your files       | never write, never delete
+- drive.metadata | See file names
+- !drive.file    | Create and edit files | I can overwrite what I make
+```
+
+```
+   ╭─ GOOGLE DRIVE ───────────────────────── not connected ─╮
+   │  Connect Google Drive                                  │
+   │  So I can read Products and Brand                      │
+   │  ────────────────────────────────────────────────────  │
+   │  ○ Read your files        never write, never delete    │
+   │  ○ See file names                                      │
+   │  ! Create and edit files  I can overwrite what I make  │
+   │                                                        │
+   │                                           [ Connect ]  │
+   ╰──────────────── 3 scopes · not connected ──────────────╯
+```
+
+| Attribute | Meaning |
+|---|---|
+| `provider` | which service. Closed per host; an unknown one draws no logo (§4.18.5). |
+| `account` | which identity, when the human has more than one. Text, never a link. |
+| `state` | `disconnected` (default) `connected` `partial` `declined` `failed` `abandoned` |
+| `granted` | with `partial`, the scope rows that survived. The count is read off them. |
+| `at` `by` | when the grant resolved, and under whose account |
+| `error` | with `failed`, what the provider said. Implies `state=failed`. |
+| `submit` | the button label. Defaults to `Connect`, and should say the verb. |
+| `expires` | as §4. A consent window left open all afternoon is the §4.11 problem with a key attached. |
+| `danger` `phrase` | as §4, for a grant that hands over destructive scopes |
+
+`?` is the headline, `:` the reason in the agent's own voice. Each `-` row is one
+scope: `scope | Label | why`. A `!` prefix marks a scope that can destroy
+something, exactly as it marks a destructive option in §4.1.
+
+**There is no `ask=`.** `@card` and `@message` take one because a card and a
+memo are useful things to show with no question attached, and §2 is emphatic
+that those two are the only blocks that change category on an attribute. A
+`@connect` is asking by construction. The block that looks like a record is the
+same block in a terminal state: `state=connected` is absorbing, so it renders
+the grant and no button, and nothing had to switch category to get there.
+
+**4.18.1 The scopes are rows, because they are the thing being consented to.**
+
+The obvious header is `scopes=drive.readonly,drive.file`, and it is wrong twice.
+It introduces a second list syntax next to `|`, in a language that has exactly
+one. And it puts the only content that matters into attribute position, where a
+renderer either prints `drive.readonly,drive.file` at a human or hides it.
+
+As rows, each scope carries the machine string, the human label, and the sentence
+that makes it agreeable. Those are three different readers: the API, the person,
+and the person's suspicion. §4.12.1's argument arrives here intact -- the block
+prints `3 scopes` because there are three rows, and there is no `count=` to
+disagree with them.
+
+**4.18.2 `disconnected` is the default, and that is a safety property.**
+
+Every state past `disconnected` has to be **asserted**, for the same reason a
+`@message` renders `draft · not sent` until something says otherwise (§4.15.1).
+A human who scrolls back two screens, sees a Connect card, and concludes their
+Drive is wired up will not check again.
+
+`connected=true` is the shape to avoid. It is one boolean over six states, and
+the `sent=No` scar says what happens next: a model writes `connected=No`, one
+capital letter defeats the comparison, and the safe default was not a default.
+
+**4.18.3 The click is consent, and the stamp waits for the answer.**
+
+```
+   disconnected ──click──► authorising ──stamp──► connected
+                           (§7.2 pending)         │
+                                                  ├─► partial
+                                                  ├─► declined
+                                                  └─► failed
+```
+
+The click opens someone else's consent screen. Nothing is known yet, so nothing
+is stamped yet: the block sits in `authorising`, which is **§7.2's `pending`**
+wearing a longer coat. Thirty seconds is a long spinner and a legitimate one,
+because the human is off reading Google's checkboxes.
+
+The stamp is written when the flow **returns**, and it carries the outcome. A
+human who closes the popup and never comes back trips `expires` and the block
+falls back to `disconnected` with an error strip, exactly as §7.2 already
+specifies for a nak.
+
+This is deliberately **not** `@message`'s shape, and the difference is worth
+stating: an email's fate arrives seconds later from a different actor, so
+§4.15.5.1 has to permit one post-stamp mutation. An OAuth flow answers **in the
+same round trip the human is standing in**. So `@connect` needs no exception,
+and §4.15.5.1's claim to be the only one in the language survives.
+
+**4.18.4 A grant comes back partial, and the rows record which.**
+
+This is the reason `@connect` is a block rather than a `@choice` with a link on
+it. An email is sent or it is not. A grant is a **negotiation**: every serious
+provider's consent screen has per-scope checkboxes, and people uncheck the one
+that scares them.
+
+So the outcome is written **per row**, and the block keeps every row it asked
+for:
+
+```
+   ╭─ GOOGLE DRIVE ─────────────────────────────── partial ─╮
+   │  Connect Google Drive                                  │
+   │  So I can read Products and Brand                      │
+   │  ────────────────────────────────────────────────────  │
+   │  ✓ Read your files                      granted        │
+   │  ✓ See file names                       granted        │
+   │  ✗ Create and edit files                refused        │
+   │                                                        │
+   │                                     Jonas · 14:02      │
+   ╰───────────────── 2 of 3 granted · 14:02 ───────────────╯
+```
+
+The refused row stays on screen for the §4.1 reason, arriving in a third place:
+a stamped `@choice` keeps its rejected options because they show what the human
+was choosing between, and a refused scope shows what the agent **asked for and
+did not get**. An agent that reads only `state=partial` will try to write to
+Drive and fail; an agent that reads the rows knows not to.
+
+Which makes the delivery rule sharp: the granted scopes are the stamp's
+`values=`, and the refused ones are named too. A partial grant the model never
+learns about is a block that has recorded a decision and told nobody.
+
+```xml
+<stamp block="gdrive" kind="connect" state="partial"
+       values="drive.readonly,drive.metadata"
+       labels="Read your files,See file names"
+       refused="drive.file" at="14:02" by="Jonas">
+  I connected Google Drive, but not with write access.
+</stamp>
+```
+
+**4.18.5 The provider's logo is a phishing primitive.**
+
+An agent-supplied `img=` sitting beside the words "Connect Google" and a button
+is a credential-harvest card, rendered by a trusted surface, inside a transcript
+the human already trusts. §8.3 allowlists `img=` to `http(s)` because the risk
+there is a stylesheet escape. Here the URL can be perfectly well-formed and the
+card is still an attack.
+
+So `@connect` **takes no `img=` at all.** The mark comes from a host allowlist
+keyed by `provider=`, and a provider the host has no entry for renders with a
+neutral mark plus a warning, in the shape §4.15.4 already established for an
+unknown channel. Drawing an unrecognised provider in a familiar logo tells the
+human this goes somewhere it does not.
+
+**4.18.6 A connect block is a receipt, not a status light.**
+
+The grant will be revoked, or the refresh token will die in six weeks. The block
+must not notice. It records that at 14:02 a human granted two scopes, and that
+stays true forever, which is §4.12.2's rule about live state arriving at the
+block with the strongest temptation to break it.
+
+A connection that has since lapsed is a **new block**, in the turn where the
+agent discovered it. Nothing re-renders in place.
+
+For the same reason there is no Disconnect button. Revoking is not un-answering
+a question (§7.1, law I), it is a different action with a different blast radius,
+and it belongs in the provider's own settings or in a `@choice` with `danger` on
+it. A block that could both grant and revoke would be a widget that can be
+re-answered, which §1 spent the whole document ruling out.
+
 ---
 
 ## 5. Streaming
@@ -1245,6 +1420,22 @@ Not yet.
 <!-- the outcome, written by the HOST afterwards. Not a second stamp. -->
 <sent block="intro-mail" state="sent" at="14:04:23"/>
 <sent block="intro-mail" state="failed" at="14:04:23" error="550 mailbox unavailable"/>
+
+<!-- @connect -- one stamp, written when the consent screen ANSWERS. The
+     refused scopes are named: an agent that reads only `state` will try to
+     write to a Drive it was denied write access to. -->
+<stamp block="gdrive" kind="connect" state="connected" provider="google-drive"
+       values="drive.readonly,drive.metadata" labels="Read your files,See file names"
+       at="14:02" by="Jonas">
+I connected Google Drive.
+</stamp>
+<stamp block="gdrive" kind="connect" state="partial" provider="google-drive"
+       values="drive.readonly,drive.metadata" refused="drive.file" at="14:02" by="Jonas">
+I connected Google Drive, but not with write access.
+</stamp>
+<stamp block="gdrive" kind="connect" state="declined" provider="google-drive">
+I would rather not connect that.
+</stamp>
 
 <!-- skipped / expired -->
 <stamp block="refs" kind="link" skipped="yes">Skipped that one.</stamp>
@@ -1438,6 +1629,20 @@ A value that fails is **dropped**, not escaped. This is implemented and tested i
 
 Everything else -- prompts, labels, hints, placeholders -- is HTML-escaped.
 
+**8.3.1 A brand mark is not one of these, and cannot be.**
+
+The three rules above all ask the same question: could this string escape the
+attribute it lands in? A `@connect` provider mark defeats that question, because
+a perfectly well-formed `https://` URL beside the words "Connect Google" and a
+button is already the attack. There is no lexical rule that separates a real
+logo from a convincing one.
+
+So `@connect` takes no `img=` (§4.18.5). The mark is chosen by the **host**, from
+a list keyed by `provider=`, and an unrecognised provider gets a neutral mark and
+a warning rather than a borrowed one. This is the only place in the language
+where an allowlist covers *which value may be used* rather than *what shape it
+must have*, and the reason is that the shape was never the risk.
+
 ---
 
 ## 9. Rendering and interaction rules
@@ -1607,6 +1812,10 @@ reorder. A positional id lands the stamp on the wrong block.
 | 32 | A bar chart floored above zero without saying so | announce it in the scale line **and** in the bars (§4.16.2) |
 | 33 | A chart you can see but cannot read a value off | every mode prints its numbers; the shape is `aria-hidden` (§4.16.1) |
 | 34 | A flow that drops the back edge, or hangs on it | cycles are lifted out of ranking and drawn as returns (§4.17.3) |
+| 35 | A connect card wearing an agent-supplied logo | the mark comes from a host allowlist, keyed by `provider=` (§4.18.5, §8.3.1) |
+| 36 | A partial grant recorded as `connected` | the refused scopes stay on the block and in the stamp (§4.18.4) |
+| 37 | A connect block that goes red when the token lapses | it is a receipt of a grant, not a status light; emit a new one (§4.18.6) |
+| 38 | A Disconnect button on a stamped grant | revoking is a different action, not an un-answer (§4.18.6, §7.1 law I) |
 
 ---
 
@@ -1617,9 +1826,10 @@ reorder. A positional id lands the stamp on the wrong block.
    │ @choice   text options            @upload  files, real attachments   │
    │ @gallery  image|swatch|type|card  @link    paste URL + fetched card  │
    │ @input    typed fields            @scale   sliders between poles     │
-   │                                   @order   drag to rank              │
+   │ @connect  scopes are rows         @order   drag to rank              │
    │ common: id= select=one|many min= max= submit= icon= expires=         │
    │         optional danger phrase=                                      │
+   │ @connect provider= state= granted= · mark is host-chosen, never img= │
    ├── SHOW / CONTROL ────────────────────────────────────────────────────┤
    │ @note tone=info|warn|danger (markdown body)                          │
    │ @code lang= label=   @example for=<id>   @void id= reason=           │

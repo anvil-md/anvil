@@ -161,7 +161,7 @@ describe('SPEC.md examples', () => {
    * `packages/parser`, and the test breaks the day one of them lands, which is
    * the moment somebody should delete the entry.
    */
-  const UNIMPLEMENTED = ['code', 'upload', 'link', 'order', 'example', 'void']
+  const UNIMPLEMENTED = ['code', 'upload', 'link', 'order', 'example', 'void', 'connect']
 
   test('the reference parser is behind the spec by exactly the documented set', () => {
     const missing = new Set<string>()

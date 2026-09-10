@@ -14,12 +14,15 @@ summary: "Twelve blocks, two containers and one directive, why the set is closed
      @link      paste a URL, get a fetched preview card
      @scale     one or more sliders between two named poles
      @order     drag N items into a ranking
+     @connect   a key to somewhere the agent cannot reach on its own
 
    SHOW (never produce a stamp, never freeze)
      @note      prose, hints, warnings. Body is markdown.
      @code      a verbatim literal, inside the block
      @example   a canned value that fills an ASK block
      @board     task rows grouped into lanes
+     @chart     one series of numbers, drawn as a shape
+     @flow      steps and arrows, drawn as a diagram
 
    SHOW, until ask= (a record; with ask= it is an ASK block and stamps once)
      @card      one work item: subtasks, counted progress, status
@@ -34,7 +37,7 @@ summary: "Twelve blocks, two containers and one directive, why the set is closed
      @void      retract an unanswered block the conversation moved past
 ```
 
-Thirteen blocks, two containers and one directive. The set is **closed on
+Sixteen blocks, two containers and one directive. The set is **closed on
 purpose**. Almost everything an implementer is tempted to add (`@confirm`,
 `@yesno`, `@palette`, `@rate`, `@multi`, `@markdown`) is one of these with an
 attribute set.

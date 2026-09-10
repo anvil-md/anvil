@@ -118,18 +118,18 @@ implemented here. Those two sections are the contract if you want to build it.
 ## The blocks
 
 ```
-   ASK   @choice  @gallery  @input  @upload  @link  @scale  @order
+   ASK   @choice  @gallery  @input  @upload  @link  @scale  @order  @connect
    SHOW  @note    @code     @example  @board  @chart  @flow
    BOTH  @card    @message           (records, until ask= makes them questions)
    GRID  @grid    @stack    @end
    CTRL  @void
 ```
 
-Fifteen blocks, two containers and one directive, and the set is **closed on
+Sixteen blocks, two containers and one directive, and the set is **closed on
 purpose**. Nearly everything you will want to add is one of these with an
 attribute set.
 
-Four of them are worth naming here, because they are the reason the set grew:
+Five of them are worth naming here, because they are the reason the set grew:
 
 **`@card`** is a work item -- subtasks, status, a progress bar -- and the bar is
 **counted from the rows**. There is no `progress=` attribute, deliberately. An
@@ -161,6 +161,16 @@ same thing, so a deploy pipeline with two green stages and one blocked one costs
 no new vocabulary. Cycles are drawn rather than dropped, the layout is computed
 from a character count rather than measured, and the whole graph is emitted as
 text alongside the SVG because an SVG has no reading order of its own.
+
+**`@connect`** is the agent asking for a key to somewhere it cannot reach on its
+own -- a Drive, a mailbox, a repo. The scopes are **rows, not a `scopes=`
+attribute**, because the scopes are the thing being consented to and they need a
+label and a reason a human will actually read. A grant comes back **partial**
+more often than anyone expects, so the refused scopes stay on the block and go
+into the stamp: an agent that reads only `state=partial` will try to write to a
+Drive it was denied. And the provider's logo comes from a **host allowlist**,
+never from the agent, because an agent-supplied image next to the words "Connect
+Google" and a button is a phishing card in a surface the human already trusts.
 
 `@grid` and `@stack` lay blocks out with **no breakpoints anywhere**: the agent
 writing the fence cannot see the screen, `cols` is a maximum rather than a
@@ -223,7 +233,7 @@ specified and not built.
 | | |
 |---|---|
 | **Built** | `@choice` `@gallery` `@input` `@scale` `@note` `@card` `@board` `@message` `@chart` `@flow` `@grid` `@stack` |
-| **Specified, not built** | `@upload` `@link` `@order` `@example` `@void` `@code` |
+| **Specified, not built** | `@upload` `@link` `@order` `@example` `@void` `@code` `@connect` |
 
 That second row is asserted by a test, so it cannot quietly go stale: the day
 one of them lands, the suite fails until somebody deletes the entry.

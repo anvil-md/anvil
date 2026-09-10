@@ -41,3 +41,7 @@ summary: "Twenty-two ways to get this wrong, ranked by how much each one hurts, 
 | 32 | A bar chart floored above zero without saying so | announce it in the scale line **and** in the bars (§4.16.2) |
 | 33 | A chart you can see but cannot read a value off | every mode prints its numbers; the shape is `aria-hidden` (§4.16.1) |
 | 34 | A flow that drops the back edge, or hangs on it | cycles are lifted out of ranking and drawn as returns (§4.17.3) |
+| 35 | A connect card wearing an agent-supplied logo | the mark comes from a host allowlist, keyed by `provider=` (§4.18.5, §8.3.1) |
+| 36 | A partial grant recorded as `connected` | the refused scopes stay on the block and in the stamp (§4.18.4) |
+| 37 | A connect block that goes red when the token lapses | it is a receipt of a grant, not a status light; emit a new one (§4.18.6) |
+| 38 | A Disconnect button on a stamped grant | revoking is a different action, not an un-answer (§4.18.6, §7.1 law I) |

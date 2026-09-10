@@ -10,9 +10,10 @@ summary: "The whole language on one screen."
    │ @choice   text options            @upload  files, real attachments   │
    │ @gallery  image|swatch|type|card  @link    paste URL + fetched card  │
    │ @input    typed fields            @scale   sliders between poles     │
-   │                                   @order   drag to rank              │
+   │ @connect  scopes are rows         @order   drag to rank              │
    │ common: id= select=one|many min= max= submit= icon= expires=         │
    │         optional danger phrase=                                      │
+   │ @connect provider= state= granted= · mark is host-chosen, never img= │
    ├── SHOW / CONTROL ────────────────────────────────────────────────────┤
    │ @note tone=info|warn|danger (markdown body)                          │
    │ @code lang= label=   @example for=<id>   @void id= reason=           │

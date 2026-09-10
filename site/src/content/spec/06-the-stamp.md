@@ -82,6 +82,22 @@ Not yet.
 <sent block="intro-mail" state="sent" at="14:04:23"/>
 <sent block="intro-mail" state="failed" at="14:04:23" error="550 mailbox unavailable"/>
 
+<!-- @connect -- one stamp, written when the consent screen ANSWERS. The
+     refused scopes are named: an agent that reads only `state` will try to
+     write to a Drive it was denied write access to. -->
+<stamp block="gdrive" kind="connect" state="connected" provider="google-drive"
+       values="drive.readonly,drive.metadata" labels="Read your files,See file names"
+       at="14:02" by="Jonas">
+I connected Google Drive.
+</stamp>
+<stamp block="gdrive" kind="connect" state="partial" provider="google-drive"
+       values="drive.readonly,drive.metadata" refused="drive.file" at="14:02" by="Jonas">
+I connected Google Drive, but not with write access.
+</stamp>
+<stamp block="gdrive" kind="connect" state="declined" provider="google-drive">
+I would rather not connect that.
+</stamp>
+
 <!-- skipped / expired -->
 <stamp block="refs" kind="link" skipped="yes">Skipped that one.</stamp>
 <stamp block="mood" kind="gallery" expired="yes">That one timed out.</stamp>

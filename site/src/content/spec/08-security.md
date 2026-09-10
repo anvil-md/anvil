@@ -46,3 +46,17 @@ A value that fails is **dropped**, not escaped. This is implemented and tested i
 `@anvil-md/render-html`.
 
 Everything else -- prompts, labels, hints, placeholders -- is HTML-escaped.
+
+**8.3.1 A brand mark is not one of these, and cannot be.**
+
+The three rules above all ask the same question: could this string escape the
+attribute it lands in? A `@connect` provider mark defeats that question, because
+a perfectly well-formed `https://` URL beside the words "Connect Google" and a
+button is already the attack. There is no lexical rule that separates a real
+logo from a convincing one.
+
+So `@connect` takes no `img=` (§4.18.5). The mark is chosen by the **host**, from
+a list keyed by `provider=`, and an unrecognised provider gets a neutral mark and
+a warning rather than a borrowed one. This is the only place in the language
+where an allowlist covers *which value may be used* rather than *what shape it
+must have*, and the reason is that the shape was never the risk.
