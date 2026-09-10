@@ -90,6 +90,26 @@ struct ConformanceTests {
             if let labels = want.optionLabels {
                 #expect(got.options.map(\.title) == labels, "\(testCase.id): block \(index) optionLabels")
             }
+            if let labels = want.dataLabels {
+                #expect(got.data.map(\.label) == labels, "\(testCase.id): block \(index) dataLabels")
+            }
+            if let values = want.dataValues {
+                #expect(got.data.map(\.value) == values, "\(testCase.id): block \(index) dataValues")
+            }
+            if let raw = want.dataRaw {
+                #expect(got.data.map(\.raw) == raw, "\(testCase.id): block \(index) dataRaw")
+            }
+            if let domain = want.domain {
+                let got = try #require(got.domain, "\(testCase.id): block \(index) has no domain")
+                if let floor = domain.floor { #expect(got.floor == floor, "\(testCase.id): domain floor") }
+                if let top = domain.top { #expect(got.top == top, "\(testCase.id): domain top") }
+                if let authored = domain.authoredTop {
+                    #expect(got.authoredTop == authored, "\(testCase.id): domain authoredTop")
+                }
+                if let authored = domain.authoredFloor {
+                    #expect(got.authoredFloor == authored, "\(testCase.id): domain authoredFloor")
+                }
+            }
         }
     }
 

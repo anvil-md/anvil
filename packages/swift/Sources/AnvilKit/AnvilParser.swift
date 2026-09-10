@@ -25,6 +25,11 @@ public struct AnvilDocument: Sendable {
         public let fields: [Field]
         public let scales: [Scale]
         public let tasks: [Task]
+        /// `@chart` rows that carried a number. A row that did not is refused
+        /// and warned about rather than drawn at zero.
+        public let data: [AnvilDatum]
+        /// The range `data` is drawn against. Nil when the block is not a chart.
+        public let domain: AnvilDomain?
         public let prose: [String]
         public let literal: String?
         /// Blocks inside a `@grid` or `@stack`. Empty for everything else.
@@ -110,8 +115,14 @@ public enum AnvilParser {
         var literalBuffer: [String]?
 
         /// Finishes the open block into the innermost container, or top level.
+        ///
+        /// `finishChart` runs HERE rather than per-row, because `values=` can
+        /// only be judged against the rows once they are all in, and a domain
+        /// computed before the last datum arrives is a domain that excludes it.
         func closeCurrent() {
-            guard let finished = current?.build() else { return }
+            guard let builder = current else { return }
+            warnings.append(contentsOf: builder.finishChart(line: builder.headerLine))
+            let finished = builder.build()
             if containers.isEmpty { blocks.append(finished) } else { containers[containers.count - 1].children.append(finished) }
             current = nil
         }
@@ -228,6 +239,7 @@ public enum AnvilParser {
     private final class Builder {
         let kind: String
         let resolvedKind: AnvilKind?
+        let headerLine: Int
         var attributes: [String: String] = [:]
         var prompt: [String] = []
         var subtext: String?
@@ -239,8 +251,11 @@ public enum AnvilParser {
         private var fields: [AnvilDocument.Field] = []
         private var scales: [AnvilDocument.Scale] = []
         private var tasks: [AnvilDocument.Task] = []
+        private var data: [AnvilDatum] = []
+        private var domain: AnvilDomain?
 
         init(header: String, line: Int) {
+            headerLine = line
             var tokens = AnvilParser.split(header)
             let name = tokens.isEmpty ? "" : tokens.removeFirst()
             let known = AnvilKind(rawValue: name)
@@ -281,6 +296,22 @@ public enum AnvilParser {
             var text = body
             let destructive = text.hasPrefix("!")
             if destructive { text = String(text.dropFirst()).trimmingCharacters(in: .whitespaces) }
+
+            // A `@chart` row is a datum, not an option.
+            if resolvedKind == .chart {
+                let cells = AnvilParser.cells(text)
+                guard cells.count >= 2, let label = cells.first else { return [] }
+                let raw = cells[1]
+                guard let value = AnvilParser.chartValue(raw) else {
+                    // SPEC 4.16.2: refused, loudly, and NOT drawn. Drawing it
+                    // at zero would be worse -- zero is a claim.
+                    return [AnvilWarning("\(label) has no number in its value cell, so it is not drawn", line: line)]
+                }
+                data.append(
+                    AnvilDatum(index: data.count, label: label, value: value, raw: raw, note: cells.count > 2 ? cells[2] : nil)
+                )
+                return []
+            }
 
             // `- [ ] ref | Label | meta` -- the box is the state.
             if let box = AnvilParser.boxState(text) {
@@ -420,6 +451,41 @@ public enum AnvilParser {
             return warnings
         }
 
+        /// Resolves `@chart` data and range. Called once, at close, because
+        /// `values=` can only be judged against the rows once they are all in.
+        func finishChart(line: Int?) -> [AnvilWarning] {
+            guard resolvedKind == .chart else { return [] }
+            var warnings: [AnvilWarning] = []
+
+            // SPEC 4.16.4: the rows ARE the data, so `values=` is sugar for
+            // when there are none. With rows present it is a second source of
+            // truth, and the rows win.
+            if let sugar = attributes["values"] {
+                if data.isEmpty {
+                    for (index, cell) in sugar.split(separator: ",").enumerated() {
+                        let raw = String(cell).trimmingCharacters(in: .whitespaces)
+                        guard let value = AnvilParser.chartValue(raw) else { continue }
+                        // No label: a values= series has none, and inventing an ordinal
+                        // would be drawing something that is not there.
+                        data.append(AnvilDatum(index: index, label: "", value: value, raw: raw))
+                    }
+                } else {
+                    warnings.append(
+                        AnvilWarning("values= is ignored because the rows are the data", line: line)
+                    )
+                }
+            }
+
+            let (resolved, domainWarnings) = AnvilDomain.resolve(
+                values: data.map(\.value),
+                min: attributes["min"].flatMap(AnvilParser.chartValue),
+                max: attributes["max"].flatMap(AnvilParser.chartValue),
+                line: line
+            )
+            domain = resolved
+            return warnings + domainWarnings
+        }
+
         func build() -> AnvilDocument.Parsed {
             AnvilDocument.Parsed(
                 // A container has no identity at all -- not a derived one
@@ -433,6 +499,8 @@ public enum AnvilParser {
                 fields: fields,
                 scales: scales,
                 tasks: tasks,
+                data: data,
+                domain: domain,
                 prose: prose,
                 literal: literal,
                 children: children

@@ -45,8 +45,20 @@ enum Corpus {
         var taskLabels: [String]?
         var dataLabels: [String]?
         var dataValues: [Double]?
+        var dataRaw: [String]?
+        var domain: Domain?
         var nodeIds: [String]?
         var edges: [String]?
+    }
+
+    /// The range a chart's bars are drawn against, after SPEC 4.16.2 has had
+    /// its say.
+    struct Domain: Sendable, Codable {
+        var floor: Double?
+        var top: Double?
+        var zeroPct: Double?
+        var authoredTop: Bool?
+        var authoredFloor: Bool?
     }
 
     static let repositoryRoot: URL = {
