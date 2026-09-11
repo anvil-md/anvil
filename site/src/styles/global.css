@@ -16,6 +16,58 @@
 @import "@fontsource/ibm-plex-mono/500.css";
 @import "@fontsource/ibm-plex-mono/600.css";
 
+/* Fontsource ships Google's Plex subsets, and none of them carries Box Drawing
+   or the arrows. Every `─│┌` fell through to SF Mono / Menlo at a different
+   advance, so a 75-character row of `─` and a 75-character row of text came out
+   different widths and every ASCII box in the spec had a crooked right edge.
+   These are IBM's own "Pi" subsets (@ibm/plex-mono 2.5.0, OFL), same family
+   name, scoped to the code points the fontsource files lack. */
+@font-face {
+	font-family: "IBM Plex Mono";
+	font-style: normal;
+	font-display: swap;
+	font-weight: 400;
+	src: url("./fonts/IBMPlexMono-Regular-Pi.woff2") format("woff2");
+	unicode-range: U+2190-2199, U+21A9-21BB, U+2500-259F, U+25CA, U+2713, U+274C;
+}
+@font-face {
+	font-family: "IBM Plex Mono";
+	font-style: normal;
+	font-display: swap;
+	font-weight: 500;
+	src: url("./fonts/IBMPlexMono-Medium-Pi.woff2") format("woff2");
+	unicode-range: U+2190-2199, U+21A9-21BB, U+2500-259F, U+25CA, U+2713, U+274C;
+}
+@font-face {
+	font-family: "IBM Plex Mono";
+	font-style: normal;
+	font-display: swap;
+	font-weight: 600;
+	src: url("./fonts/IBMPlexMono-SemiBold-Pi.woff2") format("woff2");
+	unicode-range: U+2190-2199, U+21A9-21BB, U+2500-259F, U+25CA, U+2713, U+274C;
+}
+
+/* The glyphs Plex never drew: the board's ○ ◐ ●, the ► ▼ ▲ arrowheads, ✕ ✗ ⊕.
+   Borrowed from two mono faces whose advance is also 600/1000 em, so a borrowed
+   glyph occupies exactly one Plex cell. One file per source, any weight: these
+   are icons, and a synthesised bold would widen them. */
+@font-face {
+	font-family: "IBM Plex Mono";
+	font-style: normal;
+	font-display: swap;
+	font-weight: 100 900;
+	src: url("./fonts/JetBrainsMono-Regular-Shapes.woff2") format("woff2");
+	unicode-range: U+203F, U+2295, U+25A0-25C9, U+25CB-25CF, U+25D4-25FF, U+2715-2717;
+}
+@font-face {
+	font-family: "IBM Plex Mono";
+	font-style: normal;
+	font-display: swap;
+	font-weight: 100 900;
+	src: url("./fonts/NotoSansMono-Regular-HalfCircles.woff2") format("woff2");
+	unicode-range: U+25D0-25D3;
+}
+
 /* ─────────────────────────────────────────────────────────────
    ANVIL - design tokens
    Monochrome graphite on paper. One cool slate accent, functional
