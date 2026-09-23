@@ -6,7 +6,8 @@
   "scripts": {
     "test": "bun test",
     "typecheck": "bunx tsc --noEmit",
-    "check": "bun run typecheck && bun test && bun run lint",
+    "check": "bun run typecheck && bun test && bun run lint && bun run test:swift",
+    "test:swift": "swift test --quiet",
     "lint": "bun packages/lint/src/cli.ts SPEC.md README.md",
     "conformance": "bun test packages/conformance",
     "spec": "bun run scripts/split-spec.ts",

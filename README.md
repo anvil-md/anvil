@@ -112,8 +112,10 @@ If you get to choose your markdown parser, choose marked.
 
 **Display only** means the emitted controls carry `disabled`: this renders a
 block, it does not run one. Stamping -- the answer half in [§6](./SPEC.md#6-the-stamp)
-and [§7](./SPEC.md#7-stamp-lifecycle) of the spec -- is specified but not yet
-implemented here. Those two sections are the contract if you want to build it.
+and [§7](./SPEC.md#7-stamp-lifecycle) of the spec -- is not implemented in the
+TypeScript packages. The Swift package (`packages/swift`, AnvilKit) has it: the
+§6.2 serializer, a reader for stamps in a transcript, and the first-wins ledger.
+Those two sections are the contract if you want to build it here.
 
 ## The blocks
 

@@ -1,31 +1,69 @@
 import Foundation
 
-/// What the phone sends back when a block is answered.
+/// What a client sends back when a block is answered, and what it reads back
+/// out of a transcript afterwards.
 ///
-/// SPEC section 6.1: `<stamp block="…" kind="…" [payload]>a sentence a human
-/// would have typed</stamp>`. **Attributes are the truth; the body is the
+/// SPEC 6.1: `<stamp block="…" kind="…" [payload]>a sentence a human would
+/// have typed</stamp>`. **Attributes are the truth; the body is the
 /// courtesy.** The CLIENT writes this. The agent never does -- which is why it
 /// lives in AnvilKit rather than being something a renderer improvises.
 ///
+/// **One serializer** (SPEC 6.2). `xml` is the only place a stamp becomes
+/// text, and every attribute and child goes through the same escaping. The
+/// children used to be pre-built strings, and neither `<field>` nor `<dial>`
+/// escaped anything: a field value of `a</field><field name="x">` rewrote the
+/// record.
+///
 /// Named `<stamp>` and deliberately not `<input>`, because `<input>` collides
 /// with a real HTML element that a renderer or a model could plausibly confuse.
-public struct AnvilStamp: Identifiable, Sendable, Equatable {
+public struct AnvilStamp: Identifiable, Sendable, Hashable {
+    /// One `key="value"`. Ordered, because the wire form is read by people too.
+    public struct Attribute: Sendable, Hashable {
+        public let key: String
+        public let value: String
+
+        public init(_ key: String, _ value: String) {
+            self.key = key
+            self.value = value
+        }
+    }
+
+    /// One child element: `<field name="legal">Acme Ltd</field>`,
+    /// `<dial name="formal" value="2" …/>`.
+    public struct Child: Sendable, Hashable {
+        public let name: String
+        public let attributes: [Attribute]
+        /// Text content. Nil writes a self-closing element.
+        public let text: String?
+
+        public init(_ name: String, _ attributes: [Attribute] = [], text: String? = nil) {
+            self.name = name
+            self.attributes = attributes
+            self.text = text
+        }
+
+        public func attribute(_ key: String) -> String? {
+            attributes.first { $0.key == key }?.value
+        }
+    }
+
+    /// Local identity, for lists. Not part of the stamp: two stamps with the
+    /// same block, kind, payload and body are the same stamp.
     public let id: UUID
     public let block: String
     public let kind: String
-    public let attributes: [(key: String, value: String)]
-    public let children: [String]
-    /// The sentence a human would have typed.
+    /// The payload, in wire order, `at` and `by` included.
+    public let attributes: [Attribute]
+    public let children: [Child]
+    /// The sentence a human would have typed. Empty writes no body line.
     public let body: String
-    public let at: Date
 
     public init(
         block: String,
         kind: String,
-        attributes: [(key: String, value: String)] = [],
-        children: [String] = [],
-        body: String,
-        at: Date = Date()
+        attributes: [Attribute] = [],
+        children: [Child] = [],
+        body: String = ""
     ) {
         id = UUID()
         self.block = block
@@ -33,112 +71,65 @@ public struct AnvilStamp: Identifiable, Sendable, Equatable {
         self.attributes = attributes
         self.children = children
         self.body = body
-        self.at = at
     }
 
-    public static func == (a: AnvilStamp, b: AnvilStamp) -> Bool { a.id == b.id }
+    public static func == (a: AnvilStamp, b: AnvilStamp) -> Bool {
+        a.block == b.block && a.kind == b.kind && a.attributes == b.attributes
+            && a.children == b.children && a.body == b.body
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(block)
+        hasher.combine(kind)
+        hasher.combine(attributes)
+        hasher.combine(children)
+        hasher.combine(body)
+    }
+
+    public func attribute(_ key: String) -> String? {
+        attributes.first { $0.key == key }?.value
+    }
+
+    /// When the human answered, as written. SPEC 6.2: "Every tag may also
+    /// carry `at=`." A stamp tapped offline at 14:02 and delivered at 16:30
+    /// says 14:02 here; the transcript row says 16:30.
+    public var at: String? { attribute("at") }
+    /// Who answered, "where more than one human can act".
+    public var by: String? { attribute("by") }
+
+    /// `at`, read back. Accepts what this serializer writes (ISO 8601) and
+    /// nothing looser: `14:02` has no day, and guessing one is inventing it.
+    public var date: Date? {
+        at.flatMap { try? Date($0, strategy: .iso8601) }
+    }
+
+    /// The `value`/`values` this stamp picked, as option ids.
+    public var picked: [String] {
+        if let value = attribute("value") { return [value] }
+        return (attribute("values") ?? "").split(separator: ",").map(String.init)
+    }
 
     /// The wire form, exactly as section 6.1 specifies it.
     public var xml: String {
-        var head = "<stamp block=\"\(escape(block))\" kind=\"\(escape(kind))\""
-        for (key, value) in attributes {
-            head += " \(key)=\"\(escape(value))\""
+        var lines = ["<stamp" + Self.write([Attribute("block", block), Attribute("kind", kind)] + attributes) + ">"]
+        for child in children {
+            let head = "  <\(child.name)" + Self.write(child.attributes)
+            lines.append(child.text.map { "\(head)>\(Self.escape($0))</\(child.name)>" } ?? "\(head)/>")
         }
-        head += ">"
-
-        var lines = [head]
-        lines += children.map { "  \($0)" }
-        if !body.isEmpty { lines.append(body) }
+        if !body.isEmpty { lines.append(Self.escape(body)) }
         lines.append("</stamp>")
         return lines.joined(separator: "\n")
     }
 
-    private func escape(_ s: String) -> String {
+    private static func write(_ attributes: [Attribute]) -> String {
+        attributes.map { " \($0.key)=\"\(escape($0.value))\"" }.joined()
+    }
+
+    /// The one escaping policy. Text and attribute values both go through it.
+    static func escape(_ s: String) -> String {
         s.replacingOccurrences(of: "&", with: "&amp;")
             .replacingOccurrences(of: "\"", with: "&quot;")
             .replacingOccurrences(of: "<", with: "&lt;")
             .replacingOccurrences(of: ">", with: "&gt;")
-    }
-}
-
-public extension AnvilStamp {
-    /// `@choice select=one`
-    static func choice(block: String, option: AnvilOption) -> AnvilStamp {
-        AnvilStamp(
-            block: block,
-            kind: "choice",
-            attributes: [("value", option.id), ("label", option.title)],
-            body: "I picked \(option.title)."
-        )
-    }
-
-    /// `@choice select=many` / `@gallery`
-    static func choice(block: String, options: [AnvilOption], kind: String = "choice") -> AnvilStamp {
-        AnvilStamp(
-            block: block,
-            kind: kind,
-            attributes: [
-                ("values", options.map(\.id).joined(separator: ",")),
-                ("labels", options.map(\.title).joined(separator: ",")),
-            ],
-            body: "I picked \(list(options.map(\.title)))."
-        )
-    }
-
-    /// `@scale`
-    static func scale(block: String, name: String, value: Int, steps: Int, poles: String) -> AnvilStamp {
-        AnvilStamp(
-            block: block,
-            kind: "scale",
-            attributes: [("steps", "\(steps)")],
-            children: [
-                "<dial name=\"\(name)\" value=\"\(value)\" "
-                    + "norm=\"\(String(format: "%.2f", Double(value - 1) / Double(max(steps - 1, 1))))\" "
-                    + "poles=\"\(poles)\"/>",
-            ],
-            body: "I set \(name) to \(value) of \(steps)."
-        )
-    }
-
-    /// `@input`
-    static func input(block: String, fields: [(String, String)]) -> AnvilStamp {
-        AnvilStamp(
-            block: block,
-            kind: "input",
-            children: fields.map { "<field name=\"\($0.0)\">\($0.1)</field>" },
-            body: "I filled it in."
-        )
-    }
-
-    /// `@connect`. The grant, not the click -- section 4.18.3 is explicit that
-    /// the stamp waits for the provider's answer.
-    static func connect(
-        block: String,
-        provider: String,
-        granted: [AnvilOption],
-        account: String?
-    ) -> AnvilStamp {
-        var attributes = [
-            ("provider", provider),
-            ("state", granted.isEmpty ? "declined" : "connected"),
-            ("granted", granted.map(\.id).joined(separator: ",")),
-        ]
-        if let account { attributes.append(("account", account)) }
-        return AnvilStamp(
-            block: block,
-            kind: "connect",
-            attributes: attributes,
-            body: granted.isEmpty
-                ? "I did not connect \(provider)."
-                : "I connected \(provider) with \(granted.count) scope\(granted.count == 1 ? "" : "s")."
-        )
-    }
-
-    private static func list(_ items: [String]) -> String {
-        switch items.count {
-        case 0: "nothing"
-        case 1: items[0]
-        default: items.dropLast().joined(separator: ", ") + " and " + items[items.count - 1]
-        }
     }
 }
