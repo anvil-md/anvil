@@ -16,7 +16,13 @@ public struct AnvilDocument: Sendable {
     }
 
     public struct Parsed: Identifiable, Sendable {
+        /// The authored `id=`, else one derived from the block's content
+        /// (SPEC 11). It is the `block=` in the stamp, so it must name the
+        /// same block on every client: derived exactly as the reference
+        /// parser derives it, never from position.
         public let id: String
+        /// True when nobody wrote `id=` and the id came from the content.
+        public let derivedId: Bool
         public let kind: String
         public let attributes: [String: String]
         public let prompt: String
@@ -75,7 +81,15 @@ public struct AnvilDocument: Sendable {
         public let name: String
         public let type: String
         public let required: Bool
+        /// The third cell, raw. Kept for callers that read it; prefer `label`.
         public let hint: String?
+        /// `_ name | type | Label | placeholder`: the label, or the name
+        /// title-cased when the row has none (SPEC 4.3).
+        public let label: String
+        /// The fourth cell. What the empty control shows, not what it holds.
+        public let placeholder: String?
+
+        public var fieldType: AnvilFieldType { AnvilFieldType(rawValue: type) ?? .text }
     }
 
     public struct Scale: Identifiable, Sendable {
@@ -153,6 +167,9 @@ public enum AnvilParser {
 
             // Inside a ~~~ fence everything is verbatim, including sigils.
             if literalBuffer != nil {
+                // The id hashes every content line, literal included, the
+                // way the reference parser reads them: trimmed, no comments.
+                if !line.isEmpty, !line.hasPrefix("#") { current?.body.append(line) }
                 if line == "~~~" {
                     current?.literal = literalBuffer?.joined(separator: "\n")
                     literalBuffer = nil
@@ -199,6 +216,8 @@ public enum AnvilParser {
                 }
                 continue
             }
+
+            current?.body.append(line)
 
             // A row belongs to the open BLOCK. If there is no block but a
             // container is open, the row has nowhere to go -- SPEC 4.14 says a
@@ -253,6 +272,8 @@ public enum AnvilParser {
         var subtext: String?
         var prose: [String] = []
         var literal: String?
+        /// Every content line after the header, for the derived id.
+        var body: [String] = []
         var children: [AnvilDocument.Parsed] = []
         private(set) var headerWarnings: [AnvilWarning] = []
         private var options: [AnvilOption] = []
@@ -372,21 +393,23 @@ public enum AnvilParser {
                 return warnings
             }
 
-            let cells = AnvilParser.cells(text)
-            guard !cells.isEmpty else { return [] }
+            let all = AnvilParser.cells(text)
+            guard let value = all.first else { return [] }
 
-            // `- value | Label | hint`. With one cell the value IS the label.
-            let value = cells[0]
-            let label = cells.count > 1 ? cells[1] : cells[0]
-            let hint = cells.count > 2 ? cells[2] : nil
+            // `- value | Label | hint | img= swatch= font= sample=`. The
+            // key=value cells are unordered and never positional: read as the
+            // fourth cell, `swatch=#111,#fff` was drawn at the human as text.
+            let (cells, attributes) = AnvilParser.optionCells(all.dropFirst())
 
+            // With one cell the value IS the label.
             options.append(
                 AnvilOption(
                     id: value,
-                    title: label,
-                    subtitle: hint,
-                    side: cells.count > 3 ? cells[3] : nil,
-                    destructive: destructive
+                    title: cells.first ?? value,
+                    subtitle: cells.count > 1 ? cells[1] : nil,
+                    side: cells.count > 2 ? cells[2] : nil,
+                    destructive: destructive,
+                    attributes: attributes
                 )
             )
             return []
@@ -435,13 +458,16 @@ public enum AnvilParser {
             let raw = cells.count > 1 ? cells[1] : "text"
             let (type, fellBack) = AnvilFieldType.resolve(raw)
 
+            let label = cells.count > 2 ? cells[2] : nil
             fields.append(
                 AnvilDocument.Field(
                     id: name,
                     name: name,
                     type: type.rawValue,
                     required: required,
-                    hint: cells.count > 2 ? cells[2] : nil
+                    hint: label,
+                    label: label ?? AnvilParser.titleCase(name),
+                    placeholder: cells.count > 3 ? cells[3] : nil
                 )
             )
             return fellBack
@@ -569,10 +595,13 @@ public enum AnvilParser {
         }
 
         func build() -> AnvilDocument.Parsed {
-            AnvilDocument.Parsed(
-                // A container has no identity at all -- not a derived one
-                // either, because there is nothing to answer.
-                id: resolvedKind?.isContainer == true ? "" : (attributes["id"] ?? kind),
+            // A container has no identity at all -- not a derived one either,
+            // because there is nothing to answer.
+            let container = resolvedKind?.isContainer == true
+            let authored = attributes["id"].flatMap { $0.isEmpty ? nil : $0 }
+            return AnvilDocument.Parsed(
+                id: container ? "" : authored ?? AnvilParser.deriveID(kind: kind, body: body),
+                derivedId: !container && authored == nil,
                 kind: kind,
                 attributes: attributes,
                 prompt: prompt.joined(separator: " "),

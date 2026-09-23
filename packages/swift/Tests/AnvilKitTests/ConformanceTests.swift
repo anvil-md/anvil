@@ -79,6 +79,11 @@ struct ConformanceTests {
             if let id = want.id {
                 #expect(got.id == id, "\(testCase.id): block \(index) id")
             }
+            // Decoded and never asserted until 2026-09-23, while the id was
+            // `attributes["id"] ?? kind`: SPEC 11 broken, corpus green.
+            if let derived = want.derivedId {
+                #expect(got.derivedId == derived, "\(testCase.id): block \(index) derivedId")
+            }
             if let prompt = want.prompt {
                 #expect(got.prompt == prompt, "\(testCase.id): block \(index) prompt")
             }
