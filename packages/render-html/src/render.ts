@@ -106,6 +106,7 @@ const CHART_ICON: Record<ChartRender, IconName> = {
   line: 'chart-line',
   spark: 'chart-line',
   dot: 'chart-scatter',
+  stat: 'trending-up',
 }
 
 /** A card's icon follows what kind of ticket it claims to be. */

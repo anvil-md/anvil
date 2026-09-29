@@ -12,7 +12,16 @@
  * case added for a feature also becomes a totality case, for free.
  */
 import { describe, expect, test } from 'bun:test'
-import { type AnvilBlock, type AnvilDoc, chartDomain, flowGraph, parseAnvil, taskProgress } from '@anvil-md/parser'
+import {
+  type AnvilBlock,
+  type AnvilDoc,
+  chartDelta,
+  chartDomain,
+  flowGraph,
+  parseAnvil,
+  recommended,
+  taskProgress,
+} from '@anvil-md/parser'
 import { renderAnvilFence } from '@anvil-md/render-html'
 import { type BlockExpectation, cases, coveredSections, CORPUS } from './index'
 
@@ -51,6 +60,7 @@ function checkBlock(actual: AnvilBlock, want: BlockExpectation, where: string): 
 
   if (want.optionValues) expect(actual.options.map(o => o.value), at('option values')).toEqual(want.optionValues)
   if (want.optionLabels) expect(actual.options.map(o => o.label), at('option labels')).toEqual(want.optionLabels)
+  if (want.recommended !== undefined) expect(recommended(actual) ?? '', at('recommended')).toBe(want.recommended)
 
   if (want.taskStates) expect(actual.tasks.map(t => String(t.state)), at('task states')).toEqual(want.taskStates)
   if (want.taskRefs) expect(actual.tasks.map(t => t.ref), at('task refs')).toEqual(want.taskRefs)
@@ -73,6 +83,13 @@ function checkBlock(actual: AnvilBlock, want: BlockExpectation, where: string): 
   if (want.dataLabels) expect(actual.data.map(d => d.label), at('data labels')).toEqual(want.dataLabels)
   if (want.dataValues) expect(actual.data.map(d => d.value), at('data values')).toEqual(want.dataValues)
   if (want.dataRaw) expect(actual.data.map(d => d.raw), at('data raw')).toEqual(want.dataRaw)
+  if (want.dataDeltas) {
+    const got = actual.data.map(d => {
+      const x = chartDelta(actual, d)
+      return x ? { diff: x.diff, pct: x.pct, tone: x.tone } : null
+    })
+    expect(got, at('data deltas')).toEqual(want.dataDeltas)
+  }
   if (want.domain) {
     const d = chartDomain(actual)
     for (const [k, v] of Object.entries(want.domain)) {
@@ -142,6 +159,14 @@ describe('conformance corpus', () => {
     expect(() => checkBlock(chart, { dataValues: [4, 9], domain: { top: 9 } }, 'self')).not.toThrow()
     expect(() => checkBlock(chart, { dataValues: [4, 8] }, 'self')).toThrow()
     expect(() => checkBlock(chart, { domain: { floor: 4 } }, 'self')).toThrow()
+
+    const stat = parseAnvil('@chart id=s render=stat better=up\n- a | 12 | was=10').blocks[0] as AnvilBlock
+    expect(() => checkBlock(stat, { dataDeltas: [{ diff: 2, pct: 20, tone: 'good' }] }, 'self')).not.toThrow()
+    expect(() => checkBlock(stat, { dataDeltas: [{ diff: 2, pct: 20, tone: 'bad' }] }, 'self')).toThrow()
+
+    const pick = parseAnvil('@choice id=p recommend=b\n- a | A\n- b | B').blocks[0] as AnvilBlock
+    expect(() => checkBlock(pick, { recommended: 'b' }, 'self')).not.toThrow()
+    expect(() => checkBlock(pick, { recommended: '' }, 'self')).toThrow()
 
     const flow = parseAnvil('@flow id=f\n- a -> b\n- b -> a').blocks[0] as AnvilBlock
     expect(() => checkBlock(flow, { nodeIds: ['a', 'b'], backEdges: ['b>a'] }, 'self')).not.toThrow()

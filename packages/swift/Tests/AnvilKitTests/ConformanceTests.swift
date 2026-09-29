@@ -21,7 +21,7 @@ import Testing
 struct ConformanceTests {
     @Test("the corpus loaded, so a zero-case pass is impossible")
     func corpusIsPresent() {
-        #expect(Corpus.cases.count == 77, "found \(Corpus.cases.count) cases at \(Corpus.repositoryRoot.path)")
+        #expect(Corpus.cases.count == 86, "found \(Corpus.cases.count) cases at \(Corpus.repositoryRoot.path)")
     }
 
     /// Prints the score. A conformance suite that can be filtered without
@@ -96,6 +96,9 @@ struct ConformanceTests {
             if let labels = want.optionLabels {
                 #expect(got.options.map(\.title) == labels, "\(testCase.id): block \(index) optionLabels")
             }
+            if let recommended = want.recommended {
+                #expect((got.recommended ?? "") == recommended, "\(testCase.id): block \(index) recommended")
+            }
             if let labels = want.dataLabels {
                 #expect(got.data.map(\.label) == labels, "\(testCase.id): block \(index) dataLabels")
             }
@@ -104,6 +107,15 @@ struct ConformanceTests {
             }
             if let raw = want.dataRaw {
                 #expect(got.data.map(\.raw) == raw, "\(testCase.id): block \(index) dataRaw")
+            }
+            if let deltas = want.dataDeltas {
+                let actual = got.deltas
+                #expect(actual.count == deltas.count, "\(testCase.id): block \(index) dataDeltas count")
+                for (row, (have, need)) in zip(actual, deltas).enumerated() {
+                    #expect(have?.diff == need?.diff, "\(testCase.id): row \(row) delta diff")
+                    #expect(have?.pct == need?.pct, "\(testCase.id): row \(row) delta pct")
+                    #expect(have?.tone.rawValue == need?.tone, "\(testCase.id): row \(row) delta tone")
+                }
             }
             if let edges = want.edges {
                 #expect(got.edges.map(\.wire) == edges, "\(testCase.id): block \(index) edges")

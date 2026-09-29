@@ -14,6 +14,7 @@
 import {
   type AnvilBlock,
   type AnvilDatum,
+  type AnvilDelta,
   type AnvilDomain,
   type AnvilField,
   type AnvilKind,
@@ -23,10 +24,12 @@ import {
   attrNumber,
   attrString,
   type ChartRender,
+  chartDelta,
   chartDomain,
   chartGoal,
   chartPct,
   chartRender,
+  deltaText,
   type FieldType,
   type FlowEdge,
   flowGraph,
@@ -39,8 +42,10 @@ import {
   messageState,
   type NoteTone,
   recipients,
+  recommended,
   type TaskState,
   taskProgress,
+  withUnit,
 } from '@anvil-md/parser'
 import { type IconName, icon, resolveIcon } from './icons'
 
@@ -88,15 +93,28 @@ function optionMeta(o: AnvilOption): string {
   return o.hint ? `<span class="anvil-hint">${esc(o.hint)}</span>` : ''
 }
 
+/**
+ * The agent's pick, marked in words. Never preselected, never focused, never
+ * the only row that looks pressable (§4.1.1): a single-select stamps on the
+ * click, so a row that arrives chosen is the agent answering its own question.
+ */
+const REC_TAG = '<span class="anvil-rec">recommended</span>'
+
+function recAttr(on: boolean): string {
+  return on ? ' data-recommended="yes"' : ''
+}
+
 export function renderChoice(b: AnvilBlock): string {
   if (!b.options.length) return '<p class="anvil-empty">No options.</p>'
   const multi = isMulti(b)
+  const rec = recommended(b)
   const rows = b.options
     .map((o, i) => {
       const danger = o.danger ? ' anvil-row-danger' : ''
-      return `<button type="button" class="anvil-row${danger}" disabled>
+      const mine = o.value === rec
+      return `<button type="button" class="anvil-row${danger}"${recAttr(mine)} disabled>
         <span class="anvil-key">${multi ? MARK : esc(String(i + 1))}</span>
-        <span class="anvil-row-main"><span class="anvil-label">${esc(o.label)}</span>${optionMeta(o)}</span>
+        <span class="anvil-row-main"><span class="anvil-label">${esc(o.label)}</span>${optionMeta(o)}${mine ? REC_TAG : ''}</span>
       </button>`
     })
     .join('')
@@ -133,14 +151,16 @@ function cardFace(b: AnvilBlock, o: AnvilOption): string {
 export function renderGallery(b: AnvilBlock): string {
   if (!b.options.length) return '<p class="anvil-empty">No cards.</p>'
   const mode = galleryRender(b)
+  const rec = recommended(b)
   const cards = b.options
     .map((o, i) => {
       const face = cardFace(b, o)
-      return `<button type="button" class="anvil-card" disabled>
+      const mine = o.value === rec
+      return `<button type="button" class="anvil-card"${recAttr(mine)} disabled>
         ${face}
         <span class="anvil-card-foot">
           <span class="anvil-key">${esc(String(i + 1))}</span>
-          <span class="anvil-label">${esc(o.label)}</span>
+          <span class="anvil-label">${esc(o.label)}</span>${mine ? REC_TAG : ''}
         </span>
         ${o.hint ? `<span class="anvil-hint">${esc(o.hint)}</span>` : ''}
       </button>`
@@ -323,7 +343,7 @@ function taskRowInner(t: AnvilTask): string {
  * keyboard and it does not exist on a phone -- so the row is focusable and the
  * reveal fires on hover, focus and focus-within alike.
  */
-function taskRow(b: AnvilBlock, t: AnvilTask, i: number, pickIndex: number | null): string {
+function taskRow(b: AnvilBlock, t: AnvilTask, i: number, pickIndex: number | null, rec = false): string {
   const detailId = `${slugId(b.id)}-t${i}`
   const hasDetail = t.detail.trim().length > 0
   // One wrapper child, because the collapse is `grid-template-rows: 0fr -> 1fr`
@@ -343,7 +363,7 @@ function taskRow(b: AnvilBlock, t: AnvilTask, i: number, pickIndex: number | nul
   const body =
     pickIndex === null
       ? `<span class="anvil-task-main">${inner}</span>`
-      : `<button type="button" class="anvil-task-main anvil-task-pick" disabled><span class="anvil-key anvil-pick-key">${pickIndex}</span>${inner}</button>`
+      : `<button type="button" class="anvil-task-main anvil-task-pick"${recAttr(rec)} disabled><span class="anvil-key anvil-pick-key">${pickIndex}</span>${inner}${rec ? REC_TAG : ''}</button>`
 
   const attrs = hasDetail ? ` tabindex="0" aria-describedby="${detailId}"` : ''
   const cls = `anvil-task${hasDetail ? ' anvil-task-detailed' : ''}${pickIndex === null ? '' : ' anvil-task-pickable'}`
@@ -362,9 +382,13 @@ function askable(b: AnvilBlock): boolean {
 export function renderTasks(b: AnvilBlock): string {
   if (!b.tasks.length) return '<p class="anvil-empty">No subtasks.</p>'
   const asking = askable(b)
+  const rec = recommended(b)
   let pick = 0
   const rows = b.tasks
-    .map((t, i) => taskRow(b, t, i, asking && t.state === 'todo' ? ++pick : null))
+    .map((t, i) => {
+      const open = asking && t.state === 'todo'
+      return taskRow(b, t, i, open ? ++pick : null, open && t.ref === rec)
+    })
     .join('')
   return `<ul class="anvil-tasks">${rows}</ul>`
 }
@@ -498,12 +522,7 @@ const CHART_SERIES_CAP = 400
  * it is unreadable to anyone using a screen reader.
  */
 function valueText(d: AnvilDatum, unit: string): string {
-  const raw = d.raw || String(d.value)
-  if (!unit) return raw
-  // A WORD takes a space, a SYMBOL does not, and a single letter is a
-  // magnitude rather than a word: `31 ms`, `4 GB`, `12%`, `4.8k`. Spacing `k`
-  // like a unit produced `3.2 k`, which reads as three point two of something.
-  return /^[A-Za-z]{2,}/.test(unit) ? `${raw} ${unit}` : `${raw}${unit}`
+  return withUnit(d.raw || String(d.value), unit)
 }
 
 /** Start and length of a bar, as a share of the domain, measured from zero. */
@@ -659,13 +678,57 @@ function renderLine(v: Visible, domain: AnvilDomain, goal: number | null, unit: 
   return `${chart}${seriesSummary(v.data, unit)}${seriesText(v.data, unit)}${earlier}`
 }
 
-/** One entry per render mode. A sixth mode is one line here plus one renderer. */
-const CHART_MODES: Record<ChartRender, (v: Visible, d: AnvilDomain, g: number | null, u: string) => string> = {
+const DIRECTION_ICON: Record<AnvilDelta['direction'], IconName> = {
+  up: 'trending-up',
+  down: 'trending-down',
+  flat: 'minus',
+}
+
+/** Said in words for a screen reader, because the tone is otherwise only a colour. */
+const TONE_WORD: Record<AnvilDelta['tone'], string> = {
+  good: 'better',
+  bad: 'worse',
+  neutral: '',
+}
+
+/**
+ * `render=stat`: each row is a number, big, and the change from `was=` beneath
+ * it. The change is COMPUTED (§4.16.5) and printed beside the number it came
+ * from, so every figure on the tile is one the reader can check against another
+ * one on the same tile.
+ */
+function renderStats(b: AnvilBlock, v: Visible, unit: string): string {
+  const tiles = v.data
+    .map(d => {
+      const delta = chartDelta(b, d)
+      const word = delta ? TONE_WORD[delta.tone] : ''
+      const change = delta
+        ? `<span class="anvil-stat-delta" data-tone="${delta.tone}">
+            <span class="anvil-stat-dir">${icon(DIRECTION_ICON[delta.direction])}</span>
+            <span>${esc(deltaText(d, delta, unit))}</span>${word ? `<span class="anvil-sr">, ${word}</span>` : ''}
+            <span class="anvil-stat-was">from ${esc(withUnit(d.wasRaw ?? '', unit))}</span>
+          </span>`
+        : ''
+      const note = d.note ? `<span class="anvil-stat-note">${esc(d.note)}</span>` : ''
+      return `<li class="anvil-stat">
+        ${d.label ? `<span class="anvil-stat-label">${esc(d.label)}</span>` : ''}
+        <span class="anvil-stat-value">${esc(valueText(d, unit))}</span>${change}${note}
+      </li>`
+    })
+    .join('')
+  return `<ul class="anvil-stats anvil-auto" style="--anvil-cols:${Math.min(4, Math.max(1, v.data.length))};--anvil-min:8.5rem">${tiles}</ul>${more(v.after)}`
+}
+
+type ChartMode = (v: Visible, d: AnvilDomain, g: number | null, u: string, b: AnvilBlock) => string
+
+/** One entry per render mode. A seventh mode is one line here plus one renderer. */
+const CHART_MODES: Record<ChartRender, ChartMode> = {
   bar: (v, d, g, u) => renderBars(v, d, g, u, false),
   dot: (v, d, g, u) => renderBars(v, d, g, u, true),
   column: renderColumns,
   line: (v, d, g, u) => renderLine(v, d, g, u, false),
   spark: (v, d, g, u) => renderLine(v, d, g, u, true),
+  stat: (v, _d, _g, u, b) => renderStats(b, v, u),
 }
 
 export function renderChart(b: AnvilBlock): string {
@@ -673,22 +736,27 @@ export function renderChart(b: AnvilBlock): string {
   const mode = chartRender(b)
   const v = visible(b, mode)
   const domain = chartDomain(b, v.data)
-  const goal = chartGoal(b)
+  // A stat has no scale, so it has no goal marker and no scale line either; the
+  // parser has already warned about any min=, max= or goal= it was handed.
+  const scaled = mode !== 'stat'
+  const goal = scaled ? chartGoal(b) : null
   const unit = attrString(b, 'unit')
-  const body = (CHART_MODES[mode] ?? CHART_MODES.bar)(v, domain, goal, unit)
+  const body = (CHART_MODES[mode] ?? CHART_MODES.bar)(v, domain, goal, unit, b)
   // AN AXIS THAT IS NOT WHAT A READER ASSUMES MUST SAY SO. A bar chart is read
   // as "length is magnitude", and both of these break that read: a raised floor
   // means the bars are differences rather than amounts, and an authored ceiling
   // means the longest bar is not the maximum. Neither is dishonest labelled;
   // both are dishonest silent, and the truncated floor is the one that has been
   // fooling people since printed newspapers.
-  const parts = [
-    domain.authoredFloor ? `scale from ${esc(String(domain.floor))}${esc(unit)}, not zero` : '',
-    domain.authoredTop ? `to ${esc(String(domain.top))}${esc(unit)}` : '',
-    goal !== null ? `goal ${esc(String(goal))}${esc(unit)}` : '',
-  ].filter(Boolean)
+  const parts = scaled
+    ? [
+        domain.authoredFloor ? `scale from ${esc(String(domain.floor))}${esc(unit)}, not zero` : '',
+        domain.authoredTop ? `to ${esc(String(domain.top))}${esc(unit)}` : '',
+        goal !== null ? `goal ${esc(String(goal))}${esc(unit)}` : '',
+      ].filter(Boolean)
+    : []
   const scale = parts.length ? `<p class="anvil-chart-scale">${parts.join(' · ')}</p>` : ''
-  const truncated = domain.authoredFloor ? ' anvil-chart-truncated' : ''
+  const truncated = scaled && domain.authoredFloor ? ' anvil-chart-truncated' : ''
   return `<div class="anvil-chart${truncated}" data-render="${esc(mode)}">${body}${scale}</div>${renderChips(b)}`
 }
 

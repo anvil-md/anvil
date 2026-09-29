@@ -40,15 +40,26 @@ enum Corpus {
         var subtext: String?
         var optionValues: [String]?
         var optionLabels: [String]?
+        /// SPEC 4.1.1. `""` means nothing is marked; absent means not asserted.
+        var recommended: String?
         var taskStates: [String]?
         var taskRefs: [String]?
         var taskLabels: [String]?
         var dataLabels: [String]?
         var dataValues: [Double]?
         var dataRaw: [String]?
+        /// SPEC 4.16.5. `null` for a row with no `was=`.
+        var dataDeltas: [Delta?]?
         var domain: Domain?
         var nodeIds: [String]?
         var edges: [String]?
+    }
+
+    /// A stat row's computed change. `pct` is null when `was` is zero.
+    struct Delta: Sendable, Codable {
+        var diff: Double
+        var pct: Double?
+        var tone: String
     }
 
     /// The range a chart's bars are drawn against, after SPEC 4.16.2 has had

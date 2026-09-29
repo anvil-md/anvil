@@ -69,15 +69,17 @@ const COMMON_ATTRS = new Set(['id', 'icon', 'as'])
 const ASK_ATTRS = new Set(['select', 'submit', 'min', 'max', 'expires', 'optional', 'danger', 'phrase'])
 
 const KIND_ATTRS: Record<string, Set<string>> = {
-  choice: new Set([]),
-  gallery: new Set(['render']),
+  // `recommend` is not in ASK_ATTRS: it only means something where there are
+  // rows to pick, and the parser already says so everywhere else.
+  choice: new Set(['recommend']),
+  gallery: new Set(['render', 'recommend']),
   input: new Set([]),
   scale: new Set(['steps']),
   note: new Set(['tone']),
-  card: new Set(['type', 'status', 'href', 'ask']),
+  card: new Set(['type', 'status', 'href', 'ask', 'recommend']),
   board: new Set(['max', 'ask']),
   message: new Set(['channel', 'to', 'cc', 'bcc', 'from', 'subject', 'sent', 'state', 'at', 'by', 'error', 'ask']),
-  chart: new Set(['render', 'unit', 'min', 'max', 'goal', 'values']),
+  chart: new Set(['render', 'unit', 'min', 'max', 'goal', 'values', 'better']),
   flow: new Set(['dir']),
   grid: new Set(['cols', 'min', 'gap', 'frame']),
   stack: new Set(['gap', 'frame']),

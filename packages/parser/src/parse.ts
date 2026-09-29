@@ -26,12 +26,15 @@ import {
   type AnvilBlock,
   type AnvilDoc,
   type AnvilKind,
+  chartBetter,
   chartClip,
   chartNumber,
+  chartRender,
   isContainer,
   MAX_FLOW_EDGES,
   MAX_FLOW_NODES,
   MAX_LAYOUT_DEPTH,
+  recommendProblem,
   statusConflict,
 } from './types'
 
@@ -256,9 +259,26 @@ function finish(block: AnvilBlock, body: string[]): AnvilBlock {
 
   // An authored ceiling that would draw a bar shorter than its own printed
   // number is the chart version of a hand-typed progress count (§4.12.1).
+  // A stat has no scale to clip, so it gets the louder complaint below instead.
   if (block.kind === 'chart') {
-    const clip = chartClip(block)
+    const stat = chartRender(block) === 'stat'
+    const clip = stat ? null : chartClip(block)
     if (clip) block.warnings.push(clip)
+
+    // Parsed and then not drawn is the silent drop §11 forbids, in both
+    // directions: a stat has no range for min/max/goal to move, and every
+    // other mode has nowhere to print a change.
+    if (stat) {
+      const inert = ['min', 'max', 'goal'].filter(k => block.attrs[k] !== undefined)
+      if (inert.length) {
+        block.warnings.push(`${inert.map(k => `${k}=`).join(', ')} draw nothing on render=stat; a number has no scale`)
+      }
+    } else if (block.data.some(d => d.was !== undefined) || block.attrs.better !== undefined) {
+      block.warnings.push('was= and better= are only drawn by render=stat')
+    }
+    if (block.attrs.better !== undefined && !chartBetter(block.attrs.better)) {
+      block.warnings.push(`better="${String(block.attrs.better)}" is not up or down; changes are drawn without a verdict`)
+    }
   }
 
   if (block.kind === 'flow') {
@@ -288,6 +308,8 @@ function finish(block: AnvilBlock, body: string[]): AnvilBlock {
     const conflict = statusConflict(block)
     if (conflict) block.warnings.push(conflict)
   }
+  const rec = recommendProblem(block)
+  if (rec) block.warnings.push(rec)
   // Parsed-but-never-drawn is the silent drop §11 forbids.
   if (block.meta.length && !META_KINDS.has(block.kind)) {
     block.warnings.push(`+ rows are only drawn on @card, @board and @message, not @${block.kind}`)

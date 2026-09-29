@@ -177,9 +177,14 @@ export interface AnvilProgress {
 /* ── chart ───────────────────────────────────────────────────────────────── */
 
 /** How a @chart draws its data. Closed, like every other render list. */
-export type ChartRender = 'bar' | 'column' | 'line' | 'spark' | 'dot'
+export type ChartRender = 'bar' | 'column' | 'line' | 'spark' | 'dot' | 'stat'
 
-export const CHART_RENDERS: readonly ChartRender[] = ['bar', 'column', 'line', 'spark', 'dot']
+export const CHART_RENDERS: readonly ChartRender[] = ['bar', 'column', 'line', 'spark', 'dot', 'stat']
+
+/** Which way a number has to move to be good news. Absent means nobody said. */
+export type ChartBetter = 'up' | 'down'
+
+export const CHART_BETTER: readonly ChartBetter[] = ['up', 'down']
 
 /**
  * A `- Label | 42 | note` row.
@@ -196,6 +201,29 @@ export interface AnvilDatum {
   note: string
   /** The text the value was parsed out of. Always printed in preference to `value`. */
   raw: string
+  /**
+   * `was=` -- the value this one is compared with, and `wasRaw` the text it was
+   * parsed from. The CHANGE is never authored: there is no `delta=`, for the
+   * reason there is no `progress=` (§4.16.5).
+   */
+  was?: number
+  wasRaw?: string
+  /** Per-row `better=`, overriding the block's. */
+  better?: ChartBetter
+}
+
+/**
+ * The change from `was=` to the value, COMPUTED. The agent supplies two numbers
+ * it read; the difference, the percentage and the verdict are arithmetic.
+ */
+export interface AnvilDelta {
+  /** value - was, in the value's own units. */
+  diff: number
+  /** diff as a share of |was|, 0-100 scale. Null when was is zero: no base, no ratio. */
+  pct: number | null
+  direction: 'up' | 'down' | 'flat'
+  /** Good or bad only when somebody said which way is better. Never guessed. */
+  tone: 'good' | 'bad' | 'neutral'
 }
 
 /**
@@ -534,6 +562,51 @@ export function cardStatus(block: AnvilBlock): TaskState {
   return statusConflict(block) ? countedStatus(block) : (authored as TaskState)
 }
 
+/* ── recommend ───────────────────────────────────────────────────────────── */
+
+/** The kinds with rows a human picks, and therefore a row an agent can recommend. */
+const RECOMMENDABLE = new Set<AnvilKind>(['choice', 'gallery', 'card'])
+
+/**
+ * What is wrong with `recommend=`, or null when it names a row the human can pick.
+ *
+ * A recommendation that points at nothing is DROPPED WHOLE rather than guessed
+ * at, the same rule every other agent-authored reference follows. Marking the
+ * nearest match would put the agent's weight behind an option it never named.
+ *
+ * On a card it has to be an OPEN row, because only `[ ]` rows are pickable
+ * (§4.12.4). Recommending a done subtask as "what next" is the lie that rule
+ * exists to prevent, told with a highlight on it.
+ */
+export function recommendProblem(block: AnvilBlock): string | null {
+  const raw = block.attrs.recommend
+  if (raw === undefined) return null
+  if (!RECOMMENDABLE.has(block.kind)) {
+    return `recommend= has nothing to mark on @${block.kind}; only @choice, @gallery and an asking @card have rows to pick`
+  }
+  const want = typeof raw === 'string' ? raw.trim() : ''
+  if (!want) return 'recommend= names no option; nothing is marked'
+
+  if (block.kind === 'card') {
+    if (!attrString(block, 'ask')) return 'recommend= needs ask=; a record has nothing to recommend'
+    const row = block.tasks.find(t => t.ref === want)
+    if (!row) return `recommend="${want}" names no row; nothing is marked`
+    if (row.state !== 'todo') {
+      return `recommend="${want}" is a ${row.state} row and only open rows can be picked; nothing is marked`
+    }
+    return null
+  }
+
+  return block.options.some(o => o.value === want) ? null : `recommend="${want}" names no option; nothing is marked`
+}
+
+/** The value of the row the agent would pick, or null. Never a row it did not name. */
+export function recommended(block: AnvilBlock): string | null {
+  const raw = block.attrs.recommend
+  if (typeof raw !== 'string' || recommendProblem(block)) return null
+  return raw.trim()
+}
+
 /* ── chart derivations ───────────────────────────────────────────────────── */
 
 const CHART_RENDER_SET = new Set<string>(CHART_RENDERS)
@@ -571,6 +644,82 @@ export function chartNumber(text: string): number | null {
 function numberAttr(block: AnvilBlock, key: string): number | null {
   const raw = block.attrs[key]
   return typeof raw === 'string' ? chartNumber(raw) : null
+}
+
+/** `better=up|down`, read loosely. Anything else is nobody saying, not a guess. */
+export function chartBetter(raw: unknown): ChartBetter | null {
+  const v = typeof raw === 'string' ? raw.trim().toLowerCase() : ''
+  return v === 'up' || v === 'down' ? v : null
+}
+
+/**
+ * The change a `render=stat` tile prints, or null when the row has no `was=`.
+ *
+ * The verdict is only ever the author's. "Failed +2" goes UP and is bad news;
+ * "Signups +12" goes up and is good. The arithmetic knows the direction and
+ * nothing else, so without `better=` the change is drawn neutral rather than
+ * coloured by a guess about which way the agent meant.
+ */
+export function chartDelta(block: AnvilBlock, d: AnvilDatum): AnvilDelta | null {
+  if (d.was === undefined) return null
+  const diff = d.value - d.was
+  const direction = diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat'
+  const better = d.better ?? chartBetter(block.attrs.better)
+  const tone = direction === 'flat' || !better ? 'neutral' : direction === better ? 'good' : 'bad'
+  return { diff, pct: d.was === 0 ? null : (diff / Math.abs(d.was)) * 100, direction, tone }
+}
+
+/**
+ * A number with its unit. A WORD takes a space, a SYMBOL does not, and a single
+ * letter is a magnitude rather than a word: `31 ms`, `4 GB`, `12%`, `4.8k`.
+ * Spacing `k` like a unit produced `3.2 k`, which reads as three point two of
+ * something.
+ */
+export function withUnit(text: string, unit: string): string {
+  if (!unit) return text
+  return /^[A-Za-z]{2,}/.test(unit) ? `${text} ${unit}` : `${text}${unit}`
+}
+
+/** `4.8k` -> `k`, `1,204` -> ``. The magnitude a raw value was written in. */
+function rawScale(raw: string): string {
+  return /([kmb])\s*%?$/i.exec(raw.trim())?.[1]?.toLowerCase() ?? ''
+}
+
+/** Digits after the point in the mantissa: `4.80k` -> 2. */
+function rawDecimals(raw: string): number {
+  return /\.(\d+)/.exec(raw)?.[1]?.length ?? 0
+}
+
+/**
+ * `+6 · +18%`, `-0.7k · -15%`, `+2 pts`, `no change`.
+ *
+ * Printed in the units the agent WROTE, for the reason §4.16.1 prints `4.8k`
+ * rather than `4800`: two values written in thousands differ in thousands, and
+ * a float subtraction's `0.6999999` is not a number anybody typed. A value
+ * that is already a percentage changes in POINTS, and gets no relative change
+ * on top: `+2% (+20%)` is the sentence that makes people stop reading.
+ */
+export function deltaText(d: AnvilDatum, delta: AnvilDelta, unit = ''): string {
+  if (delta.direction === 'flat') return 'no change'
+  const was = d.wasRaw ?? String(d.was ?? '')
+  const scale = rawScale(d.raw) === rawScale(was) ? rawScale(d.raw) : ''
+  const div = scale ? (SCALE[scale] ?? 1) : 1
+  const places = Math.max(rawDecimals(d.raw), rawDecimals(was))
+  const sign = delta.diff > 0 ? '+' : '-'
+  const grouped = d.raw.includes(',') || was.includes(',')
+  const mag = Math.abs(delta.diff) / div
+  const num = grouped
+    ? mag.toLocaleString('en-US', { minimumFractionDigits: places, maximumFractionDigits: places })
+    : mag.toFixed(places)
+
+  const points = unit === '%' || /%\s*$/.test(d.raw) || /%\s*$/.test(was)
+  if (points) return `${sign}${num}${scale} pts`
+
+  const abs = withUnit(`${sign}${num}${scale}`, unit)
+  if (delta.pct === null) return abs
+  const p = Math.abs(delta.pct)
+  const pct = p >= 10 ? Math.round(p).toString() : Number(p.toFixed(1)).toString()
+  return pct === '0' ? abs : `${abs} · ${sign}${pct}%`
 }
 
 /** `goal=` draws a reference marker. It has to be inside the domain or it is not on screen. */

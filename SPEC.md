@@ -233,6 +233,7 @@ Every ASK block shares these attributes:
 | `optional` | off | a Skip affordance that still emits a stamp |
 | `danger` | off | destructive framing plus a deliberate second click |
 | `phrase` | -- | with `danger`: type this exact string to arm the button |
+| `recommend` | -- | the one row the agent would pick. `@choice`, `@gallery`, an asking `@card`. Marked, never preselected (§4.1.1) |
 
 ### 4.1 `@choice`
 
@@ -273,6 +274,55 @@ Stamped, at **exactly the same height** (§9.2):
 
 **Never collapse a stamped choice to one line.** The rejected rows are part of
 the record: they show what the human was choosing *between*.
+
+**4.1.1 `recommend=` marks a row. It never picks one.**
+
+An agent that has an opinion should say which option it would take, because a
+human asked to choose between three things they half understand deserves to
+know which one the thing that wrote them believes in.
+
+```anvil
+@choice id=plan recommend=pro
+? Which plan?
+: Pro is the one with the shared inbox you asked about.
+- basic | Basic | one seat, no inbox
+- pro   | Pro   | adds the shared inbox
+- team  | Team  | Pro plus SSO
+```
+
+```
+   ╭─ ? Which plan? ─────────────────────────────────────────╮
+   │  Pro is the one with the shared inbox you asked about.  │
+   │                                                         │
+   │    [1]  Basic   one seat, no inbox                      │
+   │    [2]  Pro     adds the shared inbox     RECOMMENDED   │
+   │    [3]  Team    Pro plus SSO                            │
+   ╰─────────────────────────────────────────────────────────╯
+```
+
+It is an attribute rather than `(recommended)` typed into the label, and the
+reason is the stamp. The label is what a stamp's `labels=` carries back to the
+model, so `Pro (recommended)` in the row puts the agent's advice into the
+human's answer. The record would then say the human picked the recommended plan,
+and a human never said that.
+
+Three rules hold it in its place:
+
+- **It is one value.** `recommend=` names one row by its value -- a card row by
+  its ref. An agent that recommends everything has recommended nothing.
+- **It names a row the human can pick, or it marks nothing.** A value that
+  matches no option is dropped whole and warned about, never matched to the
+  nearest row. On an asking `@card` that means an **open** row (§4.12.4); a done
+  or blocked row is refused. On a record, or on a block with no rows, it means
+  nothing and says so.
+- **It is marked, never selected.** No preselection, no focus, no fill, and it
+  is not the only row that looks pressable. A single-select stamps on the click
+  (§9.12), so a row that arrives already chosen is one keystroke from the agent
+  answering its own question. The mark is a word, `recommended`, because a
+  border colour alone says nothing to a screen reader.
+
+The stamp does not repeat it. The fence that carried the recommendation is in
+the same transcript as the answer, and the model reading the stamp wrote both.
 
 ### 4.2 `@gallery`
 
@@ -965,11 +1015,12 @@ text shown beside it.
 
 | Attribute | Default | Meaning |
 |---|---|---|
-| `render` | `bar` | `bar` `column` `line` `spark` `dot` |
+| `render` | `bar` | `bar` `column` `line` `spark` `dot` `stat` |
 | `unit` | -- | suffix printed after every value. `ms`, `%`, `GB` |
 | `max` `min` | derived | move the range. **Neither may exclude a value** (§4.16.2). |
 | `goal` | -- | a reference marker, and it extends the range so it is on screen |
 | `values` | -- | `3,5,4,9` -- a series with no labels, for the one-line case |
+| `better` | -- | `up` or `down`: which way a `stat` change is good news (§4.16.5) |
 | `as` | -- | the timestamp the data was read, exactly as on a `@card` |
 
 **4.16.1 The number is never only in the pixels.**
@@ -1058,6 +1109,61 @@ accessibility goes to die. Put two charts side by side in a `@grid`.
 `values=` is sugar and the rows are the grammar: a block with both keeps the
 rows and warns, because an agent that wrote both meant the rows and forgot to
 delete the shorthand. The dashed rule is `goal=`.
+
+**4.16.5 `render=stat` is a number that knows what it was.**
+
+The dashboard tile: one figure, big, and how it moved. The most common chart
+an agent has any business drawing, because "signups this week" is usually one
+number and the only question anyone asks about it is "compared to what".
+
+```anvil
+@chart id=outreach render=stat better=up as=14:02
+? Outreach today
+- Read   | 40 | was=34
+- Leads  | 12 | was=9
+- Sent   | 9
+- Failed | 2  | was=0 | better=down
+```
+
+```
+   ╭─ Outreach today ─────────────────────────────── 4 values ──╮
+   │                                                            │
+   │  Read          Leads         Sent          Failed          │
+   │  40            12            9             2               │
+   │  ↗ +6 · +18%   ↗ +3 · +33%                 ↗ +2            │
+   │  from 34       from 9                      from 0          │
+   │                                                            │
+   ╰──────────────────────────────── as of 14:02 · snapshot ────╯
+```
+
+`was=` is a trailing cell on the row, unordered like an option's `img=`. **There
+is no `delta=`**, for the reason there is no `progress=` (§4.12.1). The agent
+supplies the two numbers it actually read, and the change, the percentage and
+the direction are arithmetic. An agent that types `+18%` beside a 40 that was a
+34 is right today and wrong the day it edits one number and not the other.
+
+The change is printed **in the units the agent wrote**. Two values written in
+thousands differ in thousands, so `4.8k` from `4.1k` is `+0.7k`, never `+700`
+and never the `0.6999999` a float subtraction produces. A value that is already
+a percentage changes in **points** and gets no ratio on top: `99.2%` from
+`99.9%` is `-0.7 pts`, because `-0.7% (-0.7%)` is the sentence that makes people
+stop reading. A `was=` of zero has no base, so it gets the difference and no
+percentage. The base is printed too, `from 34`, so every figure on the tile can
+be checked against another one on the same tile.
+
+**The verdict is only ever the author's.** `Failed +2` goes up and is bad news;
+`Leads +3` goes up and is good. The arithmetic knows the direction and nothing
+else, so the tone comes from `better=up|down` on the block, overridden per row,
+and without it the change is drawn **neutral**. Colouring a rise green because
+rises are usually good is the chart guessing what the agent meant, and it is
+wrong on every error rate, every cost and every latency. The tone is also said
+in words to a screen reader, `better` or `worse`, because otherwise it is only a
+colour.
+
+A stat has **no scale**. Nothing is drawn against a range, so `min=`, `max=` and
+`goal=` have nowhere to go and warn rather than being parsed and dropped. And
+`was=` on any other mode warns the same way: a bar has nowhere to print a
+change. Rows past 24 are counted, exactly as in `bar`.
 
 ### 4.17 `@flow`
 
@@ -1613,6 +1719,29 @@ Give it its own permission. Do not fold it into a general "can read the
 conversation" grant -- being able to *see* a question is not consent to *answer*
 it on someone else's behalf.
 
+**8.2.1 A viewer who cannot answer is told who can.**
+
+A shared transcript puts the same open block in front of people with different
+permissions. For the ones who cannot stamp it, a row of disabled buttons with no
+reason attached reads as a broken widget, and they will report it, retry it, or
+ask the agent why it is stuck. So the block keeps its full height (§9.2), keeps
+its controls drawn and disabled, and carries one line saying who it is waiting
+on:
+
+```
+   waiting on an org admin
+```
+
+**The host writes that line, never the agent.** There is no `to=` on an ASK
+block and there must not be one. The server already knows who may stamp,
+because it enforces exactly that on the write, and the line is read off the same
+rule. An agent-authored "only Ana can answer this" is a claim nobody checks. The
+day it disagrees with the real gate, the transcript tells one person to wait for
+somebody who cannot answer either.
+
+A viewer who *can* stamp sees no such line. Telling someone the block waits on
+them is the prompt, restated.
+
 ### 8.3 Agent-authored values in attribute position
 
 `swatch`, `font` and `img` land in `style` and `src` attributes, where escaping
@@ -1816,6 +1945,9 @@ reorder. A positional id lands the stamp on the wrong block.
 | 36 | A partial grant recorded as `connected` | the refused scopes stay on the block and in the stamp (§4.18.4) |
 | 37 | A connect block that goes red when the token lapses | it is a receipt of a grant, not a status light; emit a new one (§4.18.6) |
 | 38 | A Disconnect button on a stamped grant | revoking is a different action, not an un-answer (§4.18.6, §7.1 law I) |
+| 39 | Disabled controls with no reason, shown to someone who cannot answer | the host names who the block waits on, from the rule it enforces (§8.2.1) |
+| 40 | A hand-typed `+18%` beside a number it no longer describes | `was=` is authored, the change is computed; there is no `delta=` (§4.16.5) |
+| 41 | A rise coloured green because rises are usually good | the tone is `better=`'s, never guessed; neutral without it (§4.16.5) |
 
 ---
 
@@ -1828,15 +1960,16 @@ reorder. A positional id lands the stamp on the wrong block.
    │ @input    typed fields            @scale   sliders between poles     │
    │ @connect  scopes are rows         @order   drag to rank              │
    │ common: id= select=one|many min= max= submit= icon= expires=         │
-   │         optional danger phrase=                                      │
+   │         optional danger phrase= recommend=<value> (marks, not picks) │
    │ @connect provider= state= granted= · mark is host-chosen, never img= │
    ├── SHOW / CONTROL ────────────────────────────────────────────────────┤
    │ @note tone=info|warn|danger (markdown body)                          │
    │ @code lang= label=   @example for=<id>   @void id= reason=           │
    │ @card type= status= as= ask=      @board max= as=                    │
    │ the bar is COUNTED from the rows. there is no progress=              │
-   │ @chart render=bar|column|line|spark|dot  unit= max= min= goal=       │
+   │ @chart render=bar|column|line|spark|dot|stat  unit= max= min= goal=  │
    │        values=3,5,4   one series · no axes · no sort · floor is 0    │
+   │        stat: - Label | 40 | was=34   better=up|down · no delta=      │
    │ @flow  dir=right|down   arrow makes a row an edge, else it is a node │
    ├── LAYOUT ────────────────────────────────────────────────────────────┤
    │ @grid cols=<max, 1-6> min= gap=tight|normal|loose frame              │

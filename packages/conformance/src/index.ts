@@ -22,6 +22,12 @@ export interface BlockExpectation {
   subtext?: string
   optionValues?: string[]
   optionLabels?: string[]
+  /**
+   * The row `recommend=` marks (§4.1.1). `""` means NOTHING is marked -- an
+   * empty string rather than `null` because a null and an absent key decode
+   * the same in more than one language, and "absent" means "not asserted".
+   */
+  recommended?: string
   taskStates?: string[]
   taskRefs?: string[]
   taskLabels?: string[]
@@ -35,6 +41,11 @@ export interface BlockExpectation {
   dataLabels?: string[]
   dataValues?: number[]
   dataRaw?: string[]
+  /**
+   * Each row's change from `was=`, COMPUTED (§4.16.5). `null` for a row with no
+   * `was=`; `pct` is `null` when `was` is zero.
+   */
+  dataDeltas?: ({ diff: number; pct: number | null; tone: string } | null)[]
   /** The range the bars are drawn against, after §4.16.2 has had its say. */
   domain?: { floor?: number; top?: number; zeroPct?: number; authoredTop?: boolean }
   /** @flow nodes AFTER implied ones are resolved, in rank order. */

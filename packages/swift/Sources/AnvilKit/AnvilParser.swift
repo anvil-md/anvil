@@ -46,8 +46,15 @@ public struct AnvilDocument: Sendable {
         public let literal: String?
         /// Blocks inside a `@grid` or `@stack`. Empty for everything else.
         public let children: [Parsed]
+        /// SPEC 4.1.1: the one row the agent would pick. Nil when `recommend=`
+        /// is absent or names nothing the human can pick -- it is dropped
+        /// whole, never matched to the nearest row.
+        public let recommended: String?
 
         public var selectMany: Bool { attributes["select"] == "many" }
+        /// SPEC 4.16.5: each row's change from `was=`, computed. Nil where the
+        /// row has none.
+        public var deltas: [AnvilDelta?] { data.map { $0.delta(blockBetter: attributes["better"]) } }
         public var isContainer: Bool { AnvilKind(rawValue: kind)?.isContainer ?? false }
     }
 
@@ -144,6 +151,7 @@ public enum AnvilParser {
             warnings.append(contentsOf: builder.finishChart(line: builder.headerLine))
             warnings.append(contentsOf: builder.statusWarnings(line: builder.headerLine))
             warnings.append(contentsOf: builder.flowWarnings(line: builder.headerLine))
+            warnings.append(contentsOf: builder.recommendWarnings(line: builder.headerLine))
             let finished = builder.build()
             if containers.isEmpty { blocks.append(finished) } else { containers[containers.count - 1].children.append(finished) }
             current = nil
@@ -340,18 +348,56 @@ public enum AnvilParser {
 
             // A `@chart` row is a datum, not an option.
             if resolvedKind == .chart {
-                let cells = AnvilParser.cells(text)
-                guard cells.count >= 2, let label = cells.first else { return [] }
-                let raw = cells[1]
+                let all = AnvilParser.cells(text)
+                guard all.count >= 2, let label = all.first else { return [] }
+
+                // SPEC 4.16.5: `was=` and `better=` are trailing key=value
+                // cells, unordered. Read positionally, `was=34` was the note.
+                var warnings: [AnvilWarning] = []
+                var positional: [String] = []
+                var was: Double?
+                var wasRaw: String?
+                var better: String?
+                for cell in all.dropFirst() {
+                    guard let equals = cell.firstIndex(of: "=") else { positional.append(cell); continue }
+                    let key = cell[cell.startIndex ..< equals].trimmingCharacters(in: .whitespaces).lowercased()
+                    let value = cell[cell.index(after: equals)...].trimmingCharacters(in: .whitespaces)
+                    switch key {
+                    case "was":
+                        if let number = AnvilParser.chartValue(value) {
+                            was = number
+                            wasRaw = value
+                        } else {
+                            warnings.append(AnvilWarning("\"\(label)\" was=\"\(value)\" is not a number; no change drawn", line: line))
+                        }
+                    case "better":
+                        if let direction = AnvilParser.chartBetter(value) {
+                            better = direction
+                        } else {
+                            warnings.append(AnvilWarning(
+                                "\"\(label)\" better=\"\(value)\" is not up or down; the change is drawn without a verdict",
+                                line: line
+                            ))
+                        }
+                    default:
+                        positional.append(cell)
+                    }
+                }
+
+                let raw = positional.first ?? ""
                 guard let value = AnvilParser.chartValue(raw) else {
                     // SPEC 4.16.2: refused, loudly, and NOT drawn. Drawing it
                     // at zero would be worse -- zero is a claim.
-                    return [AnvilWarning("\(label) has no number in its value cell, so it is not drawn", line: line)]
+                    return warnings + [AnvilWarning("\(label) has no number in its value cell, so it is not drawn", line: line)]
                 }
                 data.append(
-                    AnvilDatum(index: data.count, label: label, value: value, raw: raw, note: cells.count > 2 ? cells[2] : nil)
+                    AnvilDatum(
+                        index: data.count, label: label, value: value, raw: raw,
+                        note: positional.count > 1 ? positional[1] : nil,
+                        was: was, wasRaw: wasRaw, better: better
+                    )
                 )
-                return []
+                return warnings
             }
 
             // `- [ ] ref | Label | meta` -- the box is the state.
@@ -537,7 +583,31 @@ public enum AnvilParser {
                 line: line
             )
             domain = resolved
-            return warnings + domainWarnings
+
+            // SPEC 4.16.5: a stat has no scale, so min/max/goal draw nothing
+            // and the clip warnings do not apply; every other mode has nowhere
+            // to print a change. Parsed and then not drawn, in both directions.
+            if attributes["render"]?.lowercased() == "stat" {
+                let inert = ["min", "max", "goal"].filter { attributes[$0] != nil }
+                if !inert.isEmpty {
+                    warnings.append(AnvilWarning(
+                        inert.map { "\($0)=" }.joined(separator: ", ") + " draw nothing on render=stat; a number has no scale",
+                        line: line
+                    ))
+                }
+            } else {
+                warnings.append(contentsOf: domainWarnings)
+                if data.contains(where: { $0.was != nil }) || attributes["better"] != nil {
+                    warnings.append(AnvilWarning("was= and better= are only drawn by render=stat", line: line))
+                }
+            }
+            if let better = attributes["better"], AnvilParser.chartBetter(better) == nil {
+                warnings.append(AnvilWarning(
+                    "better=\"\(better)\" is not up or down; changes are drawn without a verdict",
+                    line: line
+                ))
+            }
+            return warnings
         }
 
         /// SPEC 4.17.4: past the cap the diagram is truncated, and it counts
@@ -617,8 +687,44 @@ public enum AnvilParser {
                 rollups: rollups,
                 prose: prose,
                 literal: literal,
-                children: children
+                children: children,
+                recommended: recommendation.value
             )
+        }
+
+        /// SPEC 4.1.1: `recommend=` marks one row the human can pick, or
+        /// nothing. On a card that means an OPEN row, because only `[ ]` rows
+        /// are pickable (SPEC 4.12.4).
+        var recommendation: (value: String?, problem: String?) {
+            guard let raw = attributes["recommend"] else { return (nil, nil) }
+            guard let kind = resolvedKind, [.choice, .gallery, .card].contains(kind) else {
+                return (nil, "recommend= has nothing to mark on @\(kind); "
+                    + "only @choice, @gallery and an asking @card have rows to pick")
+            }
+            let want = raw.trimmingCharacters(in: .whitespaces)
+            guard !want.isEmpty else { return (nil, "recommend= names no option; nothing is marked") }
+
+            if kind == .card {
+                guard !(attributes["ask"] ?? "").isEmpty else {
+                    return (nil, "recommend= needs ask=; a record has nothing to recommend")
+                }
+                guard let row = tasks.first(where: { $0.ref == want }) else {
+                    return (nil, "recommend=\"\(want)\" names no row; nothing is marked")
+                }
+                guard row.state == .todo else {
+                    return (nil, "recommend=\"\(want)\" is a \(row.state.rawValue) row "
+                        + "and only open rows can be picked; nothing is marked")
+                }
+                return (want, nil)
+            }
+
+            return options.contains { $0.id == want }
+                ? (want, nil)
+                : (nil, "recommend=\"\(want)\" names no option; nothing is marked")
+        }
+
+        func recommendWarnings(line: Int?) -> [AnvilWarning] {
+            recommendation.problem.map { [AnvilWarning($0, line: line)] } ?? []
         }
     }
 

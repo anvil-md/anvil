@@ -46,6 +46,9 @@ export type IconName =
   | 'chart-line'
   | 'chart-scatter'
   | 'workflow'
+  | 'trending-up'
+  | 'trending-down'
+  | 'minus'
 
 /** Inner markup only; wrapped by `icon()` below. */
 const GEOMETRY: Record<IconName, string> = {
@@ -94,6 +97,10 @@ const GEOMETRY: Record<IconName, string> = {
     '<circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="18.5" cy="5.5" r=".5" fill="currentColor"/><circle cx="11.5" cy="11.5" r=".5" fill="currentColor"/><circle cx="7.5" cy="16.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="14.5" r=".5" fill="currentColor"/><path d="M3 3v16a2 2 0 0 0 2 2h16"/>',
   workflow:
     '<rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/>',
+  // lucide-react v1.23.0, dist/esm/icons/*.mjs. The direction of a stat's change.
+  'trending-up': '<path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/>',
+  'trending-down': '<path d="M16 17h6v-6"/><path d="m22 17-8.5-8.5-5 5L2 7"/>',
+  minus: '<path d="M5 12h14"/>',
 }
 
 const NAMES = new Set<string>(Object.keys(GEOMETRY))

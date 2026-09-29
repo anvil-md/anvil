@@ -16,14 +16,57 @@ public struct AnvilDatum: Identifiable, Sendable, Hashable {
     /// into a canonical form edits the record."
     public let raw: String
     public let note: String?
+    /// `was=`: the value this one is compared with. The change itself is
+    /// never authored -- SPEC 4.16.5, for the reason there is no `progress=`.
+    public let was: Double?
+    public let wasRaw: String?
+    /// Per-row `better=up|down`, overriding the block's.
+    public let better: String?
 
-    public init(index: Int, label: String, value: Double, raw: String, note: String? = nil) {
+    public init(
+        index: Int, label: String, value: Double, raw: String, note: String? = nil,
+        was: Double? = nil, wasRaw: String? = nil, better: String? = nil
+    ) {
         id = index
         self.label = label
         self.value = value
         self.raw = raw
         self.note = note
+        self.was = was
+        self.wasRaw = wasRaw
+        self.better = better
     }
+
+    /// The change from `was=`, computed. Nil when the row has no `was=`.
+    ///
+    /// SPEC 4.16.5: the verdict is only ever the author's. "Failed +2" goes up
+    /// and is bad news, so without `better=` the change is neutral rather than
+    /// coloured by a guess.
+    public func delta(blockBetter: String?) -> AnvilDelta? {
+        guard let was else { return nil }
+        let diff = value - was
+        let direction: AnvilDelta.Direction = diff > 0 ? .up : diff < 0 ? .down : .flat
+        let wanted = better ?? AnvilParser.chartBetter(blockBetter)
+        let tone: AnvilDelta.Tone
+        if direction == .flat || wanted == nil {
+            tone = .neutral
+        } else {
+            tone = direction.rawValue == wanted ? .good : .bad
+        }
+        return AnvilDelta(diff: diff, pct: was == 0 ? nil : (diff / abs(was)) * 100, direction: direction, tone: tone)
+    }
+}
+
+/// What a `render=stat` tile prints under its number. Arithmetic, never authored.
+public struct AnvilDelta: Sendable, Hashable {
+    public enum Direction: String, Sendable { case up, down, flat }
+    public enum Tone: String, Sendable { case good, bad, neutral }
+
+    public let diff: Double
+    /// Nil when `was` is zero: no base, no ratio.
+    public let pct: Double?
+    public let direction: Direction
+    public let tone: Tone
 }
 
 /// The range a chart's bars are drawn against.
@@ -136,6 +179,12 @@ public extension AnvilParser {
         }
         guard let number = Double(text) else { return nil }
         return number * multiplier
+    }
+
+    /// `better=up|down`, read loosely. Anything else is nobody saying.
+    static func chartBetter(_ raw: String?) -> String? {
+        let value = (raw ?? "").trimmingCharacters(in: .whitespaces).lowercased()
+        return value == "up" || value == "down" ? value : nil
     }
 
     private static var magnitudes: [Character: Double] {

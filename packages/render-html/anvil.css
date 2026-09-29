@@ -189,6 +189,39 @@
   color: var(--anvil-muted-fg);
 }
 
+/* The agent's pick. Said in words, so it survives greyscale and a screen
+ * reader; the border is the glance, the tag is the meaning. It must never read
+ * as selected -- no fill, no check -- because a single-select stamps on click. */
+.anvil-rec {
+  flex: none;
+  align-self: center;
+  margin-left: auto;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid color-mix(in srgb, var(--anvil-primary) 40%, transparent);
+  border-radius: 999px;
+  font-size: 0.64em;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--anvil-primary);
+  white-space: nowrap;
+}
+
+.anvil-row[data-recommended],
+.anvil-card[data-recommended],
+.anvil-task-pick[data-recommended] {
+  border-color: color-mix(in srgb, var(--anvil-primary) 45%, transparent);
+}
+
+/* A recommended destructive row keeps its danger edge: the risk outranks the advice. */
+.anvil-row-danger[data-recommended] {
+  border-color: color-mix(in srgb, var(--anvil-danger) 45%, transparent);
+}
+
+.anvil-row-main:has(.anvil-rec) {
+  flex: 1;
+}
+
 /* ── gallery ───────────────────────────────────────────────────────────── */
 
 .anvil-grid {
@@ -1238,6 +1271,77 @@
   bottom: 0;
   height: 6px;
   border-radius: 0 0 var(--anvil-radius-sm) var(--anvil-radius-sm);
+}
+
+/* ── stat ────────────────────────────────────────────────────────────────
+ *
+ * A number with no scale. The figure is the hierarchy: label small and quiet
+ * above it, the change small and toned below it. Tiles collapse against the
+ * container like every other auto grid, never a breakpoint. */
+.anvil-stats {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+}
+
+.anvil-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.55rem 0.65rem 0.6rem;
+  border-radius: var(--anvil-radius-sm);
+  background: var(--anvil-surface);
+}
+
+.anvil-stat-label {
+  font-size: 0.72em;
+  letter-spacing: 0.02em;
+  color: var(--anvil-muted-fg);
+  overflow-wrap: anywhere;
+}
+
+.anvil-stat-value {
+  font-family: var(--anvil-mono);
+  font-size: 1.55em;
+  font-weight: 600;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.anvil-stat-delta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 0.3rem;
+  font-family: var(--anvil-mono);
+  font-size: 0.72em;
+  font-variant-numeric: tabular-nums;
+  color: var(--anvil-muted-fg);
+}
+
+.anvil-stat-delta[data-tone='good'] {
+  color: var(--anvil-ok);
+}
+
+.anvil-stat-delta[data-tone='bad'] {
+  color: var(--anvil-danger);
+}
+
+.anvil-stat-dir {
+  display: inline-flex;
+}
+
+/* The base the change is measured from. Muted whatever the tone: it is the
+   reference, not the news. */
+.anvil-stat-was {
+  color: var(--anvil-muted-fg);
+}
+
+.anvil-stat-note {
+  font-size: 0.72em;
+  color: var(--anvil-muted-fg);
 }
 
 /* ── flow ──────────────────────────────────────────────────────────────────

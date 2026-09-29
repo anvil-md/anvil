@@ -14,7 +14,16 @@ import { describe, expect, test } from 'bun:test'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { lintMarkdown } from '../packages/lint/src/index'
-import { type AnvilBlock, type AnvilDoc, flowGraph, parseAnvil, taskProgress } from '../packages/parser/src/index'
+import {
+  type AnvilBlock,
+  type AnvilDoc,
+  chartDelta,
+  chartRender,
+  deltaText,
+  flowGraph,
+  parseAnvil,
+  taskProgress,
+} from '../packages/parser/src/index'
 
 const ROOT = new URL('..', import.meta.url).pathname
 const src = await readFile(join(ROOT, 'SPEC.md'), 'utf8')
@@ -283,6 +292,43 @@ describe('SPEC.md examples', () => {
           if (!honest.has(claim)) {
             wrong.push(`SPEC.md:${ex.line} picture prints ${claim}, source has ${[...honest].join(', ')}`)
           }
+        }
+      }
+    }
+
+    expect(wrong).toEqual([])
+  })
+
+  /**
+   * §4.16.5 bans a hand-typed change for the reason §4.12.1 bans a hand-typed
+   * count, so the picture of a stat is held to the same rule: every change it
+   * prints is one the parser computes, and nothing that looks like one is
+   * printed that the parser would not produce.
+   */
+  test('every change in a stat picture is the change its source computes', () => {
+    const wrong: string[] = []
+
+    for (const ex of EXAMPLES) {
+      if (!ex.picture) continue
+      const stats = flatten(parseAnvil(ex.source)).filter(b => b.kind === 'chart' && chartRender(b) === 'stat')
+      if (!stats.length) continue
+
+      const honest = new Set<string>()
+      for (const b of stats) {
+        const unit = typeof b.attrs.unit === 'string' ? b.attrs.unit : ''
+        for (const d of b.data) {
+          const delta = chartDelta(b, d)
+          if (!delta) continue
+          const text = deltaText(d, delta, unit)
+          honest.add(text)
+          if (!ex.picture.includes(text)) wrong.push(`SPEC.md:${ex.line} picture never prints "${d.label}" ${text}`)
+          if (!ex.picture.includes(`from ${d.wasRaw}`)) wrong.push(`SPEC.md:${ex.line} picture never prints "from ${d.wasRaw}"`)
+        }
+      }
+
+      for (const m of ex.picture.matchAll(/[+-][\d.,]+[kmb]?(?: · [+-][\d.]+%)?/g)) {
+        if (![...honest].some(h => h.startsWith(m[0]))) {
+          wrong.push(`SPEC.md:${ex.line} picture prints ${m[0]}, source computes ${[...honest].join(', ')}`)
         }
       }
     }

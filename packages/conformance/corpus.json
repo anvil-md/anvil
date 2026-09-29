@@ -648,6 +648,109 @@
       "title": "the svg is accompanied by the same graph as text",
       "source": "@flow id=f\n? Q\n- [x] build | Build\n- build -> test",
       "expect": { "htmlContains": ["Step 1: Build", "build leads to test"] }
+    },
+    {
+      "id": "recommend-marks-one-row-in-words",
+      "spec": "4.1.1",
+      "title": "recommend= marks the row it names, says so in words, and leaves the label alone",
+      "source": "@choice id=plan recommend=pro\n? Which plan?\n- basic | Basic\n- pro   | Pro | adds the shared inbox",
+      "expect": {
+        "blocks": [{ "kind": "choice", "recommended": "pro", "optionLabels": ["Basic", "Pro"] }],
+        "warnings": [],
+        "htmlContains": ["recommended"]
+      }
+    },
+    {
+      "id": "recommend-naming-nothing-marks-nothing",
+      "spec": "4.1.1",
+      "title": "a recommendation that names no option is dropped whole, never matched to the nearest",
+      "source": "@choice id=plan recommend=gold\n? Which plan?\n- basic | Basic\n- pro   | Pro",
+      "expect": {
+        "blocks": [{ "kind": "choice", "recommended": "" }],
+        "warningsContain": ["recommend=\"gold\" names no option"]
+      }
+    },
+    {
+      "id": "recommend-on-a-card-must-be-an-open-row",
+      "spec": "4.1.1",
+      "title": "an asking card can only recommend a row the human can actually pick",
+      "source": "@card id=c ask=\"What next?\" recommend=ANV-115\n- [x] ANV-115 | Retry scheduler\n- [ ] ANV-119 | Metrics",
+      "expect": {
+        "blocks": [{ "kind": "card", "recommended": "" }],
+        "warningsContain": ["only open rows can be picked"]
+      }
+    },
+    {
+      "id": "recommend-needs-a-question",
+      "spec": "4.1.1",
+      "title": "a record card has nothing to recommend",
+      "source": "@card id=c recommend=ANV-119\n- [ ] ANV-119 | Metrics",
+      "expect": {
+        "blocks": [{ "kind": "card", "recommended": "" }],
+        "warningsContain": ["recommend= needs ask="]
+      }
+    },
+    {
+      "id": "chart-stat-change-is-computed",
+      "spec": "4.16.5",
+      "title": "a stat prints the change from was=, computed, beside the number it came from",
+      "source": "@chart id=o render=stat better=up\n? Outreach today\n- Read   | 40 | was=32\n- Sent   | 9\n- Failed | 2  | was=0 | better=down",
+      "expect": {
+        "blocks": [
+          {
+            "kind": "chart",
+            "dataRaw": ["40", "9", "2"],
+            "dataDeltas": [
+              { "diff": 8, "pct": 25, "tone": "good" },
+              null,
+              { "diff": 2, "pct": null, "tone": "bad" }
+            ]
+          }
+        ],
+        "warnings": [],
+        "htmlContains": ["+8 · +25%", "from 32", "+2"]
+      }
+    },
+    {
+      "id": "chart-stat-verdict-is-never-guessed",
+      "spec": "4.16.5",
+      "title": "without better= a change has a direction and no verdict",
+      "source": "@chart id=o render=stat\n- Leads | 12 | was=10",
+      "expect": {
+        "blocks": [{ "kind": "chart", "dataDeltas": [{ "diff": 2, "pct": 20, "tone": "neutral" }] }],
+        "warnings": []
+      }
+    },
+    {
+      "id": "chart-stat-has-no-scale",
+      "spec": "4.16.5",
+      "title": "min=, max= and goal= move a range, and a stat has none, so they warn",
+      "source": "@chart id=o render=stat goal=50 max=10\n- a | 40",
+      "expect": {
+        "blocks": [{ "kind": "chart", "dataValues": [40] }],
+        "warningsContain": ["max=, goal= draw nothing on render=stat"]
+      }
+    },
+    {
+      "id": "chart-was-outside-stat-warns",
+      "spec": "4.16.5",
+      "title": "was= on a bar chart is parsed as a comparison, never as the note, and says it is not drawn",
+      "source": "@chart id=o render=bar\n- a | 40 | was=32",
+      "expect": {
+        "blocks": [{ "kind": "chart", "dataRaw": ["40"] }],
+        "warningsContain": ["only drawn by render=stat"],
+        "htmlExcludes": ["was=32"]
+      }
+    },
+    {
+      "id": "chart-was-must-be-a-number",
+      "spec": "4.16.5",
+      "title": "an unreadable was= draws no change rather than a change from zero",
+      "source": "@chart id=o render=stat\n- a | 40 | was=lots",
+      "expect": {
+        "blocks": [{ "kind": "chart", "dataDeltas": [null] }],
+        "warningsContain": ["was=\"lots\" is not a number"]
+      }
     }
   ]
 }

@@ -5,8 +5,8 @@
  * Every function here is total: a malformed row records a warning on the block
  * and returns, never throws.
  */
-import type { AnvilBlock, AnvilOption, FieldType, FlowShape, TaskState } from './types'
-import { chartNumber, FIELD_TYPES, FLOW_SHAPES } from './types'
+import type { AnvilBlock, AnvilDatum, AnvilOption, FieldType, FlowShape, TaskState } from './types'
+import { chartBetter, chartNumber, FIELD_TYPES, FLOW_SHAPES } from './types'
 
 const FIELD_TYPE_SET = new Set<string>(FIELD_TYPES)
 
@@ -223,14 +223,40 @@ export function parseDatum(rest: string, block: AnvilBlock): void {
     return
   }
 
-  const [label = '', raw = '', note = ''] = parts
+  // `was=` and `better=` are trailing key=value cells, unordered, exactly like
+  // an option row's `img=`. Read positionally, `was=34` became the note.
+  const [label = '', ...after] = parts
+  const positional: string[] = []
+  const datum: Partial<AnvilDatum> = {}
+  for (const cell of after) {
+    const kv = DATUM_KV.exec(cell)
+    if (!kv) {
+      positional.push(cell)
+      continue
+    }
+    const key = (kv[1] ?? '').toLowerCase()
+    const val = (kv[2] ?? '').trim()
+    if (key === 'was') {
+      const was = chartNumber(val)
+      if (was === null) block.warnings.push(`"${label}" was="${val}" is not a number; no change drawn`)
+      else Object.assign(datum, { was, wasRaw: val })
+      continue
+    }
+    const better = chartBetter(val)
+    if (better) datum.better = better
+    else block.warnings.push(`"${label}" better="${val}" is not up or down; the change is drawn without a verdict`)
+  }
+
+  const [raw = '', note = ''] = positional
   const value = chartNumber(raw)
   if (value === null) {
     block.warnings.push(`"${label}" has no number in its value cell ("${raw}"); row not drawn`)
     return
   }
-  block.data.push({ label, value, note, raw: raw.trim() })
+  block.data.push({ label, value, note, raw: raw.trim(), ...datum })
 }
+
+const DATUM_KV = /^(was|better)\s*=\s*(.*)$/i
 
 /**
  * Split a flow row's first cell on its arrows.
