@@ -722,7 +722,7 @@ function renderStats(b: AnvilBlock, v: Visible, unit: string): string {
       </li>`
     })
     .join('')
-  return `<ul class="anvil-stats anvil-auto" style="--anvil-cols:${Math.min(4, Math.max(1, v.data.length))};--anvil-min:8.5rem">${tiles}</ul>${more(v.after)}`
+  return `<ul class="anvil-stats anvil-auto" style="--anvil-cols:${Math.min(4, Math.max(1, v.data.length))};--anvil-min:6.5rem">${tiles}</ul>${more(v.after)}`
 }
 
 type ChartMode = (v: Visible, d: AnvilDomain, g: number | null, u: string, b: AnvilBlock) => string

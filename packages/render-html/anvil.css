@@ -1307,9 +1307,11 @@
   overflow-wrap: anywhere;
 }
 
+/* 1.35em mono fits seven characters -- `$42,300`, `99.98%` -- in the narrowest
+   tile four-across leaves; at 1.55em anything past five broke mid-number. */
 .anvil-stat-value {
   font-family: var(--anvil-mono);
-  font-size: 1.55em;
+  font-size: 1.35em;
   font-weight: 600;
   line-height: 1.15;
   font-variant-numeric: tabular-nums;
@@ -1341,8 +1343,11 @@
 }
 
 /* The base the change is measured from. Muted whatever the tone: it is the
-   reference, not the news. */
+   reference, not the news. Always its own line, so every tile reads the same
+   way down: figure, change, base -- not inline on a short change and wrapped
+   on a long one. */
 .anvil-stat-was {
+  flex-basis: 100%;
   color: var(--anvil-muted-fg);
 }
 

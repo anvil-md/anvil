@@ -285,10 +285,11 @@ const total = rendered.reduce((n, g) => n + g.examples.length, 0)
 		font-weight: 500;
 	}
 
-	/* The first chip is the score: the one thing a sales list is sorted by. */
+	/* The first chip is the score: the one thing a sales list is sorted by. Set
+	   in mono so it reads as a figure, and NOT coloured: green on every score is
+	   a verdict the fence never gave, the thing §4.16.5 refuses to guess. */
 	.ex-out :global(.lead-chips span:first-child) {
 		font-family: var(--anvil-mono);
-		color: var(--anvil-ok);
 	}
 
 	.ex-out :global(.lead-why) {
