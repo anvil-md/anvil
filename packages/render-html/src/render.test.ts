@@ -529,6 +529,18 @@ describe('regressions', () => {
   test('a + row outside a block that draws it is a warning, not a silent drop', () => {
     expect(renderAnvilFence('@choice id=c\n+ chip\n- a | A', true)).toContain('only drawn on')
   })
+
+  test('both dark palettes define the same tokens', async () => {
+    // The OS-dark block forgot --anvil-ok, so prefers-color-scheme users got the
+    // light-mode green on a near-black background (~3.8:1) while .dark users got
+    // the right one. Two copies of a palette drift; this pins them together.
+    const css = await Bun.file(new URL('../anvil.css', import.meta.url)).text()
+    const tokens = (block: string): string[] => [...block.matchAll(/(--anvil-[\w-]+):/g)].map(m => m[1] as string).sort()
+    const media = /@media \(prefers-color-scheme: dark\) \{\s*\.anvil-doc \{([^}]*)\}/.exec(css)?.[1] ?? ''
+    const forced = /\.dark \.anvil-doc \{([^}]*)\}/.exec(css)?.[1] ?? ''
+    expect(forced).not.toBe('')
+    expect(tokens(media)).toEqual(tokens(forced))
+  })
 })
 
 describe('chart', () => {
