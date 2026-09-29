@@ -58,6 +58,29 @@ import { type IconName, icon, resolveIcon } from './icons'
 
 type BodyRenderer = (block: AnvilBlock) => string
 
+/** What a host face is handed besides the block. */
+export interface CardFaceContext {
+  /** The stock body this face replaces, for a face that decorates rather than redraws. */
+  stock: () => string
+  /** The escaping every stock renderer uses. Agent text is agent text inside a face too (§8.3). */
+  esc: (s: string) => string
+  /** True while the fence is still streaming. */
+  partial: boolean
+}
+
+/**
+ * A host's own drawing of one `@card type=` (§4.12.5). Returns the card BODY as
+ * an HTML string; the frame -- ref, type chip, counted status, title, warnings,
+ * the snapshot footer -- stays the language's.
+ */
+export type CardFace = (block: AnvilBlock, ctx: CardFaceContext) => string
+
+/** Everything a host may register. Faces today; the shape leaves room. */
+export interface AnvilHost {
+  /** `@card type=<key>` -> the face drawn for it. Keys match case-insensitively. */
+  faces?: Record<string, CardFace>
+}
+
 /** Strategy map, not a switch chain: a new kind is one entry plus one renderer. */
 const BODIES: Partial<Record<AnvilKind, BodyRenderer>> = {
   choice: renderChoice,
@@ -160,9 +183,82 @@ function shell(block: AnvilBlock, partial: boolean): string {
  * renderer never substitutes a clock of its own -- it has no way to know
  * whether the data is fresh, and inventing a time would claim that it does.
  */
-function recordShell(block: AnvilBlock, partial: boolean): string {
+/** The host's face for this type, looked up without trusting the key (`type=__proto__`). */
+function faceFor(host: AnvilHost | undefined, type: string): CardFace | null {
+  if (!host?.faces || !type) return null
+  const faces: Record<string, CardFace> = {}
+  for (const [k, v] of Object.entries(host.faces)) {
+    if (typeof v === 'function') faces[k.trim().toLowerCase()] = v
+  }
+  return pick<CardFace | null>(faces, type, null)
+}
+
+/**
+ * Everything the parser read off a card that a body is responsible for drawing.
+ * The frame draws the title, subtext and chip; the body owns the rest.
+ */
+function bodyText(block: AnvilBlock): string[] {
+  const out = [
+    ...block.tasks.flatMap(t => [
+      t.label,
+      t.meta,
+      t.total !== undefined ? `${t.done}/${t.total}` : '',
+      ...t.detail.split('\n'),
+    ]),
+    ...block.meta.flat().map(c => c.replace(/^!\s*/, '')),
+    ...block.prose.split('\n'),
+  ]
+  return [...new Set(out.map(s => s.trim()).filter(Boolean))]
+}
+
+/**
+ * A card's body: the stock one, or the host's face for its `type=`.
+ *
+ * THREE THINGS A FACE CANNOT DO, and each is enforced here rather than hoped
+ * for in a README:
+ *
+ * 1. Answer a question. With `ask=` set the stock body draws, because the rows
+ *    offered and the stamp written must mean the same thing on every host.
+ * 2. Drop a fact. Whatever the parser read and the face did not draw is named
+ *    in a warning on the frame -- §11's "parsed and then not drawn" arriving at
+ *    host code, which is where it is most likely to happen.
+ * 3. Take the transcript down. A face that throws is host code breaking, and
+ *    the card falls back to the stock body and says so. The totality rule does
+ *    not stop at the package boundary.
+ */
+function cardBody(block: AnvilBlock, partial: boolean, host: AnvilHost | undefined): string {
+  const stock = (): string => (BODIES[block.kind] ?? renderNote)(block)
+  if (block.kind !== 'card' || attrString(block, 'ask')) return stock()
+  const type = attrString(block, 'type').trim().toLowerCase()
+  const face = faceFor(host, type)
+  if (!face) return stock()
+
+  let html: string
+  try {
+    html = String(face(block, { stock, esc, partial }) ?? '')
+  } catch {
+    block.warnings.push(`face "${type}" failed; drawn as a plain card`)
+    return stock()
+  }
+
+  const missing = bodyText(block).filter(s => !html.includes(esc(s)))
+  if (missing.length) {
+    const named = missing.slice(0, 3).map(s => `"${s}"`).join(', ')
+    const rest = missing.length > 3 ? ` and ${missing.length - 3} more` : ''
+    block.warnings.push(`face "${type}" did not draw ${named}${rest}`)
+  }
+  return `<div class="anvil-face" data-face="${esc(type)}">${html}</div>`
+}
+
+const AUTHORED_STATES = new Set<string>(['todo', 'flight', 'done', 'blocked'])
+
+function recordShell(block: AnvilBlock, partial: boolean, host?: AnvilHost): string {
   const board = block.kind === 'board'
   const status = cardStatus(block)
+  // A card with no rows and no status= has no state anybody asserted or the
+  // rows could count. Printing "Todo" there is a claim nobody made -- and on a
+  // record like a lead or a contact it reads as a to-do list with nothing on it.
+  const claimed = block.tasks.length > 0 || AUTHORED_STATES.has(attrString(block, 'status').toLowerCase())
   const type = attrString(block, 'type')
   const rawRef = block.derivedId ? '' : block.id
   const p = taskProgress(block)
@@ -185,7 +281,9 @@ function recordShell(block: AnvilBlock, partial: boolean): string {
     ? p.total > 0
       ? `<span class="anvil-card-count">${p.done}/${p.total} · ${p.pct}% done</span>`
       : ''
-    : `<span class="anvil-status" data-state="${status}">${icon(STATE_ICON[status])}<span>${STATE_LABEL[status]}</span></span>`
+    : claimed
+      ? `<span class="anvil-status" data-state="${status}">${icon(STATE_ICON[status])}<span>${STATE_LABEL[status]}</span></span>`
+      : ''
 
   const head = `<header class="anvil-card-head">
     <span class="anvil-icon">${icon(blockIcon(block))}</span>
@@ -200,10 +298,13 @@ function recordShell(block: AnvilBlock, partial: boolean): string {
   const as = attrString(block, 'as')
   const foot = [partial ? 'streaming' : 'snapshot', as ? `as of ${as}` : ''].filter(Boolean).join(' · ')
 
+  // Before warnings(): a face that drops a fact adds the warning that says so.
+  const body = cardBody(block, partial, host)
+
   // A board has no single state -- that is the whole point of having lanes -- so
   // it does not claim one.
-  return `<section class="anvil-block anvil-card-block" data-anvil-id="${esc(block.id)}" data-anvil-kind="${esc(block.kind)}"${board ? '' : ` data-state="${status}"`}>
-    ${head}${heading}${sub}${(BODIES[block.kind] ?? renderNote)(block)}${warnings(block)}${submitBar(block)}
+  return `<section class="anvil-block anvil-card-block" data-anvil-id="${esc(block.id)}" data-anvil-kind="${esc(block.kind)}"${board || !claimed ? '' : ` data-state="${status}"`}>
+    ${head}${heading}${sub}${body}${warnings(block)}${submitBar(block)}
     <footer class="anvil-foot"><span>${esc(foot)}</span></footer>
   </section>`
 }
@@ -409,7 +510,7 @@ function safeLength(v: string): string | null {
  * measuring the wrong box. `cols` is a MAXIMUM; the track formula in anvil.css
  * collapses against the container's own width.
  */
-function layoutShell(block: AnvilBlock, partial: boolean): string {
+function layoutShell(block: AnvilBlock, partial: boolean, host?: AnvilHost): string {
   // pick(), not `?? fallback`: `gap=constructor` otherwise substitutes a
   // function's source text into the track formula and collapses the grid.
   const gap = pick(GAPS, attrString(block, 'gap', 'normal').toLowerCase(), GAPS.normal as string)
@@ -423,7 +524,7 @@ function layoutShell(block: AnvilBlock, partial: boolean): string {
 
   const title = block.prompt ? `<div class="anvil-layout-title">${esc(block.prompt)}</div>` : ''
   const framed = block.attrs.frame ? ' anvil-layout-framed' : ''
-  const inner = block.children.map(c => renderBlock(c, partial)).join('')
+  const inner = block.children.map(c => renderBlock(c, partial, host)).join('')
   const shape = block.kind === 'grid' ? 'anvil-auto' : 'anvil-stack'
 
   return `<div class="anvil-layout${framed}" data-anvil-kind="${esc(block.kind)}">
@@ -434,7 +535,7 @@ function layoutShell(block: AnvilBlock, partial: boolean): string {
 
 /* ── dispatch ────────────────────────────────────────────────────────────── */
 
-const SHELLS: Partial<Record<AnvilKind, (b: AnvilBlock, partial: boolean) => string>> = {
+const SHELLS: Partial<Record<AnvilKind, (b: AnvilBlock, partial: boolean, host?: AnvilHost) => string>> = {
   card: recordShell,
   board: recordShell,
   chart: dataShell,
@@ -444,8 +545,8 @@ const SHELLS: Partial<Record<AnvilKind, (b: AnvilBlock, partial: boolean) => str
   stack: layoutShell,
 }
 
-function renderBlock(block: AnvilBlock, partial: boolean): string {
-  return (SHELLS[block.kind] ?? shell)(block, partial)
+function renderBlock(block: AnvilBlock, partial: boolean, host?: AnvilHost): string {
+  return (SHELLS[block.kind] ?? shell)(block, partial, host)
 }
 
 /**
@@ -455,8 +556,12 @@ function renderBlock(block: AnvilBlock, partial: boolean): string {
  * option has not arrived yet must never look answerable, so a partial doc
  * renders with a streaming footer and (since every control is already inert in
  * this spike) no interaction at all.
+ *
+ * `host` is where a surface registers its own faces for `@card type=` values
+ * (§4.12.5). Without one, every card draws the stock body -- which is exactly
+ * what a host that has never heard of `type=lead` must do.
  */
-export function renderAnvilFence(source: string, closed: boolean): string {
+export function renderAnvilFence(source: string, closed: boolean, host?: AnvilHost): string {
   let doc: ReturnType<typeof parseAnvil>
   try {
     doc = parseAnvil(source, { partial: !closed })
@@ -471,6 +576,6 @@ export function renderAnvilFence(source: string, closed: boolean): string {
     return `<div class="anvil-fallback"><pre><code>${esc(source)}</code></pre></div>`
   }
 
-  const inner = doc.blocks.map(b => renderBlock(b, doc.partial)).join('')
+  const inner = doc.blocks.map(b => renderBlock(b, doc.partial, host)).join('')
   return `<div class="anvil-doc${doc.partial ? ' anvil-doc-streaming' : ''}">${inner}</div>`
 }

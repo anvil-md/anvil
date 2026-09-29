@@ -173,6 +173,10 @@ describe('warnings', () => {
     expect(rules('@grid\n@end')).toContain('no-empty-container')
     // A note is prose and a message is a body; neither has rows to miss.
     expect(rules('@note\n> hi')).not.toContain('no-empty-block')
+    // A record card with chips or prose draws both (§4.12.5); a bare one is empty.
+    expect(rules('@card id=l type=lead\n? @demo\n+ score 82')).not.toContain('no-empty-block')
+    expect(rules('@card id=l type=lead\n? @demo\n> Posts daily.')).not.toContain('no-empty-block')
+    expect(rules('@card id=l\n? @demo')).toContain('no-empty-block')
   })
 
   test('a min= nobody can satisfy', () => {

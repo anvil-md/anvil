@@ -2,6 +2,8 @@ import { describe, expect, test } from 'bun:test'
 import { anvilMarked, isFenceClosed, renderAnvilToken } from './index'
 
 const BODY = '@choice id=x\n? Q\n- a | A'
+const LEAD = '@card id=l type=lead\n? @demo.bakery\n+ score 82'
+const host = { faces: { lead: () => '<i>score 82</i>' } }
 
 describe('isFenceClosed', () => {
 	test('true when the raw token ends with a closing delimiter', () => {
@@ -56,5 +58,11 @@ describe('renderAnvilToken', () => {
 
 	test('html for an anvil token', () => {
 		expect(renderAnvilToken({ text: BODY, lang: 'anvil' })).toContain('anvil-doc')
+	})
+
+	test('a host face reaches the renderer, through both entry points', () => {
+		const token = { text: LEAD, lang: 'anvil', raw: '```anvil\n' + LEAD + '\n```' }
+		expect(renderAnvilToken(token, { host })).toContain('data-face="lead"')
+		expect(anvilMarked({ host }).renderer.code.call(null, token)).toContain('data-face="lead"')
 	})
 })

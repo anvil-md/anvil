@@ -18,7 +18,7 @@
  * EXPERIMENTAL: exercised against remark-html only. If you wire it into a
  * different pipeline and it misbehaves, that is a real bug, not misuse.
  */
-import { renderAnvilFence } from '@anvil-md/render-html'
+import { type AnvilHost, renderAnvilFence } from '@anvil-md/render-html'
 
 interface Node {
 	type: string
@@ -32,6 +32,11 @@ export interface AnvilRemarkOptions {
 	lang?: string
 	/** Whether fences are complete. Not inferable at this layer. Default true. */
 	closed?: boolean
+	/**
+	 * Faces a host registers for `@card type=` values (SPEC §4.12.5). Without
+	 * it every card draws the stock body.
+	 */
+	host?: AnvilHost
 }
 
 /**
@@ -57,7 +62,7 @@ export function anvilRemark(opts: AnvilRemarkOptions = {}) {
 			const child = kids[i]
 			if (!child) continue
 			if (child.type === 'code' && child.lang === want) {
-				kids[i] = { type: 'html', value: renderAnvilFence(child.value ?? '', closed) }
+				kids[i] = { type: 'html', value: renderAnvilFence(child.value ?? '', closed, opts.host) }
 				continue
 			}
 			walk(child)

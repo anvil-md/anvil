@@ -21,6 +21,8 @@ export interface Example {
 	source: string
 	/** Render the two panes stacked rather than side by side. For wide blocks. */
 	wide?: boolean
+	/** Render through the page's demo host (faces.ts), as a product would. */
+	host?: boolean
 }
 
 export interface ExampleGroup {
@@ -62,6 +64,18 @@ export const GROUPS: ExampleGroup[] = [
 - redis  | Redis       | queues and sessions
 - s3     | Object store
 - k8s    | Kubernetes  | somebody has to run it`,
+			},
+			{
+				id: 'choice-recommend',
+				title: '@choice recommend=',
+				spec: '4.1.1',
+				note: 'The agent says which one it would take, and it is **marked, never picked**. Nothing is preselected, because a single choice stamps on the click, and "(recommended)" typed into the label would put the advice into the human\'s answer.',
+				source: `@choice id=plan recommend=pro
+? Which plan?
+: Pro is the one with the shared inbox you asked about.
+- basic | Basic | one seat, no inbox
+- pro   | Pro   | adds the shared inbox
+- team  | Team  | Pro plus SSO`,
 			},
 			{
 				id: 'gallery-swatch',
@@ -186,6 +200,29 @@ _ nda     | bool     | We need an NDA first`,
 - [ ] ANV-120 | Runbook entry
 - [ ] ANV-121 | Load test at 10x`,
 			},
+			{
+				id: 'card-lead',
+				title: '@card type=lead',
+				spec: '4.12.5',
+				note: 'A product record is a card with a type, not a new block. This is what every host that has never heard of `lead` draws: the same title, chips and sentence. No state pill, because no rows were counted and nobody wrote `status=`.',
+				source: `@card id=demo.bakery type=lead as=09:00
+? @demo.bakery
+: Demo Bakery · Stockholm
++ score 82 | Local food | 205 posts
+> Posts daily, answers comments, sells online.`,
+			},
+			{
+				id: 'card-lead-face',
+				title: 'The same card, with a host face',
+				spec: '4.12.5',
+				note: 'Identical source, drawn by a host that registered a face for `lead`. The face owns the body; the ref, type, title and snapshot footer stay the language\'s. A face that dropped a chip would get a warning naming it.',
+				host: true,
+				source: `@card id=demo.bakery type=lead as=09:00
+? @demo.bakery
+: Demo Bakery · Stockholm
++ score 82 | Local food | 205 posts
+> Posts daily, answers comments, sells online.`,
+			},
 		],
 	},
 	{
@@ -281,6 +318,18 @@ _ nda     | bool     | We need an NDA first`,
 				source: `@chart id=p95 render=spark values=12,14,11,19,24,22,31 unit=ms goal=20
 ? p95 latency, 7d
 : The dashed rule is the SLO.`,
+			},
+			{
+				id: 'chart-stat',
+				title: 'render=stat',
+				spec: '4.16.5',
+				note: 'A number and how it moved. The agent writes the two numbers it read, `was=`, and the **change is computed**: there is no `delta=` to drift. `Failed` goes up and is bad news, which only `better=down` can say. Without `better=` a change has a direction and no colour.',
+				source: `@chart id=outreach render=stat better=up as=14:02
+? Outreach today
+- Read   | 40 | was=34
+- Leads  | 12 | was=9
+- Sent   | 9
+- Failed | 2  | was=0 | better=down`,
 			},
 			{
 				id: 'chart-negative',

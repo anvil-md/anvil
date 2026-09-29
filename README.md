@@ -174,6 +174,21 @@ Drive it was denied. And the provider's logo comes from a **host allowlist**,
 never from the agent, because an agent-supplied image next to the words "Connect
 Google" and a button is a phishing card in a surface the human already trusts.
 
+Three smaller things are attributes rather than blocks, which is the point:
+
+- **`recommend=`** marks the one option the agent would pick. It is marked in
+  words and never preselected, because a single choice stamps on the click, and
+  "(recommended)" typed into a label would put the agent's advice into the
+  human's answer.
+- **`@chart render=stat`** is a number and how it moved. The agent writes
+  `was=34`; the `+6 · +18%` is computed, because a hand-typed change goes stale
+  the day one of its two numbers is edited. Whether up is good news is
+  `better=`'s to say, and without it the change has no colour.
+- **`@card type=`** can have a **host face**. A product that draws leads all day
+  registers a face for `type=lead` instead of asking for a `@lead` block, and
+  every other host still draws the same facts as a plain card. The face owns
+  the body; the renderer names anything it forgets to draw.
+
 `@grid` and `@stack` lay blocks out with **no breakpoints anywhere**: the agent
 writing the fence cannot see the screen, `cols` is a maximum rather than a
 count, and the collapse is computed against the container.
@@ -211,7 +226,7 @@ bun test
 
 ## Security posture
 
-Three things this gets right, because they are easy to get wrong:
+Four things this gets right, because they are easy to get wrong:
 
 - **Attribute-position values are allowlisted, not escaped.** `swatch`, `font`,
   `img`, `href` and a grid's `min` land in `style`, `src` and `href`, where
@@ -225,7 +240,8 @@ Three things this gets right, because they are easy to get wrong:
   ([§8.1](./SPEC.md#81-a-stamp-is-untrusted-input)).
 - **Stamping needs its own permission.** Being able to *see* a question is not
   consent to *answer* it on someone else's behalf
-  ([§8.2](./SPEC.md#82-stamping-is-permission-gated)).
+  ([§8.2](./SPEC.md#82-stamping-is-permission-gated)). A viewer who cannot
+  answer is told who can, and the host says so, never the agent.
 
 ## Status
 

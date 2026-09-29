@@ -2,6 +2,8 @@ import { describe, expect, test } from 'bun:test'
 import { anvilMarkdownIt } from './index'
 
 const BODY = '@choice id=x\n? Q\n- a | A'
+const LEAD = '@card id=l type=lead\n? @demo.bakery\n+ score 82'
+const host = { faces: { lead: () => '<i>score 82</i>' } }
 
 type FenceRule = (tokens: unknown[], idx: number) => string
 
@@ -46,6 +48,12 @@ describe('anvilMarkdownIt', () => {
 		const md = fakeMd()
 		anvilMarkdownIt({ closed: () => false })(md)
 		expect(md.renderer.rules.fence?.([{ info: 'anvil', content: BODY }], 0)).toContain('anvil-doc-streaming')
+	})
+
+	test('a host face reaches the renderer', () => {
+		const md = fakeMd()
+		anvilMarkdownIt({ host })(md)
+		expect(md.renderer.rules.fence?.([{ info: 'anvil', content: LEAD }], 0)).toContain('data-face="lead"')
 	})
 
 	test('a missing fallback is a loud error, not a silent empty render', () => {

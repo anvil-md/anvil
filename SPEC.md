@@ -547,8 +547,8 @@ failure §4.12.1 goes on to argue is worth a whole block to prevent.
 
 | Attribute | Meaning |
 |---|---|
-| `type` | free text, shown as a chip. `epic`, `bug` and `spike` also pick the icon. |
-| `status` | `todo` `flight` `done` `blocked`. Counted from the rows, and **the count wins** (§4.12.1). |
+| `type` | free text, shown as a chip. `epic`, `bug` and `spike` also pick the icon. A host may give a type its own face (§4.12.5). |
+| `status` | `todo` `flight` `done` `blocked`. Counted from the rows, and **the count wins** (§4.12.1). A card with no rows and no `status=` shows no state at all. |
 | `href` | a link to the real ticket. The card's only outbound affordance. |
 | `as` | the timestamp the data was read. The renderer supplies no clock of its own. |
 | `ask` | turns the card into a question (§4.12.4) |
@@ -666,6 +666,68 @@ warn.
 "you chose this" next to a circle meaning "this is not done" puts two different
 questions in one row wearing the same vocabulary, and an agent re-reading its
 own fence cannot tell them apart.
+
+**4.12.5 A host may give a `type=` its own face.**
+
+Every product that runs an agent has records it draws a lot: a lead, a contact,
+an invoice, a deploy. The temptation is a block per record -- `@lead`, `@invoice`
+-- and it is wrong for the reason §2 closes the set. A transcript written for one
+host is read by others, and on every host that has never heard of `@lead` the
+record degrades to a warned note with the facts folded into its prompt.
+
+So the record is a `@card`, and the host draws it:
+
+```anvil
+@card id=demo.bakery type=lead as=09:00
+? @demo.bakery
+: Demo Bakery · Stockholm
++ score 82 | Local food | 205 posts
+> Posts daily, answers comments, sells online.
+```
+
+```
+   ╭─ demo.bakery · lead ─────────────────────────────────────╮
+   │  @demo.bakery                                            │
+   │  Demo Bakery · Stockholm                                 │
+   │  ┌────────────────────────────────────────────────────┐  │
+   │  │  DB   score 82 · Local food · 205 posts            │  │
+   │  │       Posts daily, answers comments, sells online. │  │
+   │  └────────────────────────────────────────────────────┘  │
+   ╰──────────────────────────────── as of 09:00 · snapshot ──╯
+```
+
+The boxed part is the host's: initials from the name, the chips run together on
+one line, the prose tucked under them. A host registers a **face** keyed by `type=`,
+matched case-insensitively, and the face draws the card's body from the parsed
+block. A host with no face for `lead` draws the stock card: the same title, the
+same three chips, the same sentence. Nothing in the transcript changed, so
+nothing is lost moving it between hosts. `type=` was free text already, and it
+still is.
+
+A face owns the body and nothing else, and five rules hold it there:
+
+1. **The frame is the language's.** The ref, the type chip, the counted status,
+   the title, the subtext, the warnings and the `snapshot` footer are drawn
+   around the face, never by it. Those are the parts that make a card honest
+   (§4.12.1, §4.12.2), so they are not the host's to redesign.
+2. **Every fact the parser read is drawn, or the frame says which one was not.**
+   A task row, its meta and detail, a chip, a line of prose: a face that leaves
+   one out gets a warning naming it. This is §11's "parsed and then not drawn",
+   arriving at host code, which is where it is most likely to happen.
+3. **A face never draws a question.** With `ask=` set the stock body draws,
+   because the rows a card offers and the stamp it writes (§4.12.4) must mean
+   the same thing on every host.
+4. **A face that fails falls back.** It is host code, and host code breaks. The
+   card draws the stock body and says the face failed; the totality rule does not
+   stop at the package boundary.
+5. **A face invents nothing.** It may arrange what the rows say and compute what
+   they add up to. It may not introduce a number the fence did not contain, for
+   the reason there is no `progress=`. And the text it draws is agent text, so
+   §8.3 applies inside a face exactly as it does outside one.
+
+A card with no rows and no `status=` shows **no state**. The count has nothing
+to count and nobody asserted one, so a `Todo` pill on a lead would be a claim
+nobody made.
 
 ### 4.13 `@board`
 
@@ -1948,6 +2010,8 @@ reorder. A positional id lands the stamp on the wrong block.
 | 39 | Disabled controls with no reason, shown to someone who cannot answer | the host names who the block waits on, from the rule it enforces (§8.2.1) |
 | 40 | A hand-typed `+18%` beside a number it no longer describes | `was=` is authored, the change is computed; there is no `delta=` (§4.16.5) |
 | 41 | A rise coloured green because rises are usually good | the tone is `better=`'s, never guessed; neutral without it (§4.16.5) |
+| 42 | A product record added as a new `@kind` | a `@card type=` with a host face; every other host still draws the card (§4.12.5) |
+| 43 | A host face that quietly drops a row | the frame names what the face did not draw (§4.12.5) |
 
 ---
 

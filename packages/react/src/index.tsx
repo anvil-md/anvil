@@ -13,7 +13,7 @@
  * What this does NOT do is sanitise arbitrary HTML, because it never receives
  * any: the input is ANVIL source, not markup.
  */
-import { renderAnvilFence } from '@anvil-md/render-html'
+import { type AnvilHost, renderAnvilFence } from '@anvil-md/render-html'
 import { type ReactElement, useMemo } from 'react'
 
 export interface AnvilProps {
@@ -26,6 +26,11 @@ export interface AnvilProps {
 	 */
 	closed?: boolean
 	className?: string
+	/**
+	 * Faces a host registers for `@card type=` values (SPEC §4.12.5). Without
+	 * it every card draws the stock body.
+	 */
+	host?: AnvilHost
 }
 
 /**
@@ -36,8 +41,8 @@ export interface AnvilProps {
  * <Anvil source={fenceBody} closed={!isStreaming} />
  * ```
  */
-export function Anvil({ source, closed = true, className }: AnvilProps): ReactElement {
-	const html = useMemo(() => renderAnvilFence(source, closed), [source, closed])
+export function Anvil({ source, closed = true, className, host }: AnvilProps): ReactElement {
+	const html = useMemo(() => renderAnvilFence(source, closed, host), [source, closed, host])
 	// biome-ignore lint/security/noDangerouslySetInnerHtml: the renderer builds
 	// this string itself and escapes/allowlists every agent-authored value; see
 	// the module header.
@@ -56,7 +61,7 @@ export function Anvil({ source, closed = true, className }: AnvilProps): ReactEl
  * streaming one. Pass `closed` yourself from whatever your app knows about the
  * message. See the package README.
  */
-export function anvilCode(opts: { lang?: string; closed?: boolean } = {}) {
+export function anvilCode(opts: { lang?: string; closed?: boolean; host?: AnvilHost } = {}) {
 	const want = opts.lang ?? 'anvil'
 	return function Code({
 		className,
@@ -74,6 +79,6 @@ export function anvilCode(opts: { lang?: string; closed?: boolean } = {}) {
 				</code>
 			)
 		}
-		return <Anvil source={String(children ?? '')} closed={opts.closed ?? true} />
+		return <Anvil source={String(children ?? '')} closed={opts.closed ?? true} host={opts.host} />
 	}
 }

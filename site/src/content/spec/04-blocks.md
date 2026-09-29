@@ -18,6 +18,7 @@ Every ASK block shares these attributes:
 | `optional` | off | a Skip affordance that still emits a stamp |
 | `danger` | off | destructive framing plus a deliberate second click |
 | `phrase` | -- | with `danger`: type this exact string to arm the button |
+| `recommend` | -- | the one row the agent would pick. `@choice`, `@gallery`, an asking `@card`. Marked, never preselected (§4.1.1) |
 
 ### 4.1 `@choice`
 
@@ -58,6 +59,55 @@ Stamped, at **exactly the same height** (§9.2):
 
 **Never collapse a stamped choice to one line.** The rejected rows are part of
 the record: they show what the human was choosing *between*.
+
+**4.1.1 `recommend=` marks a row. It never picks one.**
+
+An agent that has an opinion should say which option it would take, because a
+human asked to choose between three things they half understand deserves to
+know which one the thing that wrote them believes in.
+
+```anvil
+@choice id=plan recommend=pro
+? Which plan?
+: Pro is the one with the shared inbox you asked about.
+- basic | Basic | one seat, no inbox
+- pro   | Pro   | adds the shared inbox
+- team  | Team  | Pro plus SSO
+```
+
+```
+   ╭─ ? Which plan? ─────────────────────────────────────────╮
+   │  Pro is the one with the shared inbox you asked about.  │
+   │                                                         │
+   │    [1]  Basic   one seat, no inbox                      │
+   │    [2]  Pro     adds the shared inbox     RECOMMENDED   │
+   │    [3]  Team    Pro plus SSO                            │
+   ╰─────────────────────────────────────────────────────────╯
+```
+
+It is an attribute rather than `(recommended)` typed into the label, and the
+reason is the stamp. The label is what a stamp's `labels=` carries back to the
+model, so `Pro (recommended)` in the row puts the agent's advice into the
+human's answer. The record would then say the human picked the recommended plan,
+and a human never said that.
+
+Three rules hold it in its place:
+
+- **It is one value.** `recommend=` names one row by its value -- a card row by
+  its ref. An agent that recommends everything has recommended nothing.
+- **It names a row the human can pick, or it marks nothing.** A value that
+  matches no option is dropped whole and warned about, never matched to the
+  nearest row. On an asking `@card` that means an **open** row (§4.12.4); a done
+  or blocked row is refused. On a record, or on a block with no rows, it means
+  nothing and says so.
+- **It is marked, never selected.** No preselection, no focus, no fill, and it
+  is not the only row that looks pressable. A single-select stamps on the click
+  (§9.12), so a row that arrives already chosen is one keystroke from the agent
+  answering its own question. The mark is a word, `recommended`, because a
+  border colour alone says nothing to a screen reader.
+
+The stamp does not repeat it. The fence that carried the recommendation is in
+the same transcript as the answer, and the model reading the stamp wrote both.
 
 ### 4.2 `@gallery`
 
@@ -282,8 +332,8 @@ failure §4.12.1 goes on to argue is worth a whole block to prevent.
 
 | Attribute | Meaning |
 |---|---|
-| `type` | free text, shown as a chip. `epic`, `bug` and `spike` also pick the icon. |
-| `status` | `todo` `flight` `done` `blocked`. Counted from the rows, and **the count wins** (§4.12.1). |
+| `type` | free text, shown as a chip. `epic`, `bug` and `spike` also pick the icon. A host may give a type its own face (§4.12.5). |
+| `status` | `todo` `flight` `done` `blocked`. Counted from the rows, and **the count wins** (§4.12.1). A card with no rows and no `status=` shows no state at all. |
 | `href` | a link to the real ticket. The card's only outbound affordance. |
 | `as` | the timestamp the data was read. The renderer supplies no clock of its own. |
 | `ask` | turns the card into a question (§4.12.4) |
@@ -401,6 +451,68 @@ warn.
 "you chose this" next to a circle meaning "this is not done" puts two different
 questions in one row wearing the same vocabulary, and an agent re-reading its
 own fence cannot tell them apart.
+
+**4.12.5 A host may give a `type=` its own face.**
+
+Every product that runs an agent has records it draws a lot: a lead, a contact,
+an invoice, a deploy. The temptation is a block per record -- `@lead`, `@invoice`
+-- and it is wrong for the reason §2 closes the set. A transcript written for one
+host is read by others, and on every host that has never heard of `@lead` the
+record degrades to a warned note with the facts folded into its prompt.
+
+So the record is a `@card`, and the host draws it:
+
+```anvil
+@card id=demo.bakery type=lead as=09:00
+? @demo.bakery
+: Demo Bakery · Stockholm
++ score 82 | Local food | 205 posts
+> Posts daily, answers comments, sells online.
+```
+
+```
+   ╭─ demo.bakery · lead ─────────────────────────────────────╮
+   │  @demo.bakery                                            │
+   │  Demo Bakery · Stockholm                                 │
+   │  ┌────────────────────────────────────────────────────┐  │
+   │  │  DB   score 82 · Local food · 205 posts            │  │
+   │  │       Posts daily, answers comments, sells online. │  │
+   │  └────────────────────────────────────────────────────┘  │
+   ╰──────────────────────────────── as of 09:00 · snapshot ──╯
+```
+
+The boxed part is the host's: initials from the name, the chips run together on
+one line, the prose tucked under them. A host registers a **face** keyed by `type=`,
+matched case-insensitively, and the face draws the card's body from the parsed
+block. A host with no face for `lead` draws the stock card: the same title, the
+same three chips, the same sentence. Nothing in the transcript changed, so
+nothing is lost moving it between hosts. `type=` was free text already, and it
+still is.
+
+A face owns the body and nothing else, and five rules hold it there:
+
+1. **The frame is the language's.** The ref, the type chip, the counted status,
+   the title, the subtext, the warnings and the `snapshot` footer are drawn
+   around the face, never by it. Those are the parts that make a card honest
+   (§4.12.1, §4.12.2), so they are not the host's to redesign.
+2. **Every fact the parser read is drawn, or the frame says which one was not.**
+   A task row, its meta and detail, a chip, a line of prose: a face that leaves
+   one out gets a warning naming it. This is §11's "parsed and then not drawn",
+   arriving at host code, which is where it is most likely to happen.
+3. **A face never draws a question.** With `ask=` set the stock body draws,
+   because the rows a card offers and the stamp it writes (§4.12.4) must mean
+   the same thing on every host.
+4. **A face that fails falls back.** It is host code, and host code breaks. The
+   card draws the stock body and says the face failed; the totality rule does not
+   stop at the package boundary.
+5. **A face invents nothing.** It may arrange what the rows say and compute what
+   they add up to. It may not introduce a number the fence did not contain, for
+   the reason there is no `progress=`. And the text it draws is agent text, so
+   §8.3 applies inside a face exactly as it does outside one.
+
+A card with no rows and no `status=` shows **no state**. The count has nothing
+to count and nobody asserted one, so a `Todo` pill on a lead would be a claim
+nobody made.
 
 ### 4.13 `@board`
 
@@ -750,11 +862,12 @@ text shown beside it.
 
 | Attribute | Default | Meaning |
 |---|---|---|
-| `render` | `bar` | `bar` `column` `line` `spark` `dot` |
+| `render` | `bar` | `bar` `column` `line` `spark` `dot` `stat` |
 | `unit` | -- | suffix printed after every value. `ms`, `%`, `GB` |
 | `max` `min` | derived | move the range. **Neither may exclude a value** (§4.16.2). |
 | `goal` | -- | a reference marker, and it extends the range so it is on screen |
 | `values` | -- | `3,5,4,9` -- a series with no labels, for the one-line case |
+| `better` | -- | `up` or `down`: which way a `stat` change is good news (§4.16.5) |
 | `as` | -- | the timestamp the data was read, exactly as on a `@card` |
 
 **4.16.1 The number is never only in the pixels.**
@@ -843,6 +956,61 @@ accessibility goes to die. Put two charts side by side in a `@grid`.
 `values=` is sugar and the rows are the grammar: a block with both keeps the
 rows and warns, because an agent that wrote both meant the rows and forgot to
 delete the shorthand. The dashed rule is `goal=`.
+
+**4.16.5 `render=stat` is a number that knows what it was.**
+
+The dashboard tile: one figure, big, and how it moved. The most common chart
+an agent has any business drawing, because "signups this week" is usually one
+number and the only question anyone asks about it is "compared to what".
+
+```anvil
+@chart id=outreach render=stat better=up as=14:02
+? Outreach today
+- Read   | 40 | was=34
+- Leads  | 12 | was=9
+- Sent   | 9
+- Failed | 2  | was=0 | better=down
+```
+
+```
+   ╭─ Outreach today ─────────────────────────────── 4 values ──╮
+   │                                                            │
+   │  Read          Leads         Sent          Failed          │
+   │  40            12            9             2               │
+   │  ↗ +6 · +18%   ↗ +3 · +33%                 ↗ +2            │
+   │  from 34       from 9                      from 0          │
+   │                                                            │
+   ╰──────────────────────────────── as of 14:02 · snapshot ────╯
+```
+
+`was=` is a trailing cell on the row, unordered like an option's `img=`. **There
+is no `delta=`**, for the reason there is no `progress=` (§4.12.1). The agent
+supplies the two numbers it actually read, and the change, the percentage and
+the direction are arithmetic. An agent that types `+18%` beside a 40 that was a
+34 is right today and wrong the day it edits one number and not the other.
+
+The change is printed **in the units the agent wrote**. Two values written in
+thousands differ in thousands, so `4.8k` from `4.1k` is `+0.7k`, never `+700`
+and never the `0.6999999` a float subtraction produces. A value that is already
+a percentage changes in **points** and gets no ratio on top: `99.2%` from
+`99.9%` is `-0.7 pts`, because `-0.7% (-0.7%)` is the sentence that makes people
+stop reading. A `was=` of zero has no base, so it gets the difference and no
+percentage. The base is printed too, `from 34`, so every figure on the tile can
+be checked against another one on the same tile.
+
+**The verdict is only ever the author's.** `Failed +2` goes up and is bad news;
+`Leads +3` goes up and is good. The arithmetic knows the direction and nothing
+else, so the tone comes from `better=up|down` on the block, overridden per row,
+and without it the change is drawn **neutral**. Colouring a rise green because
+rises are usually good is the chart guessing what the agent meant, and it is
+wrong on every error rate, every cost and every latency. The tone is also said
+in words to a screen reader, `better` or `worse`, because otherwise it is only a
+colour.
+
+A stat has **no scale**. Nothing is drawn against a range, so `min=`, `max=` and
+`goal=` have nowhere to go and warn rather than being parsed and dropped. And
+`was=` on any other mode warns the same way: a bar has nowhere to print a
+change. Rows past 24 are counted, exactly as in `bar`.
 
 ### 4.17 `@flow`
 

@@ -6,7 +6,7 @@
  * the only place the streaming state survives, so this is one of the few
  * integrations that can detect an unclosed fence on its own (see isFenceClosed).
  */
-import { renderAnvilFence } from '@anvil-md/render-html'
+import { type AnvilHost, renderAnvilFence } from '@anvil-md/render-html'
 
 /** The shape of marked's `code` token that we rely on. */
 export interface CodeToken {
@@ -27,6 +27,11 @@ export interface AnvilMarkedOptions {
 	 * regex entirely.
 	 */
 	closed?: (token: CodeToken) => boolean
+	/**
+	 * Faces a host registers for `@card type=` values (SPEC §4.12.5). Without
+	 * it every card draws the stock body.
+	 */
+	host?: AnvilHost
 }
 
 /**
@@ -63,7 +68,7 @@ export function anvilMarked(opts: AnvilMarkedOptions = {}) {
 		renderer: {
 			code(this: unknown, token: CodeToken): string | false {
 				if (token?.lang !== lang) return false
-				return renderAnvilFence(token.text ?? '', closed(token))
+				return renderAnvilFence(token.text ?? '', closed(token), opts.host)
 			},
 		},
 	}
@@ -79,5 +84,5 @@ export function renderAnvilToken(
 ): string | null {
 	const lang = opts.lang ?? 'anvil'
 	if (token?.lang !== lang) return null
-	return renderAnvilFence(token.text ?? '', (opts.closed ?? isFenceClosed)(token))
+	return renderAnvilFence(token.text ?? '', (opts.closed ?? isFenceClosed)(token), opts.host)
 }

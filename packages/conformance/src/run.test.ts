@@ -86,7 +86,7 @@ function checkBlock(actual: AnvilBlock, want: BlockExpectation, where: string): 
   if (want.dataDeltas) {
     const got = actual.data.map(d => {
       const x = chartDelta(actual, d)
-      return x ? { diff: x.diff, pct: x.pct, tone: x.tone } : null
+      return x ? { diff: x.diff, pct: x.pct, tone: String(x.tone) } : null
     })
     expect(got, at('data deltas')).toEqual(want.dataDeltas)
   }

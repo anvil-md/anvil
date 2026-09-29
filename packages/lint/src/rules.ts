@@ -275,6 +275,9 @@ export const RULES: Rule[] = [
     run(blocks, report) {
       for (const b of blocks) {
         if (b.kind === 'note' || b.kind === 'message' || isContainer(b.kind)) continue
+        // A card with chips or prose is a record -- a lead, a contact (§4.12.5)
+        // -- and draws both. It is not the empty frame this rule is looking for.
+        if (b.kind === 'card' && (b.meta.length || b.prose.trim())) continue
         const rows =
           b.options.length + b.fields.length + b.dials.length + b.tasks.length + b.data.length + b.nodes.length + b.edges.length
         if (rows > 0) continue

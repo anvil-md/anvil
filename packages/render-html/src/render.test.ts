@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { renderAnvilFence } from './render'
+import { type CardFace, renderAnvilFence } from './render'
 
 const CHOICE = `@choice id=deploy-target
 ? Where should I ship this?
@@ -683,6 +683,101 @@ describe('flow', () => {
 
   test('an empty flow is an empty flow', () => {
     expect(renderAnvilFence('@flow id=f', true)).toContain('No steps.')
+  })
+})
+
+describe('host faces', () => {
+  const LEAD = `@card id=demo.bakery type=lead as=09:00
+? @demo.bakery
+: Demo Bakery · Stockholm
++ score 82 | Local food
+> Posts daily, answers comments, sells online.`
+
+  const lead: CardFace = (b, { esc }) =>
+    `<div class="lead">${b.meta
+      .flat()
+      .map(c => `<b>${esc(c)}</b>`)
+      .join('')}<p>${esc(b.prose)}</p></div>`
+
+  test('a registered type draws its face inside the language frame', () => {
+    const html = renderAnvilFence(LEAD, true, { faces: { lead } })
+    expect(html).toContain('data-face="lead"')
+    expect(html).toContain('<div class="lead">')
+    // The frame is still the language's: title, subtext, snapshot footer.
+    expect(html).toContain('@demo.bakery')
+    expect(html).toContain('Demo Bakery · Stockholm')
+    expect(html).toContain('snapshot · as of 09:00')
+  })
+
+  test('a host with no face for the type draws the stock card with the same facts', () => {
+    for (const host of [undefined, {}, { faces: { contact: lead } }]) {
+      const html = renderAnvilFence(LEAD, true, host)
+      expect(html).not.toContain('data-face')
+      expect(html).toContain('score 82')
+      expect(html).toContain('Posts daily')
+    }
+  })
+
+  test('keys match case-insensitively, and an inherited key is not a face', () => {
+    expect(renderAnvilFence(LEAD.replace('type=lead', 'type=LEAD'), true, { faces: { Lead: lead } })).toContain(
+      'data-face="lead"',
+    )
+    for (const t of ['__proto__', 'constructor', 'toString']) {
+      const html = renderAnvilFence(LEAD.replace('type=lead', `type=${t}`), true, { faces: { lead } })
+      expect(html).not.toContain('data-face')
+    }
+  })
+
+  test('a face that drops a fact is named on the frame', () => {
+    const lossy: CardFace = () => '<p>just a picture</p>'
+    const html = renderAnvilFence(LEAD, true, { faces: { lead: lossy } })
+    expect(html).toContain(
+      'face &quot;lead&quot; did not draw &quot;score 82&quot;, &quot;Local food&quot;, &quot;Posts daily, answers comments, sells online.&quot;',
+    )
+  })
+
+  test('a face that throws falls back to the stock body and says so', () => {
+    const broken: CardFace = () => {
+      throw new Error('host bug')
+    }
+    const html = renderAnvilFence(LEAD, true, { faces: { lead: broken } })
+    expect(html).toContain('face &quot;lead&quot; failed; drawn as a plain card')
+    expect(html).toContain('score 82')
+  })
+
+  test('a record with chips and prose and no rows does not announce missing subtasks', () => {
+    expect(renderAnvilFence(LEAD, true)).not.toContain('No subtasks.')
+    expect(renderAnvilFence('@card id=c\n? Empty', true)).toContain('No subtasks.')
+  })
+
+  test('a question is never drawn by a face', () => {
+    const html = renderAnvilFence(
+      '@card id=c type=lead ask="Add to outreach?"\n- [ ] add | Add\n- [ ] skip | Skip',
+      true,
+      { faces: { lead } },
+    )
+    expect(html).not.toContain('data-face')
+    expect(html).toContain('anvil-task-pick')
+  })
+
+  test('a face can decorate the stock body rather than redraw it', () => {
+    const framed: CardFace = (_b, { stock }) => `<div class="ring">${stock()}</div>`
+    const html = renderAnvilFence(CARD.replace('type=story', 'type=lead'), true, { faces: { lead: framed } })
+    expect(html).toContain('<div class="ring">')
+    expect(html).not.toContain('did not draw')
+  })
+
+  test('a card with no rows and no status= claims no state', () => {
+    const html = renderAnvilFence(LEAD, true)
+    expect(html).not.toContain('anvil-status')
+    expect(html).not.toContain('data-state=')
+    // An authored status on a row-less card is still a claim somebody made.
+    expect(renderAnvilFence('@card id=c status=blocked\n? Waiting on legal', true)).toContain('data-state="blocked"')
+  })
+
+  test('faces reach cards inside layout', () => {
+    const html = renderAnvilFence(`@grid cols=2\n${LEAD}\n@end`, true, { faces: { lead } })
+    expect(html).toContain('data-face="lead"')
   })
 })
 

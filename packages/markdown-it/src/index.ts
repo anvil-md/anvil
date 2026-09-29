@@ -6,7 +6,7 @@
  * integration cannot detect a still-streaming fence on its own -- pass `closed`
  * if your host knows. See the README.
  */
-import { renderAnvilFence } from '@anvil-md/render-html'
+import { type AnvilHost, renderAnvilFence } from '@anvil-md/render-html'
 
 interface FenceToken {
 	info?: string
@@ -30,6 +30,11 @@ export interface AnvilMarkdownItOptions {
 	 * delimiters, so this cannot be inferred here. Default `true`.
 	 */
 	closed?: (token: FenceToken) => boolean
+	/**
+	 * Faces a host registers for `@card type=` values (SPEC §4.12.5). Without
+	 * it every card draws the stock body.
+	 */
+	host?: AnvilHost
 }
 
 /**
@@ -51,7 +56,7 @@ export function anvilMarkdownIt(opts: AnvilMarkdownItOptions = {}) {
 			const token = tokens[idx]
 			// info can carry attributes after the language: ```anvil foo=bar
 			const lang = (token?.info ?? '').trim().split(/\s+/)[0]
-			if (lang === want) return renderAnvilFence(token?.content ?? '', closed(token ?? {}))
+			if (lang === want) return renderAnvilFence(token?.content ?? '', closed(token ?? {}), opts.host)
 			if (!fallback) throw new Error('@anvil-md/markdown-it: no default fence renderer to fall back to')
 			return fallback(tokens, idx, ...rest)
 		}

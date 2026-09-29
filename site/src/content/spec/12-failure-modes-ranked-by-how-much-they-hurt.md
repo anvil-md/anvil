@@ -45,3 +45,8 @@ summary: "Twenty-two ways to get this wrong, ranked by how much each one hurts, 
 | 36 | A partial grant recorded as `connected` | the refused scopes stay on the block and in the stamp (§4.18.4) |
 | 37 | A connect block that goes red when the token lapses | it is a receipt of a grant, not a status light; emit a new one (§4.18.6) |
 | 38 | A Disconnect button on a stamped grant | revoking is a different action, not an un-answer (§4.18.6, §7.1 law I) |
+| 39 | Disabled controls with no reason, shown to someone who cannot answer | the host names who the block waits on, from the rule it enforces (§8.2.1) |
+| 40 | A hand-typed `+18%` beside a number it no longer describes | `was=` is authored, the change is computed; there is no `delta=` (§4.16.5) |
+| 41 | A rise coloured green because rises are usually good | the tone is `better=`'s, never guessed; neutral without it (§4.16.5) |
+| 42 | A product record added as a new `@kind` | a `@card type=` with a host face; every other host still draws the card (§4.12.5) |
+| 43 | A host face that quietly drops a row | the frame names what the face did not draw (§4.12.5) |

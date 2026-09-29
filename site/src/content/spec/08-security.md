@@ -31,6 +31,29 @@ Give it its own permission. Do not fold it into a general "can read the
 conversation" grant -- being able to *see* a question is not consent to *answer*
 it on someone else's behalf.
 
+**8.2.1 A viewer who cannot answer is told who can.**
+
+A shared transcript puts the same open block in front of people with different
+permissions. For the ones who cannot stamp it, a row of disabled buttons with no
+reason attached reads as a broken widget, and they will report it, retry it, or
+ask the agent why it is stuck. So the block keeps its full height (§9.2), keeps
+its controls drawn and disabled, and carries one line saying who it is waiting
+on:
+
+```
+   waiting on an org admin
+```
+
+**The host writes that line, never the agent.** There is no `to=` on an ASK
+block and there must not be one. The server already knows who may stamp,
+because it enforces exactly that on the write, and the line is read off the same
+rule. An agent-authored "only Ana can answer this" is a claim nobody checks. The
+day it disagrees with the real gate, the transcript tells one person to wait for
+somebody who cannot answer either.
+
+A viewer who *can* stamp sees no such line. Telling someone the block waits on
+them is the prompt, restated.
+
 ### 8.3 Agent-authored values in attribute position
 
 `swatch`, `font` and `img` land in `style` and `src` attributes, where escaping

@@ -2,6 +2,8 @@ import { describe, expect, test } from 'bun:test'
 import { anvilRemark } from './index'
 
 const BODY = '@choice id=x\n? Q\n- a | A'
+const LEAD = '@card id=l type=lead\n? @demo.bakery\n+ score 82'
+const host = { faces: { lead: () => '<i>score 82</i>' } }
 const tree = () => ({
 	type: 'root',
 	children: [
@@ -41,6 +43,12 @@ describe('anvilRemark', () => {
 		const t = tree()
 		anvilRemark({ closed: false })(t)
 		expect(t.children[1]?.value).toContain('anvil-doc-streaming')
+	})
+
+	test('a host face reaches the renderer', () => {
+		const t = { type: 'root', children: [{ type: 'code', lang: 'anvil', value: LEAD }] }
+		anvilRemark({ host })(t)
+		expect(t.children[0]?.value).toContain('data-face="lead"')
 	})
 
 	test('a childless tree is survivable', () => {

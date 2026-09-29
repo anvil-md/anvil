@@ -455,7 +455,11 @@ export function renderCard(b: AnvilBlock): string {
     ? `<div class="anvil-prompt anvil-card-ask"><span class="anvil-icon">${icon('list-checks')}</span>${esc(ask)}</div>`
     : ''
   const tally = b.tasks.some(t => t.total !== undefined) ? renderTally(b) : ''
-  return `${renderProgress(b)}${tally}${cardProse(b)}${head}${renderTasks(b)}${renderChips(b)}`
+  // "No subtasks." is the honest empty state for a card with nothing in it. On
+  // a record that carries prose and chips -- a lead, a contact -- it announces
+  // an absence nobody was looking for.
+  const record = !b.tasks.length && !ask && (b.prose.trim() || b.meta.length)
+  return `${renderProgress(b)}${tally}${cardProse(b)}${head}${record ? '' : renderTasks(b)}${renderChips(b)}`
 }
 
 /**

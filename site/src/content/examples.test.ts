@@ -12,6 +12,7 @@ import { lint } from '@anvil-md/lint'
 import { type AnvilBlock, parseAnvil } from '@anvil-md/parser'
 import { renderAnvilFence } from '@anvil-md/render-html'
 import { EXAMPLES, GROUPS } from './examples'
+import { DEMO_HOST } from './faces'
 
 /** The one example that is supposed to fail every rule it touches. */
 const DELIBERATELY_BROKEN = 'degrading'

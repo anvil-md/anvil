@@ -12,15 +12,16 @@ summary: "The whole language on one screen."
    │ @input    typed fields            @scale   sliders between poles     │
    │ @connect  scopes are rows         @order   drag to rank              │
    │ common: id= select=one|many min= max= submit= icon= expires=         │
-   │         optional danger phrase=                                      │
+   │         optional danger phrase= recommend=<value> (marks, not picks) │
    │ @connect provider= state= granted= · mark is host-chosen, never img= │
    ├── SHOW / CONTROL ────────────────────────────────────────────────────┤
    │ @note tone=info|warn|danger (markdown body)                          │
    │ @code lang= label=   @example for=<id>   @void id= reason=           │
    │ @card type= status= as= ask=      @board max= as=                    │
    │ the bar is COUNTED from the rows. there is no progress=              │
-   │ @chart render=bar|column|line|spark|dot  unit= max= min= goal=       │
+   │ @chart render=bar|column|line|spark|dot|stat  unit= max= min= goal=  │
    │        values=3,5,4   one series · no axes · no sort · floor is 0    │
+   │        stat: - Label | 40 | was=34   better=up|down · no delta=      │
    │ @flow  dir=right|down   arrow makes a row an edge, else it is a node │
    ├── LAYOUT ────────────────────────────────────────────────────────────┤
    │ @grid cols=<max, 1-6> min= gap=tight|normal|loose frame              │

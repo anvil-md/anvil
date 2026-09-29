@@ -2,6 +2,7 @@
 import Masthead from '@/components/Masthead.astro'
 import SiteFooter from '@/components/SiteFooter.astro'
 import { GROUPS } from '@/content/examples'
+import { DEMO_HOST } from '@/content/faces'
 import { ghostHtml } from '@/scripts/highlight'
 import BaseLayout from '@/layouts/BaseLayout.astro'
 import { parseAnvil } from '@anvil-md/parser'
@@ -17,7 +18,7 @@ const rendered = GROUPS.map((group) => ({
 	...group,
 	examples: group.examples.map((ex) => ({
 		...ex,
-		html: renderAnvilFence(ex.source, true),
+		html: renderAnvilFence(ex.source, true, ex.host ? DEMO_HOST : undefined),
 		ghost: ghostHtml(ex.source),
 		blocks: parseAnvil(ex.source).blocks.length,
 	})),
@@ -240,5 +241,60 @@ const total = rendered.reduce((n, g) => n + g.examples.length, 0)
 
 	.ex-out {
 		min-height: 4rem;
+	}
+
+	/* The demo host's `lead` face (content/faces.ts). Host CSS, not anvil.css:
+	   a face is the host's to style, and it inherits the block's tokens. */
+	.ex-out :global(.lead-face) {
+		display: flex;
+		gap: 0.75rem;
+		align-items: flex-start;
+		margin-top: 0.65rem;
+		padding: 0.7rem 0.75rem;
+		border: 1px solid var(--anvil-border);
+		border-radius: var(--anvil-radius-sm);
+	}
+
+	.ex-out :global(.lead-mark) {
+		flex: none;
+		display: grid;
+		place-items: center;
+		width: 2.4rem;
+		height: 2.4rem;
+		border-radius: 999px;
+		background: var(--anvil-surface);
+		font-family: var(--anvil-mono);
+		font-size: 0.8em;
+		font-weight: 600;
+		letter-spacing: 0.04em;
+	}
+
+	.ex-out :global(.lead-main) {
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+	}
+
+	.ex-out :global(.lead-chips) {
+		margin: 0;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0 0.6rem;
+		font-size: 0.82em;
+		font-weight: 500;
+	}
+
+	/* The first chip is the score: the one thing a sales list is sorted by. */
+	.ex-out :global(.lead-chips span:first-child) {
+		font-family: var(--anvil-mono);
+		color: var(--anvil-ok);
+	}
+
+	.ex-out :global(.lead-why) {
+		margin: 0;
+		font-size: 0.85em;
+		line-height: 1.45;
+		color: var(--anvil-muted-fg);
 	}
 </style>
