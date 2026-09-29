@@ -796,6 +796,13 @@
   flex: none;
 }
 
+/* `Kit · 3/7`: the assignee takes the push to the right edge and the count
+   sits beside it. Two auto margins would split the space and strand Kit
+   mid-row. */
+.anvil-task-meta + .anvil-task-roll {
+  margin-left: 0;
+}
+
 /* A row with detail is focusable, so the detail reaches a keyboard and a
    thumb. See the note in blocks.ts: hover-only is the same failure as
    drag-only ranking in §9. */

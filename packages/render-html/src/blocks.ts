@@ -325,9 +325,11 @@ function taskRowInner(t: AnvilTask): string {
   const label = `<span class="anvil-task-label">${esc(t.label)}</span>`
   // A child that carries its own n/m draws its own bar. An epic is a card whose
   // rows happen to be cards.
+  // `Kit · 3/7` is an assignee AND a count. Drawing only the count dropped Kit.
+  const beside = t.meta ? `<span class="anvil-task-meta">${esc(t.meta)}</span>` : ''
   const meta =
     t.total !== undefined && t.done !== undefined
-      ? `<span class="anvil-task-roll">${bar(t.done, t.total, `${t.done} of ${t.total} done`, ' anvil-bar-mini')}<span class="anvil-count">${t.done}/${t.total}</span></span>`
+      ? `${beside}<span class="anvil-task-roll">${bar(t.done, t.total, `${t.done} of ${t.total} done`, ' anvil-bar-mini')}<span class="anvil-count">${t.done}/${t.total}</span></span>`
       : t.meta
         ? `<span class="anvil-task-meta">${esc(t.meta)}</span>`
         : ''

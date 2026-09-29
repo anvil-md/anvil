@@ -530,6 +530,14 @@ describe('regressions', () => {
     expect(renderAnvilFence('@choice id=c\n+ chip\n- a | A', true)).toContain('only drawn on')
   })
 
+  test('a rolled-up row keeps the text beside its count', () => {
+    // `Kit · 3/7` is an assignee AND a rollup (§4.12.1). The bar and the 3/7
+    // were drawn and Kit was parsed and then dropped.
+    const html = renderAnvilFence('@card id=e type=epic\n- [~] ANV-114 | Retry ladder | Kit · 3/7', true)
+    expect(html).toContain('3/7')
+    expect(html).toContain('Kit')
+  })
+
   test('both dark palettes define the same tokens', async () => {
     // The OS-dark block forgot --anvil-ok, so prefers-color-scheme users got the
     // light-mode green on a near-black background (~3.8:1) while .dark users got
