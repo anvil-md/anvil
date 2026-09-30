@@ -482,7 +482,12 @@ export function renderBoard(b: AnvilBlock): string {
       const items = shown
         .map(t => {
           const ref = t.ref === t.label ? '' : `<span class="anvil-task-ref">${esc(t.ref)}</span>`
-          return `<li class="anvil-lane-item">${ref}<span class="anvil-task-label">${esc(t.label)}</span></li>`
+          // The meta is why the card is in this lane as often as not -- "not a
+          // lead", "blocked on ANV-117" -- and it was parsed and then dropped.
+          const count = t.total !== undefined ? `${t.done}/${t.total}` : ''
+          const meta = [t.meta, count].filter(Boolean).join(' · ')
+          const line = meta ? `<span class="anvil-lane-meta">${esc(meta)}</span>` : ''
+          return `<li class="anvil-lane-item">${ref}<span class="anvil-task-label">${esc(t.label)}</span>${line}</li>`
         })
         .join('')
       // "+N more" is never silent: a board that quietly truncates reads as a

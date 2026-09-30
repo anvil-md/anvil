@@ -979,6 +979,11 @@
   overflow-wrap: anywhere;
 }
 
+.anvil-lane-meta {
+  font-size: 0.86em;
+  color: var(--anvil-muted-fg);
+}
+
 .anvil-more {
   margin: 0;
   font-size: 0.7em;

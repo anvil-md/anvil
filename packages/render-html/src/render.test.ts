@@ -530,6 +530,15 @@ describe('regressions', () => {
     expect(renderAnvilFence('@choice id=c\n+ chip\n- a | A', true)).toContain('only drawn on')
   })
 
+  test('a board lane keeps each card\'s meta', () => {
+    // The lane drew ref and label and dropped the meta: a blocked lane lost the
+    // reason every card in it was blocked.
+    const html = renderAnvilFence('@board id=b\n- [!] x | @x | not a lead\n- [~] e | Epic | Kit · 3/7', true)
+    expect(html).toContain('not a lead')
+    expect(html).toContain('Kit')
+    expect(html).toContain('3/7')
+  })
+
   test('a rolled-up row keeps the text beside its count', () => {
     // `Kit · 3/7` is an assignee AND a rollup (§4.12.1). The bar and the 3/7
     // were drawn and Kit was parsed and then dropped.
