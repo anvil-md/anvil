@@ -16,7 +16,9 @@ import {
   type AnvilBlock,
   type AnvilDoc,
   type AnvilField,
+  blockA11y,
   checkField,
+  optionAlt,
   chartDelta,
   chartDomain,
   flowGraph,
@@ -113,6 +115,13 @@ function checkBlock(actual: AnvilBlock, want: BlockExpectation, where: string): 
   }
   if (want.edges) expect(actual.edges.map(e => `${e.from}>${e.to}`), at('edges')).toEqual(want.edges)
 
+  if (want.a11y) {
+    const a = blockA11y(actual)
+    for (const [k, v] of Object.entries(want.a11y)) {
+      expect(a[k as keyof typeof a], at(`a11y.${k}`)).toBe(v as never)
+    }
+  }
+  if (want.optionAlts) expect(actual.options.map(optionAlt), at('option alts')).toEqual(want.optionAlts)
   if (want.fieldTypes) expect(actual.fields.map(f => String(f.type)), at('field types')).toEqual(want.fieldTypes)
   for (const v of want.verdicts ?? []) {
     const field = actual.fields.find(f => f.name === v.field)
@@ -196,7 +205,7 @@ describe('conformance corpus', () => {
     const covered = coveredSections()
     // Not "every section" -- §6 and §7 are stamping, which the reference
     // implementation does not ship. These are the ones it can be held to.
-    for (const s of ['4.1', '4.3', '4.3.1', '4.5', '4.8', '4.12.1', '4.13', '4.14', '4.15.1', '4.16.2', '4.17.3', '8.3', '11']) {
+    for (const s of ['4.1', '4.3', '4.3.1', '9.13', '4.5', '4.8', '4.12.1', '4.13', '4.14', '4.15.1', '4.16.2', '4.17.3', '8.3', '11']) {
       expect(covered, `no case pins §${s}`).toContain(s)
     }
   })

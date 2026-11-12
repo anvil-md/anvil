@@ -23,6 +23,7 @@ import {
   type AnvilTask,
   attrNumber,
   attrString,
+  blockA11y,
   type ChartRender,
   chartDelta,
   chartDomain,
@@ -41,6 +42,7 @@ import {
   messageChrome,
   messageState,
   type NoteTone,
+  optionAlt,
   recipients,
   recommended,
   type TaskState,
@@ -98,6 +100,35 @@ function optionMeta(o: AnvilOption): string {
  * the only row that looks pressable (§4.1.1): a single-select stamps on the
  * click, so a row that arrives chosen is the agent answering its own question.
  */
+/**
+ * A block's accessibility, as the attributes for its outermost element plus
+ * the screen-reader-only text they point at (§9.13).
+ *
+ * Only what was AUTHORED becomes an attribute. The inferred name and
+ * description are the prompt and subtext, already on screen and already read
+ * in order; restating them as `aria-label` would make a screen reader say the
+ * prompt twice.
+ */
+export function a11yAttrs(b: AnvilBlock): { attrs: string; sr: string } {
+  const a = blockA11y(b)
+  if (a.hidden) return { attrs: ' aria-hidden="true"', sr: '' }
+  const parts: string[] = []
+  let sr = ''
+  if (attrString(b, 'alt').trim()) parts.push(` role="group" aria-label="${esc(a.label)}"`)
+  if (attrString(b, 'desc').trim()) {
+    const id = `anvil-desc-${slugId(b.id || b.kind)}`
+    parts.push(` aria-describedby="${id}"`)
+    sr = `<span class="anvil-sr" id="${id}">${esc(a.description)}</span>`
+  }
+  if (a.live !== 'off') parts.push(` aria-live="${a.live}"`)
+  return { attrs: parts.join(''), sr }
+}
+
+/** A row's own accessible name, only when `alt=` gave it one. */
+function rowLabel(o: AnvilOption): string {
+  return o.alt?.trim() ? ` aria-label="${esc(optionAlt(o))}"` : ''
+}
+
 const REC_TAG = '<span class="anvil-rec">recommended</span>'
 
 function recAttr(on: boolean): string {
@@ -112,7 +143,7 @@ export function renderChoice(b: AnvilBlock): string {
     .map((o, i) => {
       const danger = o.danger ? ' anvil-row-danger' : ''
       const mine = o.value === rec
-      return `<button type="button" class="anvil-row${danger}"${recAttr(mine)} disabled>
+      return `<button type="button" class="anvil-row${danger}"${recAttr(mine)}${rowLabel(o)} disabled>
         <span class="anvil-key">${multi ? MARK : esc(String(i + 1))}</span>
         <span class="anvil-row-main"><span class="anvil-label">${esc(o.label)}</span>${optionMeta(o)}${mine ? REC_TAG : ''}</span>
       </button>`
@@ -129,7 +160,10 @@ const FACES: Record<GalleryRender, (o: AnvilOption) => string> = {
       .filter((c): c is string => c !== null)
       .map(c => `<i style="background:${c}"></i>`)
       .join('')
-    return `<span class="anvil-swatch">${chips || '<i class="anvil-swatch-empty"></i>'}</span>`
+    // Hex chips mean nothing read aloud. With alt= they become one image with
+    // a name; without it they stay out of the way and the label names the card.
+    const named = o.alt?.trim() ? ` role="img" aria-label="${esc(optionAlt(o))}"` : ' aria-hidden="true"'
+    return `<span class="anvil-swatch"${named}>${chips || '<i class="anvil-swatch-empty"></i>'}</span>`
   },
   type: o => {
     const fam = o.font ? safeFont(o.font) : null
@@ -139,7 +173,7 @@ const FACES: Record<GalleryRender, (o: AnvilOption) => string> = {
   image: o => {
     const url = o.img ? safeUrl(o.img) : null
     if (!url) return '<span class="anvil-img anvil-img-missing"></span>'
-    return `<img class="anvil-img" src="${esc(url)}" alt="${esc(o.label)}" loading="lazy">`
+    return `<img class="anvil-img" src="${esc(url)}" alt="${esc(optionAlt(o))}" loading="lazy">`
   },
   card: () => '',
 }
@@ -286,7 +320,8 @@ export function renderNote(b: AnvilBlock): string {
   // A note carries its own warnings INSIDE the tinted box. The shell cannot
   // append them, because a note has no frame to append them to and they would
   // float naked in the transcript.
-  return `<div class="anvil-note ${cls}"><span class="anvil-icon">${mark}</span><div class="anvil-note-body">${paras}${warnings(b)}</div></div>`
+  const a11y = a11yAttrs(b)
+  return `<div class="anvil-note ${cls}"${a11y.attrs}><span class="anvil-icon">${mark}</span><div class="anvil-note-body">${paras}${warnings(b)}${a11y.sr}</div></div>`
 }
 
 /* ── card and board ──────────────────────────────────────────────────────── */

@@ -14,6 +14,7 @@
  *   info  -- a nudge; a good agent would have written it differently
  */
 import {
+  A11Y_ATTRS,
   type AnvilBlock,
   attrString,
   isContainer,
@@ -64,7 +65,7 @@ function isAsk(b: AnvilBlock): boolean {
 }
 
 /** Attributes every block may carry, whatever its kind. */
-const COMMON_ATTRS = new Set(['id', 'icon', 'as'])
+const COMMON_ATTRS = new Set(['id', 'icon', 'as', ...A11Y_ATTRS])
 
 const ASK_ATTRS = new Set(['select', 'submit', 'min', 'max', 'expires', 'optional', 'danger', 'phrase'])
 

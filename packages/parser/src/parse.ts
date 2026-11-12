@@ -10,6 +10,7 @@
  * Row parsing lives in rows.ts; this file is the line dispatch and the block
  * assembly, nothing else.
  */
+import { a11yProblems } from './a11y'
 import {
   parseDatum,
   parseDial,
@@ -317,6 +318,7 @@ function finish(block: AnvilBlock, body: string[]): AnvilBlock {
   if (block.prose && block.kind === 'board') {
     block.warnings.push('@board has no prose body; use a @note beside it')
   }
+  block.warnings.push(...a11yProblems(block))
   return block
 }
 
@@ -366,6 +368,8 @@ export function parseAnvil(source: string, opts: { partial?: boolean } = {}): An
     if (opened.block.attrs.id) {
       opened.block.warnings.push('layout has no id: a @grid or @stack is never stamped, voided or targeted')
     }
+    // A container is placed at open time and never passes through finish().
+    opened.block.warnings.push(...a11yProblems(opened.block))
     // A container has no identity: it is never stamped, never voided, never
     // referenced by a `for=`. An id here would imply it could be.
     opened.block.id = ''

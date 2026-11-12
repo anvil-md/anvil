@@ -21,7 +21,7 @@ import Testing
 struct ConformanceTests {
     @Test("the corpus loaded, so a zero-case pass is impossible")
     func corpusIsPresent() {
-        #expect(Corpus.cases.count == 101, "found \(Corpus.cases.count) cases at \(Corpus.repositoryRoot.path)")
+        #expect(Corpus.cases.count == 109, "found \(Corpus.cases.count) cases at \(Corpus.repositoryRoot.path)")
     }
 
     /// Prints the score. A conformance suite that can be filtered without
@@ -119,6 +119,16 @@ struct ConformanceTests {
             }
             if let edges = want.edges {
                 #expect(got.edges.map(\.wire) == edges, "\(testCase.id): block \(index) edges")
+            }
+            if let a11y = want.a11y {
+                let have = got.a11y
+                if let label = a11y.label { #expect(have.label == label, "\(testCase.id): a11y label") }
+                if let text = a11y.description { #expect(have.description == text, "\(testCase.id): a11y description") }
+                if let live = a11y.live { #expect(have.live.rawValue == live, "\(testCase.id): a11y live") }
+                if let hidden = a11y.hidden { #expect(have.hidden == hidden, "\(testCase.id): a11y hidden") }
+            }
+            if let alts = want.optionAlts {
+                #expect(got.options.map(\.accessibleName) == alts, "\(testCase.id): block \(index) optionAlts")
             }
             if let types = want.fieldTypes {
                 #expect(got.fields.map(\.type) == types, "\(testCase.id): block \(index) fieldTypes")

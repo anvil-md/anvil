@@ -44,6 +44,9 @@ const CELL_SETTERS: Record<string, (opt: AnvilOption, val: string) => void> = {
   sample: (o, v) => {
     o.sample = v
   },
+  alt: (o, v) => {
+    o.alt = v
+  },
   swatch: (o, v) => {
     o.swatch = v
       .split(',')
@@ -52,9 +55,9 @@ const CELL_SETTERS: Record<string, (opt: AnvilOption, val: string) => void> = {
   },
 }
 
-const CELL_KV = /^(img|swatch|font|sample)\s*=\s*(.*)$/i
+const CELL_KV = /^(img|swatch|font|sample|alt)\s*=\s*(.*)$/i
 
-/** `- [!]value | Label | hint | img=… | swatch=… | font=… | sample=…` */
+/** `- [!]value | Label | hint | img=… | swatch=… | font=… | sample=… | alt=…` */
 export function parseOption(rest: string, block: AnvilBlock): void {
   const parts = cells(rest)
   let head = parts.shift() ?? ''

@@ -35,7 +35,7 @@ extension AnvilParser {
     }
 
     /// The keys an option row may carry as trailing `key=value` cells.
-    static let optionKeys: Set = ["img", "swatch", "font", "sample"]
+    static let optionKeys: Set = ["img", "swatch", "font", "sample", "alt"]
 
     /// Splits an option row's cells after the value into the positional ones
     /// (label, hint, side) and the `key=value` ones, which are unordered.

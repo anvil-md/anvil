@@ -57,6 +57,10 @@ export interface BlockExpectation {
   edges?: string[]
   /** The subset of `edges` the layout had to lift out of ranking (§4.17.3). */
   backEdges?: string[]
+  /** What the block is to assistive technology, inferred and authored (§9.13). */
+  a11y?: { label?: string; description?: string; live?: string; hidden?: boolean }
+  /** Each row's accessible name: its `alt=` cell, else its label (§9.13). */
+  optionAlts?: string[]
   /** @input field types after fallback, in row order (§4.3). */
   fieldTypes?: string[]
   /**

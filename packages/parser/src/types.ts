@@ -131,6 +131,8 @@ export interface AnvilOption {
   swatch?: string[]
   font?: string
   sample?: string
+  /** `alt=` -- the row's accessible name, when its face says nothing to a screen reader (§9.13). */
+  alt?: string
 }
 
 /** A `_` row in an @input. */

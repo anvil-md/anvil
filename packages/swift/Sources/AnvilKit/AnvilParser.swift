@@ -169,6 +169,9 @@ public enum AnvilParser {
             warnings.append(contentsOf: builder.statusWarnings(line: builder.headerLine))
             warnings.append(contentsOf: builder.flowWarnings(line: builder.headerLine))
             warnings.append(contentsOf: builder.recommendWarnings(line: builder.headerLine))
+            warnings.append(contentsOf: AnvilA11yRules.problems(
+                kind: builder.resolvedKind, attributes: builder.attributes, line: builder.headerLine
+            ))
             let finished = builder.build()
             if containers.isEmpty { blocks.append(finished) } else { containers[containers.count - 1].children.append(finished) }
             current = nil
@@ -225,6 +228,10 @@ public enum AnvilParser {
 
                 if builder.resolvedKind?.isContainer == true {
                     closeCurrent()
+                    // A container never passes through closeCurrent's checks.
+                    warnings.append(contentsOf: AnvilA11yRules.problems(
+                        kind: builder.resolvedKind, attributes: builder.attributes, line: lineNumber
+                    ))
                     if containers.count >= Self.maxLayoutDepth {
                         // SPEC 4.14: two deep is the cap. A third is flattened
                         // into the one already open rather than parsed into a

@@ -53,10 +53,21 @@ enum Corpus {
         var domain: Domain?
         var nodeIds: [String]?
         var edges: [String]?
+        /// SPEC 9.13: what the block is to assistive technology.
+        var a11y: A11y?
+        /// SPEC 9.13: each row's accessible name.
+        var optionAlts: [String]?
         /// SPEC 4.3: field types after fallback, in row order.
         var fieldTypes: [String]?
         /// SPEC 4.3.1: `check` run on a value. `reason` only when given.
         var verdicts: [Verdict]?
+    }
+
+    struct A11y: Sendable, Codable {
+        var label: String?
+        var description: String?
+        var live: String?
+        var hidden: Bool?
     }
 
     struct Verdict: Sendable, Codable {

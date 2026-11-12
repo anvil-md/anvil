@@ -23,13 +23,16 @@ summary: "The whole language on one screen."
    │        values=3,5,4   one series · no axes · no sort · floor is 0    │
    │        stat: - Label | 40 | was=34   better=up|down · no delta=      │
    │ @flow  dir=right|down   arrow makes a row an edge, else it is a node │
+   ├── ANY BLOCK ─────────────────────────────────────────────────────────┤
+   │ alt= desc= live=off|polite|assertive   decorative (SHOW blocks only) │
+   │ name and description are inferred from ? and : unless these are set │
    ├── LAYOUT ────────────────────────────────────────────────────────────┤
    │ @grid cols=<max, 1-6> min= gap=tight|normal|loose frame              │
    │ @stack gap=            @end  (or the end of the fence)               │
    │ 2 deep max · no id · no coordinates · no breakpoints                 │
    ├── LINES ─────────────────────────────────────────────────────────────┤
    │ ? prompt          : subtext          # comment (never rendered)      │
-   │ - value | Label | hint | img= swatch= font= sample=   (! = danger)   │
+   │ - value | Label | hint | img= swatch= font= sample= alt= (! danger)  │
    │ - [ ] ref | Label | meta    [ ]todo [~]flight [x]done [!]blocked     │
    │ - Label | 42 | note           a @chart datum                         │
    │ - a -> b | label   - a -- b   a @flow edge  (-> --> => → )           │

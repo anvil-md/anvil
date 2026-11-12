@@ -302,6 +302,85 @@
       }
     },
     {
+      "id": "a11y-inferred-from-what-is-on-screen",
+      "spec": "9.13",
+      "title": "with no attributes, the prompt is the name and the subtext the description",
+      "source": "@choice id=c\n? Where should it go?\n: Staging is wiped nightly.\n- prod | Production",
+      "expect": {
+        "blocks": [{ "a11y": { "label": "Where should it go?", "description": "Staging is wiped nightly.", "live": "off", "hidden": false } }],
+        "htmlExcludes": ["aria-label=\"Where should it go?\""],
+        "warnings": []
+      }
+    },
+    {
+      "id": "a11y-authored-beats-inferred",
+      "spec": "9.13",
+      "title": "alt= and desc= replace the inferred name and description",
+      "source": "@chart id=s render=spark alt=\"Signups doubled since March\" desc=\"Weekly signups, January to June\"\n? Signups\n- 3\n- 6",
+      "expect": {
+        "blocks": [{ "a11y": { "label": "Signups doubled since March", "description": "Weekly signups, January to June", "live": "off", "hidden": false } }],
+        "htmlContains": ["aria-label=\"Signups doubled since March\"", "Weekly signups, January to June"],
+        "warnings": []
+      }
+    },
+    {
+      "id": "a11y-danger-note-announces-itself",
+      "spec": "9.13",
+      "title": "a danger note is announced when it arrives, and live= can quiet it",
+      "source": "@note tone=danger\n> Production is down\n\n@note tone=danger live=off\n> Old incident, resolved",
+      "expect": {
+        "blocks": [{ "a11y": { "live": "assertive" } }, { "a11y": { "live": "off" } }],
+        "htmlCount": { "aria-live=\"assertive\"": 1 },
+        "warnings": []
+      }
+    },
+    {
+      "id": "a11y-unknown-live-warns",
+      "spec": "9.13",
+      "title": "a live= outside the set is named and the inferred mode is kept",
+      "source": "@note live=loud\n> Deploy finished",
+      "expect": { "blocks": [{ "a11y": { "live": "off" } }], "warningsContain": ["live=\"loud\""] }
+    },
+    {
+      "id": "a11y-a-record-can-be-decorative",
+      "spec": "9.13",
+      "title": "decorative hides a block that asks nothing",
+      "source": "@chart id=s render=spark decorative\n- 3\n- 6",
+      "expect": {
+        "blocks": [{ "a11y": { "hidden": true } }],
+        "htmlContains": ["aria-hidden=\"true\""],
+        "warnings": []
+      }
+    },
+    {
+      "id": "a11y-a-question-is-never-hidden",
+      "spec": "9.13",
+      "title": "decorative on a block that asks, or on layout around one, is refused",
+      "source": "@choice id=c decorative\n? Ship it?\n- y | Yes\n\n@grid decorative\n@note\n> beside it\n@end",
+      "expect": {
+        "blocks": [{ "kind": "choice", "a11y": { "hidden": false } }, { "kind": "grid" }],
+        "warningsContain": ["a question cannot be hidden", "would hide every block inside it"]
+      }
+    },
+    {
+      "id": "a11y-row-alt-names-the-face",
+      "spec": "9.13",
+      "title": "an alt= cell names an image or swatch row; without one the label does",
+      "source": "@gallery id=g render=swatch\n? Which palette?\n- warm | Warm | swatch=#c2410c,#fde68a | alt=Rust and sand\n- cold | Cold | swatch=#0f172a,#38bdf8",
+      "expect": {
+        "blocks": [{ "optionValues": ["warm", "cold"], "optionLabels": ["Warm", "Cold"], "optionAlts": ["Rust and sand", "Cold"] }],
+        "htmlContains": ["role=\"img\" aria-label=\"Rust and sand\""],
+        "warnings": []
+      }
+    },
+    {
+      "id": "a11y-empty-alt-is-named",
+      "spec": "9.13",
+      "title": "an alt with no words is ignored out loud",
+      "source": "@chart id=s alt=\"\" render=spark\n- 1",
+      "expect": { "blocks": [{ "a11y": { "label": "" } }], "warningsContain": ["alt= needs words"] }
+    },
+    {
       "id": "backslash-that-escapes-nothing-is-kept",
       "spec": "3.1",
       "title": "only \\| is an escape in a cell; every other backslash is the author's",

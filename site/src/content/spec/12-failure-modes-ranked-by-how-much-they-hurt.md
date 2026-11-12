@@ -53,3 +53,5 @@ summary: "Twenty-two ways to get this wrong, ranked by how much each one hurts, 
 | 44 | An agent-written pattern that hangs the phone | the dialect matches in linear time; no platform regex engine (§4.3.1) |
 | 45 | A check no value can pass, so the block can never stamp | an impossible check is dropped at parse time, with a warning (§4.3.1) |
 | 46 | A value the client checked and the server took on trust | the server runs `checkField` on the stamp (§4.3.1, §8.1) |
+| 47 | A question hidden from a screen reader | `decorative` is refused on any block that asks (§9.13) |
+| 48 | A prompt read out twice | an explicit label only when `alt=` was authored (§9.13) |

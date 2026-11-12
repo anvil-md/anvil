@@ -34,6 +34,7 @@ import {
   taskProgress,
 } from '@anvil-md/parser'
 import {
+  a11yAttrs,
   cardProse,
   CHANNEL_ICON,
   esc,
@@ -162,11 +163,12 @@ function shell(block: AnvilBlock, partial: boolean): string {
     : ''
   const sub = block.subtext ? `<div class="anvil-subtext">${esc(block.subtext)}</div>` : ''
   const state = partial ? 'streaming' : 'preview'
+  const a11y = a11yAttrs(block)
 
   // Order matters: warnings explain the body, so they belong ABOVE the action
   // rather than orphaned underneath it.
-  return `<section class="anvil-block" data-anvil-id="${esc(block.id)}" data-anvil-kind="${esc(block.kind)}">
-    ${head}${sub}${body}${warnings(block)}${submitBar(block)}
+  return `<section class="anvil-block" data-anvil-id="${esc(block.id)}" data-anvil-kind="${esc(block.kind)}"${a11y.attrs}>
+    ${head}${sub}${a11y.sr}${body}${warnings(block)}${submitBar(block)}
     <footer class="anvil-foot"><span>${state}</span></footer>
   </section>`
 }
@@ -300,11 +302,12 @@ function recordShell(block: AnvilBlock, partial: boolean, host?: AnvilHost): str
 
   // Before warnings(): a face that drops a fact adds the warning that says so.
   const body = cardBody(block, partial, host)
+  const a11y = a11yAttrs(block)
 
   // A board has no single state -- that is the whole point of having lanes -- so
   // it does not claim one.
-  return `<section class="anvil-block anvil-card-block" data-anvil-id="${esc(block.id)}" data-anvil-kind="${esc(block.kind)}"${board || !claimed ? '' : ` data-state="${status}"`}>
-    ${head}${heading}${sub}${body}${warnings(block)}${submitBar(block)}
+  return `<section class="anvil-block anvil-card-block" data-anvil-id="${esc(block.id)}" data-anvil-kind="${esc(block.kind)}"${board || !claimed ? '' : ` data-state="${status}"`}${a11y.attrs}>
+    ${head}${heading}${sub}${a11y.sr}${body}${warnings(block)}${submitBar(block)}
     <footer class="anvil-foot"><span>${esc(foot)}</span></footer>
   </section>`
 }
@@ -340,8 +343,9 @@ function dataShell(block: AnvilBlock, partial: boolean): string {
   const as = attrString(block, 'as')
   const foot = [partial ? 'streaming' : 'snapshot', as ? `as of ${as}` : ''].filter(Boolean).join(' · ')
 
-  return `<section class="anvil-block anvil-card-block anvil-data-block" data-anvil-id="${esc(block.id)}" data-anvil-kind="${esc(block.kind)}">
-    ${head}${sub}${cardProse(block)}${(BODIES[block.kind] ?? renderNote)(block)}${warnings(block)}
+  const a11y = a11yAttrs(block)
+  return `<section class="anvil-block anvil-card-block anvil-data-block" data-anvil-id="${esc(block.id)}" data-anvil-kind="${esc(block.kind)}"${a11y.attrs}>
+    ${head}${sub}${a11y.sr}${cardProse(block)}${(BODIES[block.kind] ?? renderNote)(block)}${warnings(block)}
     <footer class="anvil-foot"><span>${esc(foot)}</span></footer>
   </section>`
 }
@@ -435,9 +439,10 @@ function messageShell(block: AnvilBlock, partial: boolean): string {
   const foot = [partial ? 'streaming' : STATE_FOOT[state], when ? `at ${when}` : ''].filter(Boolean).join(' · ')
 
   const danger = block.attrs.danger ? ' anvil-msg-danger' : ''
+  const a11y = a11yAttrs(block)
 
-  return `<section class="anvil-block anvil-card-block anvil-msg anvil-msg-${chrome}${danger}" data-anvil-id="${esc(block.id)}" data-anvil-kind="message" data-channel="${esc(channel)}" data-state="${state}" data-locked="${locked ? 'yes' : 'no'}">
-    ${head}${subject}${sub}${renderMessage(block)}${warnings(block)}${gateOrReceipt(block, state)}
+  return `<section class="anvil-block anvil-card-block anvil-msg anvil-msg-${chrome}${danger}" data-anvil-id="${esc(block.id)}" data-anvil-kind="message" data-channel="${esc(channel)}" data-state="${state}" data-locked="${locked ? 'yes' : 'no'}"${a11y.attrs}>
+    ${head}${subject}${sub}${a11y.sr}${renderMessage(block)}${warnings(block)}${gateOrReceipt(block, state)}
     <footer class="anvil-foot"><span>${esc(foot)}</span></footer>
   </section>`
 }
@@ -526,9 +531,11 @@ function layoutShell(block: AnvilBlock, partial: boolean, host?: AnvilHost): str
   const framed = block.attrs.frame ? ' anvil-layout-framed' : ''
   const inner = block.children.map(c => renderBlock(c, partial, host)).join('')
   const shape = block.kind === 'grid' ? 'anvil-auto' : 'anvil-stack'
+  // `decorative` never reaches here as hidden: blockA11y refuses it on layout.
+  const a11y = a11yAttrs(block)
 
-  return `<div class="anvil-layout${framed}" data-anvil-kind="${esc(block.kind)}">
-    ${title}${warnings(block)}
+  return `<div class="anvil-layout${framed}" data-anvil-kind="${esc(block.kind)}"${a11y.attrs}>
+    ${title}${a11y.sr}${warnings(block)}
     <div class="${shape}" style="${vars.join(';')}">${inner}</div>
   </div>`
 }

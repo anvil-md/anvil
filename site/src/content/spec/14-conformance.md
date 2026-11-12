@@ -29,6 +29,8 @@ An implementation is **ANVIL v1 conformant** if:
 13. Field checks give the corpus's verdicts, a `pattern=` matches in time
     linear in the value, and a check no value could satisfy is dropped with a
     warning rather than kept.
+14. Every block exposes the corpus's accessible name, description, live mode
+    and hidden flag, and a block that asks is never hidden.
 
 Reference implementation: [`packages/parser`](./packages/parser) and
 [`packages/render-html`](./packages/render-html).
