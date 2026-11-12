@@ -99,8 +99,8 @@ public extension AnvilParser {
     /// c` is two edges and the middle node is shared.
     static func edges(in row: String) -> (edges: [AnvilEdge], selfLoops: [String]) {
         let cells = cells(row)
-        guard let path = cells.first else { return ([], []) }
-        let label = cells.count > 1 ? cells[1] : nil
+        guard let path = cells.cell(0) else { return ([], []) }
+        let label = cells.cell(1)
 
         // -> --> => and the arrow character all mean the same thing; -- is
         // undirected.

@@ -21,7 +21,7 @@ import Testing
 struct ConformanceTests {
     @Test("the corpus loaded, so a zero-case pass is impossible")
     func corpusIsPresent() {
-        #expect(Corpus.cases.count == 117,"found \(Corpus.cases.count) cases at \(Corpus.repositoryRoot.path)")
+        #expect(Corpus.cases.count == 118,"found \(Corpus.cases.count) cases at \(Corpus.repositoryRoot.path)")
     }
 
     /// Prints the score. A conformance suite that can be filtered without

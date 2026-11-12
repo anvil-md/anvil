@@ -59,7 +59,9 @@ literal  = "~~~" , NL , { any } , "~~~" , NL ;
 
 Pipes are the only column separator. Pad them for readability; the parser trims.
 A literal pipe inside a label is `\|`. Trailing `key=value` cells are unordered,
-so `| img=… | Editorial |` and `| Editorial | img=…` are equivalent.
+so `| img=… | Editorial |` and `| Editorial | img=…` are equivalent. An empty
+cell keeps its column: `- a | | a hint` has no label and a hint, never the hint
+promoted to a label.
 
 ### 3.3 Why `~~~` and not backticks
 

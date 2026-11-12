@@ -390,6 +390,16 @@
         "warnings": []
       }
     },
+    {
+      "id": "empty-cell-keeps-its-column",
+      "spec": "3.2",
+      "title": "an empty label cell leaves the label to the value; the hint after it is never promoted",
+      "source": "@choice id=c\n? Which?\n- a | | a hint\n- b | B",
+      "expect": {
+        "blocks": [{ "optionValues": ["a", "b"], "optionLabels": ["a", "B"] }],
+        "warnings": []
+      }
+    },
 
     {
       "id": "card-progress-is-counted",

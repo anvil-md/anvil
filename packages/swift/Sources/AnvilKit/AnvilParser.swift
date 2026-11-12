@@ -418,7 +418,7 @@ public enum AnvilParser {
                 data.append(
                     AnvilDatum(
                         index: data.count, label: label, value: value, raw: raw,
-                        note: positional.count > 1 ? positional[1] : nil,
+                        note: positional.cell(1),
                         was: was, wasRaw: wasRaw, better: better
                     )
                 )
@@ -436,9 +436,11 @@ public enum AnvilParser {
                     )
                 }
                 let cells = AnvilParser.cells(box.rest)
-                let ref = cells.first ?? ""
-                let label = cells.count > 1 ? cells[1] : ref
-                let meta = cells.count > 2 ? cells[2] : nil
+                guard let ref = cells.cell(0) else {
+                    return warnings + [AnvilWarning("task row with no ref", line: line)]
+                }
+                let label = cells.cell(1) ?? ref
+                let meta = cells.cell(2)
 
                 // SPEC 4.12.1: a count read off the END of the meta cell, and
                 // only when it is genuinely separated.
@@ -452,33 +454,32 @@ public enum AnvilParser {
                         state: box.state,
                         ref: ref,
                         label: label,
-                        meta: cells.count > 2 ? cells[2] : nil,
+                        meta: meta,
                         detail: nil
                     )
                 )
                 // The value is the REF, never the box glyph.
                 options.append(
-                    AnvilOption(id: ref, title: label, subtitle: cells.count > 2 ? cells[2] : nil,
-                                side: nil, destructive: destructive)
+                    AnvilOption(id: ref, title: label, subtitle: meta, side: nil, destructive: destructive)
                 )
                 return warnings
             }
 
             let all = AnvilParser.cells(text)
-            guard let value = all.first else { return [] }
+            guard let value = all.cell(0) else { return [AnvilWarning("option row with no value", line: line)] }
 
             // `- value | Label | hint | img= swatch= font= sample=`. The
             // key=value cells are unordered and never positional: read as the
             // fourth cell, `swatch=#111,#fff` was drawn at the human as text.
             let (cells, attributes) = AnvilParser.optionCells(all.dropFirst())
 
-            // With one cell the value IS the label.
+            // With one cell, or an empty label cell, the value IS the label.
             options.append(
                 AnvilOption(
                     id: value,
-                    title: cells.first ?? value,
-                    subtitle: cells.count > 1 ? cells[1] : nil,
-                    side: cells.count > 2 ? cells[2] : nil,
+                    title: cells.cell(0) ?? value,
+                    subtitle: cells.cell(1),
+                    side: cells.cell(2),
                     destructive: destructive,
                     attributes: attributes
                 )
@@ -504,7 +505,7 @@ public enum AnvilParser {
         /// `+ chip | chip | chip`. Kept as attributes so nothing is parsed and
         /// then silently dropped.
         func addChips(_ body: String) {
-            let cells = AnvilParser.cells(body)
+            let cells = AnvilParser.cells(body).filter { !$0.isEmpty }
             guard !cells.isEmpty else { return }
             attributes["chips"] = cells.joined(separator: "|")
         }
@@ -519,9 +520,10 @@ public enum AnvilParser {
 
         func addField(_ body: String, line: Int) -> [AnvilWarning] {
             let all = AnvilParser.cells(body)
-            guard var name = all.first else { return [] }
+            var name = all.cell(0) ?? ""
             let required = name.hasSuffix("*")
-            if required { name = String(name.dropLast()) }
+            if required { name = String(name.dropLast()).trimmingCharacters(in: .whitespaces) }
+            guard !name.isEmpty else { return [AnvilWarning("field row with no name", line: line)] }
 
             // SPEC 4.3.1: `min=` `max=` `pattern=` `error=` are trailing
             // key=value cells, unordered, like an option row's `img=`. The
@@ -542,13 +544,13 @@ public enum AnvilParser {
             // SPEC 4.3: a type outside the closed set falls back to `text` AND
             // says so. Silently rendering a text box for `emial` would hide a
             // typo the author can still fix.
-            let raw = cells.first ?? "text"
+            let raw = cells.cell(0) ?? "text"
             let (type, fellBack) = AnvilFieldType.resolve(raw)
             let (settled, complaints) = AnvilChecks.settle(
                 name: name, type: type, required: required, raw: checks, line: line
             )
 
-            let label = cells.count > 1 ? cells[1] : nil
+            let label = cells.cell(1)
             fields.append(
                 AnvilDocument.Field(
                     id: name,
@@ -557,7 +559,7 @@ public enum AnvilParser {
                     required: required,
                     hint: label,
                     label: label ?? AnvilParser.titleCase(name),
-                    placeholder: cells.count > 2 ? cells[2] : nil,
+                    placeholder: cells.cell(2),
                     checks: settled
                 )
             )
@@ -567,13 +569,15 @@ public enum AnvilParser {
 
         func addScale(_ body: String, line: Int) -> [AnvilWarning] {
             let cells = AnvilParser.cells(body)
-            guard cells.count >= 3 else { return [] }
+            // Like the reference: a dial needs a name, and a missing pole is
+            // `Less` / `More` rather than a row dropped without a word.
+            guard let name = cells.cell(0) else { return [AnvilWarning("scale row with no name", line: line)] }
 
             // SPEC 4.8: the knob stays on its track. A default outside
             // 1...steps would place the handle off the rail, so it is clamped
             // and reported rather than drawn at 300%.
             let steps = Int(attributes["steps"] ?? "") ?? 5
-            let authored = cells.count > 3 ? Int(cells[3]) : nil
+            let authored = cells.cell(3).flatMap { Int($0) }
             var warnings: [AnvilWarning] = []
             var value = authored
             if let authored, authored < 1 || authored > steps {
@@ -585,10 +589,10 @@ public enum AnvilParser {
 
             scales.append(
                 AnvilDocument.Scale(
-                    id: cells[0],
-                    name: cells[0],
-                    low: cells[1],
-                    high: cells[2],
+                    id: name,
+                    name: name,
+                    low: cells.cell(1) ?? "Less",
+                    high: cells.cell(2) ?? "More",
                     value: value
                 )
             )
@@ -838,6 +842,17 @@ public enum AnvilParser {
         }
         if pending { cell.append("\\") }
         cells.append(cell.trimmingCharacters(in: .whitespaces))
-        return cells.filter { !$0.isEmpty || cells.count == 1 }
+        // Every column, empty ones included (SPEC 3.2). Filtering the empties
+        // out shifted the row left: `- a | | a hint` drew the hint as the
+        // label. A caller reads an empty cell as absent with `cell(_:)`.
+        return cells
+    }
+}
+
+extension [String] {
+    /// The cell at `index`, or nil when the row is shorter or the cell is
+    /// empty. An empty cell keeps its column and means "not given" (SPEC 3.2).
+    func cell(_ index: Int) -> String? {
+        indices.contains(index) && !self[index].isEmpty ? self[index] : nil
     }
 }
