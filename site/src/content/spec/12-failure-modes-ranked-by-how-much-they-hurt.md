@@ -50,3 +50,6 @@ summary: "Twenty-two ways to get this wrong, ranked by how much each one hurts, 
 | 41 | A rise coloured green because rises are usually good | the tone is `better=`'s, never guessed; neutral without it (§4.16.5) |
 | 42 | A product record added as a new `@kind` | a `@card type=` with a host face; every other host still draws the card (§4.12.5) |
 | 43 | A host face that quietly drops a row | the frame names what the face did not draw (§4.12.5) |
+| 44 | An agent-written pattern that hangs the phone | the dialect matches in linear time; no platform regex engine (§4.3.1) |
+| 45 | A check no value can pass, so the block can never stamp | an impossible check is dropped at parse time, with a warning (§4.3.1) |
+| 46 | A value the client checked and the server took on trust | the server runs `checkField` on the stamp (§4.3.1, §8.1) |

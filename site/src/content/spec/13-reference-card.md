@@ -33,13 +33,14 @@ summary: "The whole language on one screen."
    │ - [ ] ref | Label | meta    [ ]todo [~]flight [x]done [!]blocked     │
    │ - Label | 42 | note           a @chart datum                         │
    │ - a -> b | label   - a -- b   a @flow edge  (-> --> => → )           │
-   │ _ name[*] | type | Label | placeholder                               │
+   │ _ name[*] | type | Label | placeholder | min= max= pattern= error=   │
    │ % name | leftPole | rightPole | default                              │
    │ + chip | chip | chip          (a card's meta strip)                  │
    │ = field=value     > prose, or the detail of the task above           │
    │ ~~~ … ~~~  literal                                                   │
    ├── FIELD TYPES ───────────────────────────────────────────────────────┤
-   │ text  longtext  number  bool  secret  path  url  date                │
+   │ text  longtext  number  bool  secret  path  url  date  email         │
+   │ pattern= matches the WHOLE value, in linear time · \| for a pipe     │
    ├── STAMP ─────────────────────────────────────────────────────────────┤
    │ <stamp block="…" kind="…" value(s)= label(s)= [at= by=]>             │
    │   <field name=…>  <file name= mime= ref=>  <url href= title=>        │

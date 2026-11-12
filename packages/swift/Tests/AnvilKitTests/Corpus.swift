@@ -53,6 +53,17 @@ enum Corpus {
         var domain: Domain?
         var nodeIds: [String]?
         var edges: [String]?
+        /// SPEC 4.3: field types after fallback, in row order.
+        var fieldTypes: [String]?
+        /// SPEC 4.3.1: `check` run on a value. `reason` only when given.
+        var verdicts: [Verdict]?
+    }
+
+    struct Verdict: Sendable, Codable {
+        var field: String
+        var value: String
+        var ok: Bool
+        var reason: String?
     }
 
     /// A stat row's computed change. `pct` is null when `was` is zero.

@@ -5,7 +5,8 @@
  * Every function here is total: a malformed row records a warning on the block
  * and returns, never throws.
  */
-import type { AnvilBlock, AnvilDatum, AnvilOption, FieldType, FlowShape, TaskState } from './types'
+import { FIELD_CHECK_KEYS, settleChecks } from './checks'
+import type { AnvilBlock, AnvilDatum, AnvilField, AnvilOption, FieldType, FlowShape, TaskState } from './types'
 import { chartBetter, chartNumber, FIELD_TYPES, FLOW_SHAPES } from './types'
 
 const FIELD_TYPE_SET = new Set<string>(FIELD_TYPES)
@@ -86,25 +87,57 @@ function titleCase(name: string): string {
   return name.replace(/[_-]+/g, ' ').replace(/^./, c => c.toUpperCase())
 }
 
-/** `_ name[*] | type | Label | placeholder` */
+/**
+ * A check cell on a field row. `(.*)` takes the rest of the cell, so a pattern
+ * keeps its own `=` and `,`; a literal `|` inside one is written `\|`, exactly
+ * as in a label, because the cell split runs first.
+ */
+const FIELD_KV = new RegExp(`^(${FIELD_CHECK_KEYS.join('|')})\\s*=\\s*(.*)$`, 'i')
+
+/** `"x"` -> `x`, only when the quotes are a matched pair: a pattern may end in `'`. */
+function unquote(v: string): string {
+  const t = v.trim()
+  if (t.length >= 2 && (t[0] === '"' || t[0] === "'") && t[t.length - 1] === t[0]) return t.slice(1, -1)
+  return t
+}
+
+/** `_ name[*] | type | Label | placeholder | min= | max= | pattern= | error=` */
 export function parseField(rest: string, block: AnvilBlock): void {
-  const [rawName = '', rawType = '', label = '', placeholder = ''] = cells(rest)
+  const [rawName = '', ...after] = cells(rest)
   const required = rawName.endsWith('*')
   const name = (required ? rawName.slice(0, -1) : rawName).trim()
   if (!name) {
     block.warnings.push('field row with no name')
     return
   }
+
+  // Trailing key=value cells are unordered, like an option row's img=, and the
+  // positional cells are whatever is left -- so `| min=3 | Label` still reads.
+  const positional: string[] = []
+  const raw: Partial<Record<(typeof FIELD_CHECK_KEYS)[number], string>> = {}
+  for (const cell of after) {
+    const kv = FIELD_KV.exec(cell)
+    if (!kv) {
+      positional.push(cell)
+      continue
+    }
+    raw[(kv[1] ?? '').toLowerCase() as (typeof FIELD_CHECK_KEYS)[number]] = unquote(kv[2] ?? '')
+  }
+  const [rawType = '', label = '', placeholder = ''] = positional
+
   const lower = rawType.toLowerCase()
   const known = FIELD_TYPE_SET.has(lower)
   if (rawType && !known) block.warnings.push(`unknown field type "${rawType}", using text`)
-  block.fields.push({
+  const field: AnvilField = {
     name,
     type: known ? (lower as FieldType) : 'text',
     label: label || titleCase(name),
     placeholder: placeholder || undefined,
     required,
-  })
+    checks: {},
+  }
+  settleChecks(field, raw, block)
+  block.fields.push(field)
 }
 
 /**

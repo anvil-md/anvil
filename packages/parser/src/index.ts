@@ -4,6 +4,10 @@
  * Zero dependencies, no DOM, no framework. Runs anywhere JavaScript runs.
  */
 export { parseAnvil } from './parse'
+export { checkField, FIELD_CHECK_KEYS, inputReady } from './checks'
+export type { CheckReason, FieldChecks, FieldVerdict } from './checks'
+export { compilePattern, matchPattern, MAX_MATCH_LENGTH, MAX_PATTERN_BOUND, MAX_PATTERN_LENGTH } from './pattern'
+export type { Pattern, PatternVerdict } from './pattern'
 export {
   ANVIL_KINDS,
   CHART_BETTER,

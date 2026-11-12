@@ -60,6 +60,257 @@
       "source": "@input id=i\n_ token | secret | API key",
       "expect": { "htmlContains": ["type=\"password\""] }
     },
+    {
+      "id": "input-email-is-a-type",
+      "spec": "4.3.1",
+      "title": "an email field checks its shape loosely and refuses an empty required value",
+      "source": "@input id=i\n_ mail* | email | Email",
+      "expect": {
+        "blocks": [
+          {
+            "kind": "input",
+            "fieldTypes": ["email"],
+            "verdicts": [
+              { "field": "mail", "value": "ana+gate@example.co", "ok": true },
+              { "field": "mail", "value": "ana@localhost", "ok": false, "reason": "format" },
+              { "field": "mail", "value": "a na@example.com", "ok": false, "reason": "format" },
+              { "field": "mail", "value": "", "ok": false, "reason": "required" }
+            ]
+          }
+        ],
+        "warnings": []
+      }
+    },
+    {
+      "id": "input-length-counts-code-points",
+      "spec": "4.3.1",
+      "title": "min= and max= on a text field count characters, not UTF-16 units",
+      "source": "@input id=i\n_ code | text | Code | min=3 | max=5",
+      "expect": {
+        "blocks": [
+          {
+            "verdicts": [
+              { "field": "code", "value": "ab", "ok": false, "reason": "min" },
+              { "field": "code", "value": "abcdef", "ok": false, "reason": "max" },
+              { "field": "code", "value": "abc", "ok": true },
+              { "field": "code", "value": "😀😀😀", "ok": true },
+              { "field": "code", "value": "", "ok": true }
+            ]
+          }
+        ],
+        "warnings": []
+      }
+    },
+    {
+      "id": "input-number-range",
+      "spec": "4.3.1",
+      "title": "min= and max= on a number field are a range, and the value must be a plain number",
+      "source": "@input id=i\n_ seats* | number | Seats | min=1 | max=40",
+      "expect": {
+        "blocks": [
+          {
+            "verdicts": [
+              { "field": "seats", "value": "0", "ok": false, "reason": "min" },
+              { "field": "seats", "value": "41", "ok": false, "reason": "max" },
+              { "field": "seats", "value": "12", "ok": true },
+              { "field": "seats", "value": "12.5", "ok": true },
+              { "field": "seats", "value": "1e3", "ok": false, "reason": "format" },
+              { "field": "seats", "value": "ten", "ok": false, "reason": "format" }
+            ]
+          }
+        ],
+        "warnings": []
+      }
+    },
+    {
+      "id": "input-date-range",
+      "spec": "4.3.1",
+      "title": "a date field bounds by date and refuses a day the calendar does not have",
+      "source": "@input id=i\n_ day | date | Day | min=2026-11-01 | max=2026-11-30",
+      "expect": {
+        "blocks": [
+          {
+            "verdicts": [
+              { "field": "day", "value": "2026-10-31", "ok": false, "reason": "min" },
+              { "field": "day", "value": "2026-11-15", "ok": true },
+              { "field": "day", "value": "2026-12-01", "ok": false, "reason": "max" },
+              { "field": "day", "value": "2026-02-30", "ok": false, "reason": "format" }
+            ]
+          }
+        ],
+        "warnings": []
+      }
+    },
+    {
+      "id": "input-pattern-matches-the-whole-value",
+      "spec": "4.3.1",
+      "title": "a pattern is anchored at both ends whether or not it says so",
+      "source": "@input id=i\n_ phone | text | Phone | pattern=\\d{10} | error=Ten digits, no spaces",
+      "expect": {
+        "blocks": [
+          {
+            "verdicts": [
+              { "field": "phone", "value": "0701234567", "ok": true },
+              { "field": "phone", "value": "tel 0701234567", "ok": false, "reason": "pattern" },
+              { "field": "phone", "value": "070123456", "ok": false, "reason": "pattern" }
+            ]
+          }
+        ],
+        "warnings": []
+      }
+    },
+    {
+      "id": "input-pattern-pipe-is-escaped",
+      "spec": "4.3.1",
+      "title": "an alternation inside a pattern writes its pipe as \\| because the cell split runs first",
+      "source": "@input id=i\n_ answer | text | Answer | pattern=yes\\|no",
+      "expect": {
+        "blocks": [
+          {
+            "verdicts": [
+              { "field": "answer", "value": "yes", "ok": true },
+              { "field": "answer", "value": "no", "ok": true },
+              { "field": "answer", "value": "maybe", "ok": false, "reason": "pattern" }
+            ]
+          }
+        ],
+        "warnings": []
+      }
+    },
+    {
+      "id": "input-pattern-digit-is-ascii",
+      "spec": "4.3.1",
+      "title": "\\d means 0-9 on every platform, not every Unicode digit",
+      "source": "@input id=i\n_ n | text | N | pattern=\\d+",
+      "expect": {
+        "blocks": [
+          {
+            "verdicts": [
+              { "field": "n", "value": "42", "ok": true },
+              { "field": "n", "value": "٤٢", "ok": false, "reason": "pattern" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "input-pattern-is-linear",
+      "spec": "4.3.1",
+      "title": "a pattern that hangs a backtracking engine answers at once",
+      "source": "@input id=i\n_ s | text | S | pattern=(a+)+$",
+      "expect": {
+        "blocks": [
+          {
+            "verdicts": [
+              { "field": "s", "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab", "ok": false, "reason": "pattern" },
+              { "field": "s", "value": "aaaa", "ok": true }
+            ]
+          }
+        ],
+        "warnings": []
+      }
+    },
+    {
+      "id": "input-pattern-outside-the-dialect-is-dropped",
+      "spec": "4.3.1",
+      "title": "lookaround and backreferences are refused by name and the field goes unchecked",
+      "source": "@input id=i\n_ pw | secret | Password | pattern=(?=.*\\d).{8,}\n_ twin | text | Twin | pattern=(\\w)\\1",
+      "expect": {
+        "blocks": [
+          {
+            "verdicts": [
+              { "field": "pw", "value": "short", "ok": true },
+              { "field": "twin", "value": "ab", "ok": true }
+            ]
+          }
+        ],
+        "warningsContain": ["lookahead is not in the dialect", "backreferences are not in the dialect"]
+      }
+    },
+    {
+      "id": "input-impossible-range-is-dropped",
+      "spec": "4.3.1",
+      "title": "a range no value can satisfy is dropped rather than locking the block forever",
+      "source": "@input id=i\n_ code | text | Code | min=5 | max=2",
+      "expect": {
+        "blocks": [{ "verdicts": [{ "field": "code", "value": "abc", "ok": true }] }],
+        "warningsContain": ["no value could pass"]
+      }
+    },
+    {
+      "id": "input-required-switch-means-on",
+      "spec": "4.3.1",
+      "title": "a switch always has a value, so a required one must be switched on",
+      "source": "@input id=i\n_ agree* | bool | I agree to the terms",
+      "expect": {
+        "blocks": [
+          {
+            "verdicts": [
+              { "field": "agree", "value": "false", "ok": false, "reason": "required" },
+              { "field": "agree", "value": "true", "ok": true }
+            ]
+          }
+        ],
+        "warnings": []
+      }
+    },
+    {
+      "id": "input-empty-optional-skips-checks",
+      "spec": "4.3.1",
+      "title": "a field the human may skip is never held to its pattern when skipped",
+      "source": "@input id=i\n_ code | text | Code | pattern=[A-Z]{3}",
+      "expect": {
+        "blocks": [
+          {
+            "verdicts": [
+              { "field": "code", "value": "", "ok": true },
+              { "field": "code", "value": "ab", "ok": false, "reason": "pattern" },
+              { "field": "code", "value": "ABC", "ok": true }
+            ]
+          }
+        ],
+        "warnings": []
+      }
+    },
+    {
+      "id": "input-check-cells-are-unordered",
+      "spec": "4.3.1",
+      "title": "check cells may sit anywhere after the name; the positional cells are what is left",
+      "source": "@input id=i\n_ zip* | min=5 | text | max=5 | Postcode | pattern=\\d+",
+      "expect": {
+        "blocks": [
+          {
+            "fieldTypes": ["text"],
+            "verdicts": [
+              { "field": "zip", "value": "12345", "ok": true },
+              { "field": "zip", "value": "1234", "ok": false, "reason": "min" },
+              { "field": "zip", "value": "1234a", "ok": false, "reason": "pattern" }
+            ]
+          }
+        ],
+        "warnings": []
+      }
+    },
+    {
+      "id": "input-checks-that-mean-nothing-warn",
+      "spec": "4.3.1",
+      "title": "a pattern on a number and an error= with nothing to explain are named, never kept quietly",
+      "source": "@input id=i\n_ n | number | N | pattern=\\d+\n_ note | text | Note | error=Too long",
+      "expect": {
+        "blocks": [{ "verdicts": [{ "field": "n", "value": "4.5", "ok": true }] }],
+        "warningsContain": ["pattern= does not apply to a number field", "error= has no check to explain"]
+      }
+    },
+    {
+      "id": "backslash-that-escapes-nothing-is-kept",
+      "spec": "3.1",
+      "title": "only \\| is an escape in a cell; every other backslash is the author's",
+      "source": "@choice id=c\n? Where?\n- win | C:\\Users | a path\n- either | a\\|b",
+      "expect": {
+        "blocks": [{ "optionValues": ["win", "either"], "optionLabels": ["C:\\Users", "a|b"] }],
+        "warnings": []
+      }
+    },
 
     {
       "id": "card-progress-is-counted",

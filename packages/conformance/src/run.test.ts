@@ -15,6 +15,8 @@ import { describe, expect, test } from 'bun:test'
 import {
   type AnvilBlock,
   type AnvilDoc,
+  type AnvilField,
+  checkField,
   chartDelta,
   chartDomain,
   flowGraph,
@@ -110,6 +112,17 @@ function checkBlock(actual: AnvilBlock, want: BlockExpectation, where: string): 
     }
   }
   if (want.edges) expect(actual.edges.map(e => `${e.from}>${e.to}`), at('edges')).toEqual(want.edges)
+
+  if (want.fieldTypes) expect(actual.fields.map(f => String(f.type)), at('field types')).toEqual(want.fieldTypes)
+  for (const v of want.verdicts ?? []) {
+    const field = actual.fields.find(f => f.name === v.field)
+    expect(field, at(`field ${v.field}`)).toBeDefined()
+    const got = checkField(field as AnvilField, v.value)
+    expect(got.ok, at(`verdict ${v.field}=${JSON.stringify(v.value)}`)).toBe(v.ok)
+    if (v.reason !== undefined) {
+      expect(got.ok ? '' : got.reason, at(`reason ${v.field}=${JSON.stringify(v.value)}`)).toBe(v.reason)
+    }
+  }
 }
 
 describe('conformance corpus', () => {
@@ -168,6 +181,11 @@ describe('conformance corpus', () => {
     expect(() => checkBlock(pick, { recommended: 'b' }, 'self')).not.toThrow()
     expect(() => checkBlock(pick, { recommended: '' }, 'self')).toThrow()
 
+    const input = parseAnvil('@input id=i\n_ n* | number | N | max=9').blocks[0] as AnvilBlock
+    expect(() => checkBlock(input, { verdicts: [{ field: 'n', value: '10', ok: false, reason: 'max' }] }, 'self')).not.toThrow()
+    expect(() => checkBlock(input, { verdicts: [{ field: 'n', value: '10', ok: true }] }, 'self')).toThrow()
+    expect(() => checkBlock(input, { verdicts: [{ field: 'n', value: '', ok: false, reason: 'max' }] }, 'self')).toThrow()
+
     const flow = parseAnvil('@flow id=f\n- a -> b\n- b -> a').blocks[0] as AnvilBlock
     expect(() => checkBlock(flow, { nodeIds: ['a', 'b'], backEdges: ['b>a'] }, 'self')).not.toThrow()
     expect(() => checkBlock(flow, { backEdges: [] }, 'self')).toThrow()
@@ -178,7 +196,7 @@ describe('conformance corpus', () => {
     const covered = coveredSections()
     // Not "every section" -- §6 and §7 are stamping, which the reference
     // implementation does not ship. These are the ones it can be held to.
-    for (const s of ['4.1', '4.3', '4.5', '4.8', '4.12.1', '4.13', '4.14', '4.15.1', '4.16.2', '4.17.3', '8.3', '11']) {
+    for (const s of ['4.1', '4.3', '4.3.1', '4.5', '4.8', '4.12.1', '4.13', '4.14', '4.15.1', '4.16.2', '4.17.3', '8.3', '11']) {
       expect(covered, `no case pins §${s}`).toContain(s)
     }
   })

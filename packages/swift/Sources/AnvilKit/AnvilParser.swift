@@ -95,8 +95,25 @@ public struct AnvilDocument: Sendable {
         public let label: String
         /// The fourth cell. What the empty control shows, not what it holds.
         public let placeholder: String?
+        /// SPEC 4.3.1: what the value must look like before the block stamps.
+        /// Already proven satisfiable; run it with `check(_:)`.
+        public let checks: AnvilFieldChecks
 
         public var fieldType: AnvilFieldType { AnvilFieldType(rawValue: type) ?? .text }
+
+        public init(
+            id: String, name: String, type: String, required: Bool, hint: String?, label: String,
+            placeholder: String?, checks: AnvilFieldChecks = .none
+        ) {
+            self.id = id
+            self.name = name
+            self.type = type
+            self.required = required
+            self.hint = hint
+            self.label = label
+            self.placeholder = placeholder
+            self.checks = checks
+        }
     }
 
     public struct Scale: Identifiable, Sendable {
@@ -493,18 +510,37 @@ public enum AnvilParser {
         }
 
         func addField(_ body: String, line: Int) -> [AnvilWarning] {
-            let cells = AnvilParser.cells(body)
-            guard var name = cells.first else { return [] }
+            let all = AnvilParser.cells(body)
+            guard var name = all.first else { return [] }
             let required = name.hasSuffix("*")
             if required { name = String(name.dropLast()) }
+
+            // SPEC 4.3.1: `min=` `max=` `pattern=` `error=` are trailing
+            // key=value cells, unordered, like an option row's `img=`. The
+            // positional cells are whatever is left.
+            var cells: [String] = []
+            var checks: [String: String] = [:]
+            for cell in all.dropFirst() {
+                if let equals = cell.firstIndex(of: "=") {
+                    let key = cell[cell.startIndex ..< equals].trimmingCharacters(in: .whitespaces).lowercased()
+                    if AnvilChecks.keys.contains(key) {
+                        checks[key] = AnvilParser.unquote(String(cell[cell.index(after: equals)...]))
+                        continue
+                    }
+                }
+                cells.append(cell)
+            }
 
             // SPEC 4.3: a type outside the closed set falls back to `text` AND
             // says so. Silently rendering a text box for `emial` would hide a
             // typo the author can still fix.
-            let raw = cells.count > 1 ? cells[1] : "text"
+            let raw = cells.first ?? "text"
             let (type, fellBack) = AnvilFieldType.resolve(raw)
+            let (settled, complaints) = AnvilChecks.settle(
+                name: name, type: type, required: required, raw: checks, line: line
+            )
 
-            let label = cells.count > 2 ? cells[2] : nil
+            let label = cells.count > 1 ? cells[1] : nil
             fields.append(
                 AnvilDocument.Field(
                     id: name,
@@ -513,12 +549,12 @@ public enum AnvilParser {
                     required: required,
                     hint: label,
                     label: label ?? AnvilParser.titleCase(name),
-                    placeholder: cells.count > 3 ? cells[3] : nil
+                    placeholder: cells.count > 2 ? cells[2] : nil,
+                    checks: settled
                 )
             )
-            return fellBack
-                ? [AnvilWarning("unknown field type \(raw), fell back to text", line: line)]
-                : []
+            return (fellBack ? [AnvilWarning("unknown field type \(raw), fell back to text", line: line)] : [])
+                + complaints
         }
 
         func addScale(_ body: String, line: Int) -> [AnvilWarning] {
@@ -758,17 +794,36 @@ public enum AnvilParser {
         return tokens
     }
 
-    /// Splits a row on pipes. A literal pipe inside a label is `\|`.
+    /// `"x"` -> `x`, only when the quotes are a matched pair: a pattern may
+    /// legitimately end in a `'`.
+    static func unquote(_ raw: String) -> String {
+        let value = raw.trimmingCharacters(in: .whitespaces)
+        guard value.count >= 2, let first = value.first, first == "\"" || first == "'", value.last == first else { return value }
+        return String(value.dropFirst().dropLast())
+    }
+
+    /// Splits a row on pipes. A literal pipe inside a label is `\|`, and that
+    /// is the ONLY escape: every other backslash belongs to the author.
+    ///
+    /// This used to treat a backslash before anything as an escape and drop
+    /// it, which the reference parser never did -- `C:\Users` became
+    /// `C:Users`, and a `pattern=\d{10}` (SPEC 4.3.1) became `d{10}`, a check
+    /// that refuses every phone number it was written to accept.
     static func cells(_ body: String) -> [String] {
         var cells: [String] = []
         var cell = ""
-        var escaped = false
+        var pending = false
         for character in body {
-            if escaped { cell.append(character); escaped = false; continue }
-            if character == "\\" { escaped = true; continue }
+            if pending {
+                pending = false
+                if character == "|" { cell.append("|"); continue }
+                cell.append("\\")
+            }
+            if character == "\\" { pending = true; continue }
             if character == "|" { cells.append(cell.trimmingCharacters(in: .whitespaces)); cell = ""; continue }
             cell.append(character)
         }
+        if pending { cell.append("\\") }
         cells.append(cell.trimmingCharacters(in: .whitespaces))
         return cells.filter { !$0.isEmpty || cells.count == 1 }
     }

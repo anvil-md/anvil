@@ -21,7 +21,7 @@ import Testing
 struct ConformanceTests {
     @Test("the corpus loaded, so a zero-case pass is impossible")
     func corpusIsPresent() {
-        #expect(Corpus.cases.count == 86, "found \(Corpus.cases.count) cases at \(Corpus.repositoryRoot.path)")
+        #expect(Corpus.cases.count == 101, "found \(Corpus.cases.count) cases at \(Corpus.repositoryRoot.path)")
     }
 
     /// Prints the score. A conformance suite that can be filtered without
@@ -119,6 +119,20 @@ struct ConformanceTests {
             }
             if let edges = want.edges {
                 #expect(got.edges.map(\.wire) == edges, "\(testCase.id): block \(index) edges")
+            }
+            if let types = want.fieldTypes {
+                #expect(got.fields.map(\.type) == types, "\(testCase.id): block \(index) fieldTypes")
+            }
+            for verdict in want.verdicts ?? [] {
+                let field = try #require(
+                    got.fields.first { $0.name == verdict.field },
+                    "\(testCase.id): no field \(verdict.field)"
+                )
+                let result = field.check(verdict.value)
+                #expect(result.isOK == verdict.ok, "\(testCase.id): \(verdict.field)=\"\(verdict.value)\" -> \(result)")
+                if let reason = verdict.reason, case let .failed(actual, _) = result {
+                    #expect(actual.rawValue == reason, "\(testCase.id): \(verdict.field)=\"\(verdict.value)\" reason")
+                }
             }
             if let domain = want.domain {
                 let got = try #require(got.domain, "\(testCase.id): block \(index) has no domain")

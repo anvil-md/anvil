@@ -9,6 +9,8 @@
  * surface is rendering the surrounding conversation.
  */
 
+import type { FieldChecks } from './checks'
+
 export type AnvilKind =
   | 'choice'
   | 'gallery'
@@ -104,9 +106,19 @@ export const MAX_LAYOUT_DEPTH = 2
 /** How a @gallery draws each card. */
 export type GalleryRender = 'image' | 'swatch' | 'type' | 'card'
 
-export type FieldType = 'text' | 'longtext' | 'number' | 'bool' | 'secret' | 'path' | 'url' | 'date'
+export type FieldType = 'text' | 'longtext' | 'number' | 'bool' | 'secret' | 'path' | 'url' | 'date' | 'email'
 
-export const FIELD_TYPES: readonly FieldType[] = ['text', 'longtext', 'number', 'bool', 'secret', 'path', 'url', 'date']
+export const FIELD_TYPES: readonly FieldType[] = [
+  'text',
+  'longtext',
+  'number',
+  'bool',
+  'secret',
+  'path',
+  'url',
+  'date',
+  'email',
+]
 
 /** A `-` row: an option in a @choice or a card in a @gallery. */
 export interface AnvilOption {
@@ -128,6 +140,8 @@ export interface AnvilField {
   label: string
   placeholder?: string
   required: boolean
+  /** `min=` `max=` `pattern=` `error=` cells, already proven satisfiable (§4.3.1). */
+  checks: FieldChecks
 }
 
 /** A `%` row in a @scale. */

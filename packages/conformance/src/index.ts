@@ -57,6 +57,13 @@ export interface BlockExpectation {
   edges?: string[]
   /** The subset of `edges` the layout had to lift out of ranking (§4.17.3). */
   backEdges?: string[]
+  /** @input field types after fallback, in row order (§4.3). */
+  fieldTypes?: string[]
+  /**
+   * `checkField` run on a value (§4.3.1). `reason` is asserted only when given;
+   * an implementation's own error wording is never part of conformance.
+   */
+  verdicts?: { field: string; value: string; ok: boolean; reason?: string }[]
 }
 
 export interface TreeExpectation {

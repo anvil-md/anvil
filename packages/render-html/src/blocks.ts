@@ -171,9 +171,24 @@ export function renderGallery(b: AnvilBlock): string {
   return `<div class="anvil-grid anvil-grid-${mode}">${cards}</div>`
 }
 
+/**
+ * The checks a browser understands, as attributes, so a host that hydrates this
+ * markup gets native constraint validation for free. `pattern=` is NOT emitted:
+ * a browser would run it through its own backtracking engine, which is exactly
+ * what §4.3.1 exists to avoid. The host runs `checkField` instead.
+ */
+function checkAttrs(f: AnvilField): string {
+  const { min, max } = f.checks
+  const lengthy = f.type !== 'number' && f.type !== 'date'
+  const out = [f.required ? ' required' : '']
+  if (min !== undefined) out.push(` ${lengthy ? 'minlength' : 'min'}="${esc(min)}"`)
+  if (max !== undefined) out.push(` ${lengthy ? 'maxlength' : 'max'}="${esc(max)}"`)
+  return out.join('')
+}
+
 function textControl(type: string, f: AnvilField): string {
   const ph = f.placeholder ? ` placeholder="${esc(f.placeholder)}"` : ''
-  return `<input class="anvil-input" type="${type}" disabled${ph}>`
+  return `<input class="anvil-input" type="${type}" disabled${ph}${checkAttrs(f)}>`
 }
 
 /**
@@ -189,14 +204,15 @@ const CONTROLS: Record<FieldType, (f: AnvilField) => string> = {
   url: f => textControl('url', f),
   date: f => textControl('date', f),
   path: f => textControl('text', f),
+  email: f => textControl('email', f),
   longtext: f => {
     const ph = f.placeholder ? ` placeholder="${esc(f.placeholder)}"` : ''
-    return `<textarea class="anvil-input" rows="3" disabled${ph}></textarea>`
+    return `<textarea class="anvil-input" rows="3" disabled${ph}${checkAttrs(f)}></textarea>`
   },
   bool: () => '<span class="anvil-switch" aria-hidden="true"></span>',
 }
 
-const MONO_FIELDS = new Set<FieldType>(['path', 'url', 'secret'])
+const MONO_FIELDS = new Set<FieldType>(['path', 'url', 'secret', 'email'])
 
 export function renderInput(b: AnvilBlock): string {
   if (!b.fields.length) return '<p class="anvil-empty">No fields.</p>'
@@ -205,9 +221,12 @@ export function renderInput(b: AnvilBlock): string {
       const opt = f.required ? '' : '<span class="anvil-optional">optional</span>'
       const control = (CONTROLS[f.type] ?? CONTROLS.text)(f)
       const mono = MONO_FIELDS.has(f.type) ? ' anvil-field-mono' : ''
+      // Present and hidden: a hydrating host unhides it when checkField fails.
+      // Leaving it out would parse `error=` and never draw it (§11).
+      const error = f.checks.error ? `<small class="anvil-field-error" hidden>${esc(f.checks.error)}</small>` : ''
       return `<div class="anvil-field${mono}">
         <label class="anvil-field-label">${esc(f.label)}${opt}</label>
-        ${control}
+        ${control}${error}
       </div>`
     })
     .join('')

@@ -368,8 +368,77 @@ means required. Label defaults to the name, title-cased.
 | `bool` | a switch |
 | `secret` | **masked**; the value never reaches the transcript (§7.6) |
 | `path` | monospace text input |
-| `url` | url input |
-| `date` | native date picker |
+| `url` | url input; `http(s)://` and no whitespace |
+| `date` | native date picker; `YYYY-MM-DD`, a day the calendar has |
+| `email` | email keyboard; one `@`, a dot in the domain, no whitespace |
+
+#### 4.3.1 Checks
+
+A field row may say what its value has to look like before the block stamps:
+
+```anvil
+@input id=booking submit="Book it"
+? Who is coming?
+_ phone* | text   | Mobile | 0701234567 | pattern=\d{10} | error=Ten digits, no spaces
+_ seats* | number | Seats  |            | min=1 | max=40
+_ day    | date   | Day    |            | min=2026-11-01 | max=2026-11-30
+_ mail   | email  | Email for the receipt
+_ agree* | bool   | I accept the cancellation terms
+```
+
+Four trailing cells, unordered, like an option row's `img=`:
+
+| Cell | On | Means |
+|---|---|---|
+| `min=` `max=` | text, longtext, path, secret, email, url | length, counted in **characters** (code points, so `😀` is one) |
+| `min=` `max=` | number | the range, inclusive |
+| `min=` `max=` | date | the range, as `YYYY-MM-DD` |
+| `pattern=` | text, longtext, path, secret, email, url | the shape of the **whole** value |
+| `error=` | any field with a check | what the human is told when a check fails |
+
+On top of those, every type checks its own shape: a `number` is a plain
+decimal (no exponent, no thousands separator), and `url`, `email` and `date`
+are as in the table above. `*` keeps its meaning, except on a `bool`: a switch
+always has a value, so a required one has to be switched **on**. That is the
+consent box, and it is the only reason a required switch exists.
+
+An empty optional field passes without running anything else. Holding a human
+to the pattern of a field they were told they could skip is how a form tells
+them they could not.
+
+A check that cannot be satisfied is dropped, with a warning. `min=5 max=2` would
+leave the submit button dead forever and the human unable to answer a question
+the agent is waiting on. A missing check costs one bad value the server can
+still refuse; an impossible one costs the conversation.
+
+`pattern=` is a small regular expression dialect that runs the same way on every
+host:
+
+- literals, `.`, classes with ranges and negation, `\d \D \w \W \s \S` (ASCII
+  `\d` and `\w`, as JavaScript means them), `\t \n \v \f \r \0`, `\xHH`,
+  `\uHHHH`, `\u{H…}`, and a backslash before any syntax character;
+- groups `( )` and `(?: )`, alternation, `* + ? {n} {n,} {n,m}` with bounds up to
+  100, and `^` `$`, which change nothing because the match is anchored anyway;
+- **not** lookaround, backreferences, named groups, `\b`, `\p{…}` or inline flags.
+  A pattern that uses one is dropped with a warning that names it.
+
+A pipe inside a pattern is written `\|`, as in a label, because the cell split
+runs first: `pattern=yes\|no`. Every other backslash is the author's.
+
+Matching must take time linear in the value. The pattern is agent-authored and
+runs on the human's device and again on the server, and a backtracking engine
+handed `(a+)+$` and sixty `a`s followed by a `b` does not come back. A
+conformant implementation answers at once (corpus: `input-pattern-is-linear`).
+The reference compiles the pattern to an NFA and simulates it, and so does the
+Swift port. Handing `pattern=` to the platform's `RegExp` or
+`NSRegularExpression` fails conformance twice over, because those two also
+disagree with each other about what `\d` and `$` mean. A value longer than 4096
+characters never matches.
+
+The checks run twice. The host runs them to decide whether the submit button is
+live, and the server runs the same function on the stamp before it accepts it,
+because a stamp is untrusted input (§8.1) and a client that skipped its checks
+is one HTTP request away. `checkField` in `@anvil-md/parser` is that function.
 
 ### 4.4 `@code`
 
@@ -2012,6 +2081,9 @@ reorder. A positional id lands the stamp on the wrong block.
 | 41 | A rise coloured green because rises are usually good | the tone is `better=`'s, never guessed; neutral without it (§4.16.5) |
 | 42 | A product record added as a new `@kind` | a `@card type=` with a host face; every other host still draws the card (§4.12.5) |
 | 43 | A host face that quietly drops a row | the frame names what the face did not draw (§4.12.5) |
+| 44 | An agent-written pattern that hangs the phone | the dialect matches in linear time; no platform regex engine (§4.3.1) |
+| 45 | A check no value can pass, so the block can never stamp | an impossible check is dropped at parse time, with a warning (§4.3.1) |
+| 46 | A value the client checked and the server took on trust | the server runs `checkField` on the stamp (§4.3.1, §8.1) |
 
 ---
 
@@ -2045,13 +2117,14 @@ reorder. A positional id lands the stamp on the wrong block.
    │ - [ ] ref | Label | meta    [ ]todo [~]flight [x]done [!]blocked     │
    │ - Label | 42 | note           a @chart datum                         │
    │ - a -> b | label   - a -- b   a @flow edge  (-> --> => → )           │
-   │ _ name[*] | type | Label | placeholder                               │
+   │ _ name[*] | type | Label | placeholder | min= max= pattern= error=   │
    │ % name | leftPole | rightPole | default                              │
    │ + chip | chip | chip          (a card's meta strip)                  │
    │ = field=value     > prose, or the detail of the task above           │
    │ ~~~ … ~~~  literal                                                   │
    ├── FIELD TYPES ───────────────────────────────────────────────────────┤
-   │ text  longtext  number  bool  secret  path  url  date                │
+   │ text  longtext  number  bool  secret  path  url  date  email         │
+   │ pattern= matches the WHOLE value, in linear time · \| for a pipe     │
    ├── STAMP ─────────────────────────────────────────────────────────────┤
    │ <stamp block="…" kind="…" value(s)= label(s)= [at= by=]>             │
    │   <field name=…>  <file name= mime= ref=>  <url href= title=>        │
@@ -2090,6 +2163,9 @@ An implementation is **ANVIL v1 conformant** if:
     whatever `min=` and `max=` say, and announces a floor that is not zero.
 12. A `@flow` terminates on a cyclic graph, draws the back edges rather than
     dropping them, and states the count of anything it did not draw.
+13. Field checks give the corpus's verdicts, a `pattern=` matches in time
+    linear in the value, and a check no value could satisfy is dropped with a
+    warning rather than kept.
 
 Reference implementation: [`packages/parser`](./packages/parser) and
 [`packages/render-html`](./packages/render-html).

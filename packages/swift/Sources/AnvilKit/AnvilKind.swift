@@ -33,7 +33,7 @@ public enum AnvilKind: String, CaseIterable, Sendable {
 /// so, rather than rendering nothing or guessing -- CLAUDE.md names this
 /// exact degradation as the required behaviour.
 public enum AnvilFieldType: String, CaseIterable, Sendable {
-    case text, longtext, number, bool, secret, path, url, date
+    case text, longtext, number, bool, secret, path, url, date, email
 
     /// Returns the type and whether it had to fall back.
     public static func resolve(_ raw: String) -> (type: AnvilFieldType, fellBack: Bool) {

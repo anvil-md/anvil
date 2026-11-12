@@ -26,6 +26,9 @@ An implementation is **ANVIL v1 conformant** if:
     whatever `min=` and `max=` say, and announces a floor that is not zero.
 12. A `@flow` terminates on a cyclic graph, draws the back edges rather than
     dropping them, and states the count of anything it did not draw.
+13. Field checks give the corpus's verdicts, a `pattern=` matches in time
+    linear in the value, and a check no value could satisfy is dropped with a
+    warning rather than kept.
 
 Reference implementation: [`packages/parser`](./packages/parser) and
 [`packages/render-html`](./packages/render-html).
