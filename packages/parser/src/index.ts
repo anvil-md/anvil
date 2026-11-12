@@ -4,6 +4,9 @@
  * Zero dependencies, no DOM, no framework. Runs anywhere JavaScript runs.
  */
 export { parseAnvil } from './parse'
+export { safeColor, safeFont, safeUrl } from './allow'
+export { STAMP_MASK, stampAnswer, stampXml } from './stamp'
+export type { AnvilAnswer, AnvilStamp, StampAttr, StampChild, StampOptions, StampResult } from './stamp'
 export { A11Y_ATTRS, a11yProblems, blockA11y, LIVE_MODES, optionAlt } from './a11y'
 export { LIVE_KINDS, liveProblems, liveRows, liveSource, MAX_LIVE_ARGS } from './live'
 export type { LiveSource } from './live'

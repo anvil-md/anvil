@@ -45,6 +45,9 @@ import {
   optionAlt,
   recipients,
   recommended,
+  safeColor,
+  safeFont,
+  safeUrl,
   type TaskState,
   taskProgress,
   withUnit,
@@ -73,21 +76,8 @@ export function esc(s: string): string {
     .replace(/'/g, '&#39;')
 }
 
-/** Hex only. Anything else is dropped rather than escaped into a style attr. */
-function safeColor(c: string): string | null {
-  return /^#[0-9a-f]{3,8}$/i.test(c.trim()) ? c.trim() : null
-}
-
-/** Conservative family name: letters, digits, spaces, dashes. No quotes, no url(). */
-function safeFont(f: string): string | null {
-  const t = f.trim().replace(/^["']|["']$/g, '')
-  return /^[\w][\w -]{0,48}$/.test(t) ? t : null
-}
-
-export function safeUrl(u: string): string | null {
-  const t = u.trim()
-  return /^https?:\/\/[^\s"'<>]+$/i.test(t) ? t : null
-}
+// The §8.3 allowlists live in the parser, so every surface draws the same rows.
+export { safeUrl }
 
 const MARK = '<span class="anvil-mark" aria-hidden="true"></span>'
 
