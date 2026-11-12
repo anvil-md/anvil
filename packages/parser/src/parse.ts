@@ -11,6 +11,7 @@
  * assembly, nothing else.
  */
 import { a11yProblems } from './a11y'
+import { liveProblems } from './live'
 import {
   parseDatum,
   parseDial,
@@ -319,6 +320,7 @@ function finish(block: AnvilBlock, body: string[]): AnvilBlock {
     block.warnings.push('@board has no prose body; use a @note beside it')
   }
   block.warnings.push(...a11yProblems(block))
+  block.warnings.push(...liveProblems(block))
   return block
 }
 

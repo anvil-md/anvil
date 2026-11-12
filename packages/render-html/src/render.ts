@@ -22,6 +22,7 @@ import {
   type GalleryRender,
   galleryRender,
   isLocked,
+  liveSource,
   messageAt,
   type MessageChannel,
   messageChannel,
@@ -165,10 +166,18 @@ function shell(block: AnvilBlock, partial: boolean): string {
   const state = partial ? 'streaming' : 'preview'
   const a11y = a11yAttrs(block)
 
+  // This package draws; it never calls a host function. So a live block shows
+  // its written fallback and says where the real rows come from, rather than
+  // parsing `query=` and dropping it (§11).
+  const source = liveSource(block)
+  const live = source
+    ? `<p class="anvil-live">${icon('refresh-cw')}<span>Rows from <code>${esc(source.fn)}</code> when answered${block.options.length ? '; the written ones until then' : ''}</span></p>`
+    : ''
+
   // Order matters: warnings explain the body, so they belong ABOVE the action
   // rather than orphaned underneath it.
-  return `<section class="anvil-block" data-anvil-id="${esc(block.id)}" data-anvil-kind="${esc(block.kind)}"${a11y.attrs}>
-    ${head}${sub}${a11y.sr}${body}${warnings(block)}${submitBar(block)}
+  return `<section class="anvil-block" data-anvil-id="${esc(block.id)}" data-anvil-kind="${esc(block.kind)}"${source ? ` data-live="${esc(source.fn)}"` : ''}${a11y.attrs}>
+    ${head}${sub}${a11y.sr}${live}${body}${warnings(block)}${submitBar(block)}
     <footer class="anvil-foot"><span>${state}</span></footer>
   </section>`
 }

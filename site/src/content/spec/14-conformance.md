@@ -31,6 +31,9 @@ An implementation is **ANVIL v1 conformant** if:
     warning rather than kept.
 14. Every block exposes the corpus's accessible name, description, live mode
     and hidden flag, and a block that asks is never hidden.
+15. A `query=` names the corpus's function and arguments, a function's result
+    becomes the corpus's rows, and if it implements stamping: the stamp carries
+    the `<offered>` rows and a stamped block never calls the function again.
 
 Reference implementation: [`packages/parser`](./packages/parser) and
 [`packages/render-html`](./packages/render-html).

@@ -5,6 +5,8 @@
  */
 export { parseAnvil } from './parse'
 export { A11Y_ATTRS, a11yProblems, blockA11y, LIVE_MODES, optionAlt } from './a11y'
+export { LIVE_KINDS, liveProblems, liveRows, liveSource, MAX_LIVE_ARGS } from './live'
+export type { LiveSource } from './live'
 export type { AnvilA11y, LiveMode } from './a11y'
 export { checkField, FIELD_CHECK_KEYS, inputReady } from './checks'
 export type { CheckReason, FieldChecks, FieldVerdict } from './checks'

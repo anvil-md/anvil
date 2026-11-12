@@ -13,6 +13,7 @@ summary: "The whole language on one screen."
    │ @connect  scopes are rows         @order   drag to rank              │
    │ common: id= select=one|many min= max= submit= icon= expires=         │
    │         optional danger phrase= recommend=<value> (marks, not picks) │
+   │ query="fn.name k=v" rows from a READ-ONLY host fn; - rows = fallback │
    │ @connect provider= state= granted= · mark is host-chosen, never img= │
    ├── SHOW / CONTROL ────────────────────────────────────────────────────┤
    │ @note tone=info|warn|danger (markdown body)                          │
@@ -25,7 +26,7 @@ summary: "The whole language on one screen."
    │ @flow  dir=right|down   arrow makes a row an edge, else it is a node │
    ├── ANY BLOCK ─────────────────────────────────────────────────────────┤
    │ alt= desc= live=off|polite|assertive   decorative (SHOW blocks only) │
-   │ name and description are inferred from ? and : unless these are set │
+   │ name and description are inferred from ? and : unless these are set  │
    ├── LAYOUT ────────────────────────────────────────────────────────────┤
    │ @grid cols=<max, 1-6> min= gap=tight|normal|loose frame              │
    │ @stack gap=            @end  (or the end of the fence)               │
@@ -48,6 +49,7 @@ summary: "The whole language on one screen."
    │ <stamp block="…" kind="…" value(s)= label(s)= [at= by=]>             │
    │   <field name=…>  <file name= mime= ref=>  <url href= title=>        │
    │   <dial name= value= norm= poles=>                                   │
+   │   <offered value= label=>  every live row shown, with query="fn"     │
    │   A sentence a human would have typed.                               │
    │ </stamp>                                                             │
    │ attributes are the TRUTH · the sentence is the COURTESY              │

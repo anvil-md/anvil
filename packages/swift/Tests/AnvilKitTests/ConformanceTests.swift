@@ -21,7 +21,7 @@ import Testing
 struct ConformanceTests {
     @Test("the corpus loaded, so a zero-case pass is impossible")
     func corpusIsPresent() {
-        #expect(Corpus.cases.count == 109, "found \(Corpus.cases.count) cases at \(Corpus.repositoryRoot.path)")
+        #expect(Corpus.cases.count == 117,"found \(Corpus.cases.count) cases at \(Corpus.repositoryRoot.path)")
     }
 
     /// Prints the score. A conformance suite that can be filtered without
@@ -143,6 +143,18 @@ struct ConformanceTests {
                 if let reason = verdict.reason, case let .failed(actual, _) = result {
                     #expect(actual.rawValue == reason, "\(testCase.id): \(verdict.field)=\"\(verdict.value)\" reason")
                 }
+            }
+            if let fn = want.liveFn {
+                #expect((got.liveSource?.fn ?? "") == fn, "\(testCase.id): block \(index) liveFn")
+            }
+            if let args = want.liveArgs {
+                #expect((got.liveSource?.args ?? [:]) == args, "\(testCase.id): block \(index) liveArgs")
+            }
+            for (row, live) in (want.liveRows ?? []).enumerated() {
+                let have = AnvilLiveRows(live.result).options
+                #expect(have.map(\.id) == live.values, "\(testCase.id): live rows \(row) values")
+                if let labels = live.labels { #expect(have.map(\.title) == labels, "\(testCase.id): live rows \(row) labels") }
+                if let alts = live.alts { #expect(have.map(\.accessibleName) == alts, "\(testCase.id): live rows \(row) alts") }
             }
             if let domain = want.domain {
                 let got = try #require(got.domain, "\(testCase.id): block \(index) has no domain")

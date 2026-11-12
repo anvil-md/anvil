@@ -1021,6 +1021,113 @@
       }
     },
     {
+      "id": "live-query-names-a-function-and-its-arguments",
+      "spec": "4.1.2",
+      "title": "query= names a host function and key=value arguments; the written rows stay as the fallback",
+      "source": "@choice id=slot query=\"calendar.free date=2026-11-14 minutes=30\"\n? When on Friday?\n- morning   | Friday morning\n- afternoon | Friday afternoon",
+      "expect": {
+        "blocks": [
+          {
+            "kind": "choice",
+            "liveFn": "calendar.free",
+            "liveArgs": { "date": "2026-11-14", "minutes": "30" },
+            "optionValues": ["morning", "afternoon"]
+          }
+        ],
+        "warnings": []
+      }
+    },
+    {
+      "id": "live-query-quoted-argument",
+      "spec": "4.1.2",
+      "title": "an argument with a space is single-quoted inside the attribute",
+      "source": "@choice id=who query=\"contacts.find name='Ana B' limit=5\"\n? Who?\n- me | Me",
+      "expect": {
+        "blocks": [{ "kind": "choice", "liveFn": "contacts.find", "liveArgs": { "name": "Ana B", "limit": "5" } }],
+        "warnings": []
+      }
+    },
+    {
+      "id": "live-query-first-argument-wins",
+      "spec": "4.1.2",
+      "title": "an argument named twice keeps the first, and says so",
+      "source": "@choice id=c query=\"x.y a=1 a=2\"\n? Pick\n- k | K",
+      "expect": {
+        "blocks": [{ "kind": "choice", "liveFn": "x.y", "liveArgs": { "a": "1" } }],
+        "warningsContain": ["names a twice"]
+      }
+    },
+    {
+      "id": "live-query-argument-names-are-only-names",
+      "spec": "4.1.2",
+      "title": "an argument called __proto__ or constructor is an argument like any other",
+      "source": "@choice id=c query=\"x.y __proto__=a constructor=b\"\n? Pick\n- k | K",
+      "expect": {
+        "blocks": [{ "kind": "choice", "liveFn": "x.y", "liveArgs": { "__proto__": "a", "constructor": "b" } }],
+        "warnings": []
+      }
+    },
+    {
+      "id": "live-query-bad-function-name",
+      "spec": "4.1.2",
+      "title": "a query that is not a dotted lowercase name calls nothing, and says so",
+      "source": "@choice id=c query=\"Calendar Free\"\n? When?\n- am | Morning",
+      "expect": {
+        "blocks": [{ "kind": "choice", "liveFn": "", "optionValues": ["am"] }],
+        "warningsContain": ["is not a function name"]
+      }
+    },
+    {
+      "id": "live-query-only-fills-picked-rows",
+      "spec": "4.1.2",
+      "title": "query= on a block whose rows are not picked is ignored, with a warning",
+      "source": "@input id=i query=\"x.y\"\n? Name\n_ name | text",
+      "expect": {
+        "blocks": [{ "kind": "input", "liveFn": "" }],
+        "warningsContain": ["query= only fills @choice and @gallery rows"]
+      }
+    },
+    {
+      "id": "live-query-without-fallback-warns",
+      "spec": "4.1.2",
+      "title": "a query with no written rows is legal, and warned about",
+      "source": "@gallery id=g query=\"fonts.installed\"\n? Which face?",
+      "expect": {
+        "blocks": [{ "kind": "gallery", "liveFn": "fonts.installed", "optionValues": [] }],
+        "warningsContain": ["has no written rows to fall back on"]
+      }
+    },
+    {
+      "id": "live-rows-are-read-field-by-field",
+      "spec": "4.1.2",
+      "title": "a function's rows: no value is skipped, a repeated value keeps the first, a whole number is its digits",
+      "source": "@choice id=slot query=\"calendar.free\"\n? When?\n- am | Morning",
+      "expect": {
+        "blocks": [
+          {
+            "kind": "choice",
+            "liveRows": [
+              {
+                "result": [
+                  { "value": "1000", "label": "10:00" },
+                  { "value": "1030" },
+                  { "label": "no value" },
+                  { "value": "1000", "label": "the same value again" },
+                  "not a row",
+                  { "value": 1400, "label": "14:00", "alt": "two in the afternoon" },
+                  { "value": 14.5, "label": "a fraction is not a value" }
+                ],
+                "values": ["1000", "1030", "1400"],
+                "labels": ["10:00", "1030", "14:00"],
+                "alts": ["10:00", "1030", "two in the afternoon"]
+              },
+              { "result": { "rows": [{ "value": "x" }] }, "values": [] }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "id": "chart-stat-change-is-computed",
       "spec": "4.16.5",
       "title": "a stat prints the change from was=, computed, beside the number it came from",

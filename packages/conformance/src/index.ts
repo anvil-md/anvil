@@ -68,6 +68,15 @@ export interface BlockExpectation {
    * an implementation's own error wording is never part of conformance.
    */
   verdicts?: { field: string; value: string; ok: boolean; reason?: string }[]
+  /** The function `query=` names (§4.1.2). `""` means the block calls nothing. */
+  liveFn?: string
+  /** Its arguments, exactly. */
+  liveArgs?: Record<string, string>
+  /**
+   * A function's result turned into rows (§4.1.2). `result` is the INPUT, as a
+   * host would receive it; the rest is what must come out.
+   */
+  liveRows?: { result: unknown; values: string[]; labels?: string[]; alts?: string[] }[]
 }
 
 export interface TreeExpectation {

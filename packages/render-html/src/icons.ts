@@ -49,6 +49,7 @@ export type IconName =
   | 'trending-up'
   | 'trending-down'
   | 'minus'
+  | 'refresh-cw'
 
 /** Inner markup only; wrapped by `icon()` below. */
 const GEOMETRY: Record<IconName, string> = {
@@ -101,6 +102,9 @@ const GEOMETRY: Record<IconName, string> = {
   'trending-up': '<path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/>',
   'trending-down': '<path d="M16 17h6v-6"/><path d="m22 17-8.5-8.5-5 5L2 7"/>',
   minus: '<path d="M5 12h14"/>',
+  // lucide-react v1.24.0. A block whose rows come from a function (§4.1.2).
+  'refresh-cw':
+    '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
 }
 
 const NAMES = new Set<string>(Object.keys(GEOMETRY))

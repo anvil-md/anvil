@@ -473,6 +473,33 @@
   font-style: italic;
 }
 
+/* A field's own check message (§4.3.1). Hidden here: this package never
+   evaluates a value, so it never has a failure to show. A host that wires the
+   controls un-hides it next to the field that failed. */
+.anvil-field-error {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.78em;
+  color: var(--anvil-danger);
+}
+
+/* Live rows (§4.1.2): where the real options come from. Sits above the body it
+   qualifies, in the same quiet register as the sub line. */
+.anvil-live {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.5rem;
+  font-size: 0.78em;
+  color: var(--anvil-muted-fg);
+}
+
+.anvil-live .anvil-icon {
+  flex: none;
+  width: 1em;
+  height: 1em;
+}
+
 .anvil-fallback pre {
   margin: 0;
   overflow-x: auto;

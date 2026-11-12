@@ -72,8 +72,8 @@ const ASK_ATTRS = new Set(['select', 'submit', 'min', 'max', 'expires', 'optiona
 const KIND_ATTRS: Record<string, Set<string>> = {
   // `recommend` is not in ASK_ATTRS: it only means something where there are
   // rows to pick, and the parser already says so everywhere else.
-  choice: new Set(['recommend']),
-  gallery: new Set(['render', 'recommend']),
+  choice: new Set(['recommend', 'query']),
+  gallery: new Set(['render', 'recommend', 'query']),
   input: new Set([]),
   scale: new Set(['steps']),
   note: new Set(['tone']),

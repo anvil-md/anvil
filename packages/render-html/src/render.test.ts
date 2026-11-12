@@ -642,6 +642,26 @@ describe('chart', () => {
   })
 })
 
+describe('live rows', () => {
+  test('a block with query= draws its written rows and names the function they will come from', () => {
+    const html = renderAnvilFence('@choice id=s query="calendar.free date=2026-11-14"\n? When?\n- am | Morning\n- pm | Afternoon', true)
+    expect(html).toContain('data-live="calendar.free"')
+    expect(html).toContain('<code>calendar.free</code>')
+    expect(html).toContain('Morning')
+    expect(html).toContain('Afternoon')
+  })
+
+  test('a query that names no function draws no live line, and the warning says why', () => {
+    const html = renderAnvilFence('@choice id=s query="Calendar Free"\n? When?\n- am | Morning', true)
+    expect(html).not.toContain('data-live=')
+    expect(html).toContain('is not a function name')
+  })
+
+  test('query= on a block whose rows are not picked is not drawn as live', () => {
+    expect(renderAnvilFence('@note id=n query="x.y"\nhello', true)).not.toContain('data-live=')
+  })
+})
+
 describe('flow', () => {
   test('nodes carry the four card states, and the arrows connect them', () => {
     const html = renderAnvilFence(FLOW, true)

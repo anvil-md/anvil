@@ -324,6 +324,73 @@ Three rules hold it in its place:
 The stamp does not repeat it. The fence that carried the recommendation is in
 the same transcript as the answer, and the model reading the stamp wrote both.
 
+**4.1.2 `query=` fills the rows from the host. The stamp keeps what was offered.**
+
+Some answers only exist at answer time. The free slots on Friday, the contacts
+that match a name, the builds that finished since lunch: an agent that writes
+them into the fence is guessing, and a guess is stale by the time the human
+reads it.
+
+```anvil
+@choice id=slot query="calendar.free date=2026-11-14 minutes=30"
+? When on Friday?
+: Both calendars are free at these times.
+- morning   | Friday morning
+- afternoon | Friday afternoon
+```
+
+```
+   ╭─ ? When on Friday? ─────────────────────────────────────╮
+   │  Both calendars are free at these times.                │
+   │                                                         │
+   │    [1]  10:00                                           │
+   │    [2]  10:30                                           │
+   │    [3]  14:00    after lunch                            │
+   ╰─────────────────────────────────────────────────────────╯
+```
+
+`query=` names a function the **host** owns, `calendar.free`, and its
+arguments as `key=value` words. Quote a value with `'…'` when it holds a space:
+`query="contacts.find name='Ana B'"`. The host calls it once, when the fence
+has closed and the block becomes answerable (§5), and the rows it returns
+replace the written ones.
+
+Five rules keep it inside the axiom:
+
+- **It is a query.** A function a host exposes here reads availability,
+  contacts, slots. It never books, sends, buys or writes. The only thing that
+  happens in ANVIL is a stamp, and the attribute is called `query=` so nobody
+  forgets that.
+- **The model is not in the loop.** The host answers the call from its own
+  registry. The agent never sees the call and is never asked to run anything,
+  so §0 still holds: nothing reaches into the agent loop. A block cannot be used
+  to run a tool behind the human's back, and a slow model cannot make a picker
+  hang.
+- **The written rows are the fallback.** A host without the function, a call
+  that fails or takes too long, and a renderer that never heard of `query=` all
+  show the `-` rows. A `query=` with no written rows is legal and warned about:
+  on every other host it is a question with no answers.
+- **What comes back is data, read field by field.** A JSON list of rows with
+  `value`, `label`, `hint`, `img`, `swatch`, `font`, `sample`, `alt` and
+  `danger`. Each is a string or a whole number, `swatch` a list of strings and
+  `danger` a boolean. A row with no value is skipped, a second row with the same
+  value is skipped, and the allowlists of §8.3 apply as they do to written
+  rows. Past twelve rows the host warns, like it would for written ones.
+  `recommend=` is matched against the rows actually shown; when the function's
+  rows do not hold that value, nothing is marked (§4.1.1).
+- **The stamp records the offer.** Calling `calendar.free` tomorrow returns
+  tomorrow's slots. A stamped block that called it again would show options the
+  human never saw, and law IV (§7.1) says the rejected rows are part of the
+  record. So the stamp carries every row the human was shown (§6.2), and a
+  stamped block draws from those, never from a fresh call. A stamp with no
+  `<offered>` rows means the written rows were shown.
+
+A host that serves the call should keep what it returned, keyed by block id,
+and refuse a stamp whose value was not among those rows (law II).
+
+Only `@choice` and `@gallery` take `query=`: they are the blocks whose rows are
+picked. Anywhere else it is ignored and warned about.
+
 ### 4.2 `@gallery`
 
 Same semantics as `@choice`, different renderer. `render=` picks the card body:
@@ -1611,6 +1678,15 @@ It is a product UI.
 I picked Editorial and Brutal.
 </stamp>
 
+<!-- @choice query= -- every row the human was shown, because calling the
+     function again tomorrow returns tomorrow's rows (§4.1.2) -->
+<stamp block="slot" kind="choice" value="1030" label="10:30" query="calendar.free">
+  <offered value="1000" label="10:00"/>
+  <offered value="1030" label="10:30"/>
+  <offered value="1400" label="14:00" hint="after lunch"/>
+I picked 10:30.
+</stamp>
+
 <!-- @input -- note the masked secret -->
 <stamp block="company" kind="input">
   <field name="legal">Acme Ltd</field>
@@ -2131,6 +2207,9 @@ reorder. A positional id lands the stamp on the wrong block.
 | 46 | A value the client checked and the server took on trust | the server runs `checkField` on the stamp (§4.3.1, §8.1) |
 | 47 | A question hidden from a screen reader | `decorative` is refused on any block that asks (§9.13) |
 | 48 | A prompt read out twice | an explicit label only when `alt=` was authored (§9.13) |
+| 49 | A stamped block that calls its function again and shows rows nobody was offered | the stamp carries the `<offered>` rows; a stamped block draws those (§4.1.2) |
+| 50 | A block that runs a tool behind the human's back | `query=` names a read-only host function; the model is never in the loop (§4.1.2) |
+| 51 | A live picker with nothing in it on a host without the function | the written rows are the fallback; a query with none is warned about (§4.1.2) |
 
 ---
 
@@ -2144,6 +2223,7 @@ reorder. A positional id lands the stamp on the wrong block.
    │ @connect  scopes are rows         @order   drag to rank              │
    │ common: id= select=one|many min= max= submit= icon= expires=         │
    │         optional danger phrase= recommend=<value> (marks, not picks) │
+   │ query="fn.name k=v" rows from a READ-ONLY host fn; - rows = fallback │
    │ @connect provider= state= granted= · mark is host-chosen, never img= │
    ├── SHOW / CONTROL ────────────────────────────────────────────────────┤
    │ @note tone=info|warn|danger (markdown body)                          │
@@ -2156,7 +2236,7 @@ reorder. A positional id lands the stamp on the wrong block.
    │ @flow  dir=right|down   arrow makes a row an edge, else it is a node │
    ├── ANY BLOCK ─────────────────────────────────────────────────────────┤
    │ alt= desc= live=off|polite|assertive   decorative (SHOW blocks only) │
-   │ name and description are inferred from ? and : unless these are set │
+   │ name and description are inferred from ? and : unless these are set  │
    ├── LAYOUT ────────────────────────────────────────────────────────────┤
    │ @grid cols=<max, 1-6> min= gap=tight|normal|loose frame              │
    │ @stack gap=            @end  (or the end of the fence)               │
@@ -2179,6 +2259,7 @@ reorder. A positional id lands the stamp on the wrong block.
    │ <stamp block="…" kind="…" value(s)= label(s)= [at= by=]>             │
    │   <field name=…>  <file name= mime= ref=>  <url href= title=>        │
    │   <dial name= value= norm= poles=>                                   │
+   │   <offered value= label=>  every live row shown, with query="fn"     │
    │   A sentence a human would have typed.                               │
    │ </stamp>                                                             │
    │ attributes are the TRUTH · the sentence is the COURTESY              │
@@ -2218,6 +2299,9 @@ An implementation is **ANVIL v1 conformant** if:
     warning rather than kept.
 14. Every block exposes the corpus's accessible name, description, live mode
     and hidden flag, and a block that asks is never hidden.
+15. A `query=` names the corpus's function and arguments, a function's result
+    becomes the corpus's rows, and if it implements stamping: the stamp carries
+    the `<offered>` rows and a stamped block never calls the function again.
 
 Reference implementation: [`packages/parser`](./packages/parser) and
 [`packages/render-html`](./packages/render-html).

@@ -169,6 +169,7 @@ public enum AnvilParser {
             warnings.append(contentsOf: builder.statusWarnings(line: builder.headerLine))
             warnings.append(contentsOf: builder.flowWarnings(line: builder.headerLine))
             warnings.append(contentsOf: builder.recommendWarnings(line: builder.headerLine))
+            warnings.append(contentsOf: builder.liveWarnings(line: builder.headerLine))
             warnings.append(contentsOf: AnvilA11yRules.problems(
                 kind: builder.resolvedKind, attributes: builder.attributes, line: builder.headerLine
             ))
@@ -768,6 +769,11 @@ public enum AnvilParser {
 
         func recommendWarnings(line: Int?) -> [AnvilWarning] {
             recommendation.problem.map { [AnvilWarning($0, line: line)] } ?? []
+        }
+
+        /// SPEC 4.1.2: everything wrong with a `query=`.
+        func liveWarnings(line: Int?) -> [AnvilWarning] {
+            AnvilLiveRules.problems(kind: kind, attributes: attributes, hasRows: !options.isEmpty, line: line)
         }
     }
 

@@ -109,6 +109,73 @@ Three rules hold it in its place:
 The stamp does not repeat it. The fence that carried the recommendation is in
 the same transcript as the answer, and the model reading the stamp wrote both.
 
+**4.1.2 `query=` fills the rows from the host. The stamp keeps what was offered.**
+
+Some answers only exist at answer time. The free slots on Friday, the contacts
+that match a name, the builds that finished since lunch: an agent that writes
+them into the fence is guessing, and a guess is stale by the time the human
+reads it.
+
+```anvil
+@choice id=slot query="calendar.free date=2026-11-14 minutes=30"
+? When on Friday?
+: Both calendars are free at these times.
+- morning   | Friday morning
+- afternoon | Friday afternoon
+```
+
+```
+   ╭─ ? When on Friday? ─────────────────────────────────────╮
+   │  Both calendars are free at these times.                │
+   │                                                         │
+   │    [1]  10:00                                           │
+   │    [2]  10:30                                           │
+   │    [3]  14:00    after lunch                            │
+   ╰─────────────────────────────────────────────────────────╯
+```
+
+`query=` names a function the **host** owns, `calendar.free`, and its
+arguments as `key=value` words. Quote a value with `'…'` when it holds a space:
+`query="contacts.find name='Ana B'"`. The host calls it once, when the fence
+has closed and the block becomes answerable (§5), and the rows it returns
+replace the written ones.
+
+Five rules keep it inside the axiom:
+
+- **It is a query.** A function a host exposes here reads availability,
+  contacts, slots. It never books, sends, buys or writes. The only thing that
+  happens in ANVIL is a stamp, and the attribute is called `query=` so nobody
+  forgets that.
+- **The model is not in the loop.** The host answers the call from its own
+  registry. The agent never sees the call and is never asked to run anything,
+  so §0 still holds: nothing reaches into the agent loop. A block cannot be used
+  to run a tool behind the human's back, and a slow model cannot make a picker
+  hang.
+- **The written rows are the fallback.** A host without the function, a call
+  that fails or takes too long, and a renderer that never heard of `query=` all
+  show the `-` rows. A `query=` with no written rows is legal and warned about:
+  on every other host it is a question with no answers.
+- **What comes back is data, read field by field.** A JSON list of rows with
+  `value`, `label`, `hint`, `img`, `swatch`, `font`, `sample`, `alt` and
+  `danger`. Each is a string or a whole number, `swatch` a list of strings and
+  `danger` a boolean. A row with no value is skipped, a second row with the same
+  value is skipped, and the allowlists of §8.3 apply as they do to written
+  rows. Past twelve rows the host warns, like it would for written ones.
+  `recommend=` is matched against the rows actually shown; when the function's
+  rows do not hold that value, nothing is marked (§4.1.1).
+- **The stamp records the offer.** Calling `calendar.free` tomorrow returns
+  tomorrow's slots. A stamped block that called it again would show options the
+  human never saw, and law IV (§7.1) says the rejected rows are part of the
+  record. So the stamp carries every row the human was shown (§6.2), and a
+  stamped block draws from those, never from a fresh call. A stamp with no
+  `<offered>` rows means the written rows were shown.
+
+A host that serves the call should keep what it returned, keyed by block id,
+and refuse a stamp whose value was not among those rows (law II).
+
+Only `@choice` and `@gallery` take `query=`: they are the blocks whose rows are
+picked. Anywhere else it is ignored and warned about.
+
 ### 4.2 `@gallery`
 
 Same semantics as `@choice`, different renderer. `render=` picks the card body:

@@ -55,3 +55,6 @@ summary: "Twenty-two ways to get this wrong, ranked by how much each one hurts, 
 | 46 | A value the client checked and the server took on trust | the server runs `checkField` on the stamp (§4.3.1, §8.1) |
 | 47 | A question hidden from a screen reader | `decorative` is refused on any block that asks (§9.13) |
 | 48 | A prompt read out twice | an explicit label only when `alt=` was authored (§9.13) |
+| 49 | A stamped block that calls its function again and shows rows nobody was offered | the stamp carries the `<offered>` rows; a stamped block draws those (§4.1.2) |
+| 50 | A block that runs a tool behind the human's back | `query=` names a read-only host function; the model is never in the loop (§4.1.2) |
+| 51 | A live picker with nothing in it on a host without the function | the written rows are the fallback; a query with none is warned about (§4.1.2) |

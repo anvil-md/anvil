@@ -22,6 +22,8 @@ import {
   chartDelta,
   chartDomain,
   flowGraph,
+  liveRows,
+  liveSource,
   parseAnvil,
   recommended,
   taskProgress,
@@ -132,6 +134,18 @@ function checkBlock(actual: AnvilBlock, want: BlockExpectation, where: string): 
       expect(got.ok ? '' : got.reason, at(`reason ${v.field}=${JSON.stringify(v.value)}`)).toBe(v.reason)
     }
   }
+  if (want.liveFn !== undefined) expect(liveSource(actual)?.fn ?? '', at('live fn')).toBe(want.liveFn)
+  if (want.liveArgs) {
+    // Entries, not toEqual on the objects: an own `__proto__` key is the case
+    // being pinned, and object equality is exactly where it would be lost.
+    expect(Object.entries(liveSource(actual)?.args ?? {}), at('live args')).toEqual(Object.entries(want.liveArgs))
+  }
+  for (const [i, r] of (want.liveRows ?? []).entries()) {
+    const got = liveRows(r.result).options
+    expect(got.map(o => o.value), at(`live rows ${i} values`)).toEqual(r.values)
+    if (r.labels) expect(got.map(o => o.label), at(`live rows ${i} labels`)).toEqual(r.labels)
+    if (r.alts) expect(got.map(optionAlt), at(`live rows ${i} alts`)).toEqual(r.alts)
+  }
 }
 
 describe('conformance corpus', () => {
@@ -195,6 +209,13 @@ describe('conformance corpus', () => {
     expect(() => checkBlock(input, { verdicts: [{ field: 'n', value: '10', ok: true }] }, 'self')).toThrow()
     expect(() => checkBlock(input, { verdicts: [{ field: 'n', value: '', ok: false, reason: 'max' }] }, 'self')).toThrow()
 
+    const live = parseAnvil('@choice id=l query="a.b k=v"\n- x | X').blocks[0] as AnvilBlock
+    expect(() => checkBlock(live, { liveFn: 'a.b', liveArgs: { k: 'v' } }, 'self')).not.toThrow()
+    expect(() => checkBlock(live, { liveFn: '' }, 'self')).toThrow()
+    expect(() => checkBlock(live, { liveArgs: { k: 'w' } }, 'self')).toThrow()
+    expect(() => checkBlock(live, { liveRows: [{ result: [{ value: 'a' }], values: ['a'] }] }, 'self')).not.toThrow()
+    expect(() => checkBlock(live, { liveRows: [{ result: [{ value: 'a' }], values: [] }] }, 'self')).toThrow()
+
     const flow = parseAnvil('@flow id=f\n- a -> b\n- b -> a').blocks[0] as AnvilBlock
     expect(() => checkBlock(flow, { nodeIds: ['a', 'b'], backEdges: ['b>a'] }, 'self')).not.toThrow()
     expect(() => checkBlock(flow, { backEdges: [] }, 'self')).toThrow()
@@ -205,7 +226,7 @@ describe('conformance corpus', () => {
     const covered = coveredSections()
     // Not "every section" -- §6 and §7 are stamping, which the reference
     // implementation does not ship. These are the ones it can be held to.
-    for (const s of ['4.1', '4.3', '4.3.1', '9.13', '4.5', '4.8', '4.12.1', '4.13', '4.14', '4.15.1', '4.16.2', '4.17.3', '8.3', '11']) {
+    for (const s of ['4.1', '4.1.2', '4.3', '4.3.1', '9.13', '4.5', '4.8', '4.12.1', '4.13', '4.14', '4.15.1', '4.16.2', '4.17.3', '8.3', '11']) {
       expect(covered, `no case pins §${s}`).toContain(s)
     }
   })

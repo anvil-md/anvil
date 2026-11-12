@@ -1,3 +1,4 @@
+import AnvilKit
 import Foundation
 
 /// The conformance corpus, read straight off disk.
@@ -13,7 +14,7 @@ import Foundation
 /// lives two packages over. Tests only ever run from inside this repo, so the
 /// path is always there.
 enum Corpus {
-    struct Case: Sendable, Codable {
+    struct Case: Sendable, Decodable {
         let id: String
         let spec: String
         let title: String
@@ -24,7 +25,7 @@ enum Corpus {
     /// Only the keys the README calls "about the document model". The `html*`
     /// keys name substrings of the reference renderer's output and are not a
     /// parser's business.
-    struct Expectation: Sendable, Codable {
+    struct Expectation: Sendable, Decodable {
         var blocks: [BlockExpectation]?
         var topLevelKinds: [String]?
         var maxDepth: Int?
@@ -32,7 +33,7 @@ enum Corpus {
         var warningsContain: [String]?
     }
 
-    struct BlockExpectation: Sendable, Codable {
+    struct BlockExpectation: Sendable, Decodable {
         var kind: String?
         var id: String?
         var derivedId: Bool?
@@ -61,16 +62,28 @@ enum Corpus {
         var fieldTypes: [String]?
         /// SPEC 4.3.1: `check` run on a value. `reason` only when given.
         var verdicts: [Verdict]?
+        /// SPEC 4.1.2: the function `query=` names. `""` means it calls nothing.
+        var liveFn: String?
+        var liveArgs: [String: String]?
+        /// SPEC 4.1.2: a function's result (the INPUT) and the rows it must become.
+        var liveRows: [LiveRows]?
     }
 
-    struct A11y: Sendable, Codable {
+    struct LiveRows: Sendable, Decodable {
+        var result: AnvilJSON
+        var values: [String]
+        var labels: [String]?
+        var alts: [String]?
+    }
+
+    struct A11y: Sendable, Decodable {
         var label: String?
         var description: String?
         var live: String?
         var hidden: Bool?
     }
 
-    struct Verdict: Sendable, Codable {
+    struct Verdict: Sendable, Decodable {
         var field: String
         var value: String
         var ok: Bool
@@ -78,7 +91,7 @@ enum Corpus {
     }
 
     /// A stat row's computed change. `pct` is null when `was` is zero.
-    struct Delta: Sendable, Codable {
+    struct Delta: Sendable, Decodable {
         var diff: Double
         var pct: Double?
         var tone: String
@@ -86,7 +99,7 @@ enum Corpus {
 
     /// The range a chart's bars are drawn against, after SPEC 4.16.2 has had
     /// its say.
-    struct Domain: Sendable, Codable {
+    struct Domain: Sendable, Decodable {
         var floor: Double?
         var top: Double?
         var zeroPct: Double?
@@ -112,7 +125,7 @@ enum Corpus {
         // silently produced zero cases, and a parameterised test with zero
         // arguments is a green test that proves nothing. That is what
         // `corpusIsPresent` exists to catch.
-        struct File: Codable { let cases: [Case] }
+        struct File: Decodable { let cases: [Case] }
         return (try? JSONDecoder().decode(File.self, from: data))?.cases ?? []
     }()
 

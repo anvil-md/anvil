@@ -35,6 +35,15 @@ It is a product UI.
 I picked Editorial and Brutal.
 </stamp>
 
+<!-- @choice query= -- every row the human was shown, because calling the
+     function again tomorrow returns tomorrow's rows (§4.1.2) -->
+<stamp block="slot" kind="choice" value="1030" label="10:30" query="calendar.free">
+  <offered value="1000" label="10:00"/>
+  <offered value="1030" label="10:30"/>
+  <offered value="1400" label="14:00" hint="after lunch"/>
+I picked 10:30.
+</stamp>
+
 <!-- @input -- note the masked secret -->
 <stamp block="company" kind="input">
   <field name="legal">Acme Ltd</field>
