@@ -96,6 +96,7 @@ block visibly provisional and never answerable.
 | [`@anvil-md/markdown-it`](./packages/markdown-it) | [markdown-it](https://github.com/markdown-it/markdown-it) | Works |
 | [`@anvil-md/react`](./packages/react) | React component + react-markdown | Works |
 | [`@anvil-md/remark`](./packages/remark) | remark / unified, so MDX, Astro, Docusaurus | **Experimental** |
+| [`@anvil-md/a2ui`](./packages/a2ui) | Any [A2UI v1.0](https://a2ui.org) renderer: blocks out as surfaces, actions back as frozen stamps | **Experimental** |
 
 ### The one thing every integration gets wrong
 

@@ -1,0 +1,31 @@
+{
+  "name": "@anvil-md/a2ui",
+  "version": "0.1.0",
+  "description": "Export ANVIL blocks to A2UI v1.0 surfaces, and turn A2UI actions back into frozen ANVIL stamps.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anvil-md/anvil.git",
+    "directory": "packages/a2ui"
+  },
+  "homepage": "https://anvil-md.frst.dev",
+  "keywords": ["anvil", "a2ui", "agent", "ui", "stamp"],
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": ["src", "README.md"],
+  "dependencies": {
+    "@anvil-md/parser": "workspace:*"
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "ajv": "^8",
+    "ajv-formats": "^3"
+  }
+}

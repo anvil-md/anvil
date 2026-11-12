@@ -41,6 +41,9 @@
 			"@anvil-md/conformance": [
 				"./packages/conformance/src/index.ts"
 			],
+			"@anvil-md/a2ui": [
+				"./packages/a2ui/src/index.ts"
+			],
 			"@/*": [
 				"./site/src/*"
 			]
