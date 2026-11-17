@@ -138,7 +138,7 @@ _ token  | secret | API key`
 })
 
 describe('live rows (§4.1.2)', () => {
-  const SLOT = `@choice id=slot query="calendar.free date=2026-11-14"
+  const SLOT = `@choice id=slot query="calendar.free date=2026-11-20"
 ? When on Friday?
 - morning   | Friday morning
 - afternoon | Friday afternoon`

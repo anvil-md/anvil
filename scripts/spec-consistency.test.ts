@@ -363,6 +363,36 @@ describe('SPEC.md examples', () => {
     expect(missing).toEqual([])
   })
 
+  /**
+   * A weekday and a `date=` in the same fence must be the same day.
+   *
+   * §4.1.2 asked "When on Friday?" over `date=2026-11-14`, a Saturday, and the
+   * conformance corpus copied the fence word for word. A date in an example is
+   * held to the same standard as a count in a picture. The corpus is checked
+   * here too, because it is where a copied example goes to live forever.
+   */
+  test('a weekday written beside a date= is the weekday of that date', async () => {
+    const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    const corpus = JSON.parse(await readFile(join(ROOT, 'packages/conformance/corpus.json'), 'utf8')) as {
+      cases: { id: string; source: string }[]
+    }
+    const sources = [
+      ...EXAMPLES.map(ex => ({ where: `SPEC.md:${ex.line}`, source: ex.source })),
+      ...corpus.cases.map(c => ({ where: `corpus.json ${c.id}`, source: c.source })),
+    ]
+    const wrong: string[] = []
+
+    for (const { where, source } of sources) {
+      const named = DAYS.filter(d => new RegExp(`\\b${d}\\b`).test(source))
+      for (const m of source.matchAll(/\bdate=(\d{4})-(\d{2})-(\d{2})\b/g)) {
+        const day = DAYS[new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))).getUTCDay()]
+        for (const n of named) if (n !== day) wrong.push(`${where} says ${n} over ${m[0]}, a ${day}`)
+      }
+    }
+
+    expect(wrong).toEqual([])
+  })
+
   test('a lane count in a picture matches the rows in its source', () => {
     const wrong: string[] = []
 

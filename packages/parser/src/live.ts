@@ -2,7 +2,7 @@
  * Live rows (§4.1.2): a @choice or @gallery whose options come from a host
  * function at answer time, instead of from the agent's text.
  *
- * `query="calendar.free date=2026-11-14 minutes=30"` names a function the HOST
+ * `query="calendar.free date=2026-11-20 minutes=30"` names a function the HOST
  * owns and its arguments. The host calls it when the block becomes
  * answerable, and the rows that come back replace the authored ones.
  *

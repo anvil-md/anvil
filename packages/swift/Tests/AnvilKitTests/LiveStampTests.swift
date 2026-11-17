@@ -8,7 +8,7 @@ import Testing
 @Suite("Live rows in the stamp")
 struct LiveStampTests {
     static let fence = """
-    @choice id=slot query="calendar.free date=2026-11-14 minutes=30"
+    @choice id=slot query="calendar.free date=2026-11-20 minutes=30"
     ? When on Friday?
     : Both calendars are free at these times.
     - morning   | Friday morning

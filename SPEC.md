@@ -334,7 +334,7 @@ them into the fence is guessing, and a guess is stale by the time the human
 reads it.
 
 ```anvil
-@choice id=slot query="calendar.free date=2026-11-14 minutes=30"
+@choice id=slot query="calendar.free date=2026-11-20 minutes=30"
 ? When on Friday?
 : Both calendars are free at these times.
 - morning   | Friday morning

@@ -49,7 +49,7 @@ const TONE = `@scale id=tone steps=5
 ? Set the dials
 % formal | Formal | Playful | 2`
 
-const SLOT = `@choice id=slot query="calendar.free date=2026-11-14 minutes=30"
+const SLOT = `@choice id=slot query="calendar.free date=2026-11-20 minutes=30"
 ? When on Friday?
 - morning   | Friday morning
 - afternoon | Friday afternoon`

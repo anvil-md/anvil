@@ -1034,13 +1034,13 @@
       "id": "live-query-names-a-function-and-its-arguments",
       "spec": "4.1.2",
       "title": "query= names a host function and key=value arguments; the written rows stay as the fallback",
-      "source": "@choice id=slot query=\"calendar.free date=2026-11-14 minutes=30\"\n? When on Friday?\n- morning   | Friday morning\n- afternoon | Friday afternoon",
+      "source": "@choice id=slot query=\"calendar.free date=2026-11-20 minutes=30\"\n? When on Friday?\n- morning   | Friday morning\n- afternoon | Friday afternoon",
       "expect": {
         "blocks": [
           {
             "kind": "choice",
             "liveFn": "calendar.free",
-            "liveArgs": { "date": "2026-11-14", "minutes": "30" },
+            "liveArgs": { "date": "2026-11-20", "minutes": "30" },
             "optionValues": ["morning", "afternoon"]
           }
         ],

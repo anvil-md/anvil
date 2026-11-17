@@ -3,7 +3,7 @@ import Foundation
 /// Live rows (SPEC 4.1.2). A port of `packages/parser/src/live.ts`, held to the
 /// same corpus cases.
 ///
-/// `query="calendar.free date=2026-11-14"` names a READ-ONLY function the host
+/// `query="calendar.free date=2026-11-20"` names a READ-ONLY function the host
 /// owns. The host calls it once, when the block becomes answerable, and its
 /// rows replace the written ones; the written rows are the fallback. The model
 /// is never in the loop, and the stamp records every row that was offered
