@@ -520,6 +520,22 @@ describe('layout', () => {
     expect(layout).not.toContain('<button')
   })
 
+  test('a grid cell is as tall as its own block, never stretched to its neighbour', async () => {
+    // Grid items stretch to the row by default, so a spark beside a three-row
+    // card grew a frame twice its content's height, with an empty band under
+    // its footer (the site's chart-beside-a-card and chart-decorative).
+    const css = await stylesheet()
+    expect(declarations(css, '.anvil-layout > .anvil-auto')['align-items']).toBe('start')
+    // The rule has to reach the @grid's track container, which is a direct
+    // child of the layout...
+    const html = renderAnvilFence(GRID, true)
+    const layout = html.slice(html.indexOf('<div class="anvil-layout'))
+    expect(layout).toMatch(/^<div class="anvil-layout[^>]*>\s*(<div class="anvil-layout-title">[^<]*<\/div>)?\s*<div class="anvil-auto"/)
+    // ...and not the stat tiles, which share the track formula and should
+    // stay one height across a row.
+    expect(renderAnvilFence('@chart id=s render=stat\n- a | 1\n- b | 2 | was=1', true)).toContain('<ul class="anvil-stats anvil-auto"')
+  })
+
   test('children render inside the container, in order', () => {
     const html = renderAnvilFence(GRID, true)
     expect(html.indexOf('anvil-layout')).toBeLessThan(html.indexOf('data-anvil-id="a"'))

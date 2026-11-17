@@ -590,6 +590,15 @@
   min-width: 0;
 }
 
+/* A block in a @grid is as tall as its own content. Grid items stretch to the
+   row by default, so a spark beside a three-row card grew a frame twice its
+   height with an empty band under its footer, and its border would have kept
+   growing while the card beside it streamed in rows. Only the layout grid:
+   stat tiles share the track formula and stay one height across a row. */
+.anvil-layout > .anvil-auto {
+  align-items: start;
+}
+
 /* ── card and board ────────────────────────────────────────────────────────
  *
  * Every number drawn here is COUNTED FROM THE ROWS. There is no progress
