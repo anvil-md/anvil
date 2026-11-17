@@ -1008,6 +1008,38 @@ describe('flow', () => {
     }
   })
 
+  test('a return never runs under a node that shares a rank with either of its ends', () => {
+    // The site's flow-decision example: `fix -> review` left Push fixes on its
+    // lane side and ran along the rank, under the Merge box beside it. A
+    // rightward flow dropped the same return through the box stacked below.
+    const decision = `@flow id=review dir=down
+- [x] open   | PR opened  | shape=round
+- [~] review | Approved?  | shape=diamond
+- [ ] merge  | Merge      | squash
+- [ ] fix    | Push fixes
+- open -> review
+- review -> merge | yes
+- review -> fix   | changes requested
+- fix -> review   | re-request`
+    // The other end: `u -> t` came back into Target step through Side branch.
+    const target = `@flow id=t dir=down
+- s | Start
+- x | Side branch
+- t | Target step
+- u | Undo
+- s -> x
+- s -> t
+- t -> u
+- u -> t | again`
+    for (const source of [decision, target]) {
+      for (const flow of [source, source.replace('dir=down', 'dir=right')]) {
+        const html = renderAnvilFence(flow, true)
+        expect(wiresThroughNodes(html)).toEqual([])
+        expect(flowFaults(html)).toEqual([])
+      }
+    }
+  })
+
   test('every return runs in a lane of its own, and their labels never meet', () => {
     // One lane for every return: `c -> b` and `d -> a` drew on one line, and
     // both labels sat at the same midpoint, halfway between b and c.

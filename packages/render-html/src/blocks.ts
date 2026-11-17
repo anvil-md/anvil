@@ -1072,7 +1072,8 @@ const ROW_PAD = 6
  *
  * A gutter with one row or none turns where it always did. A rightward flow
  * needs none of this: its labels stack down the gutter at least a node's
- * height apart. An edge that skips a rank is left as it was.
+ * height apart. An edge that skips a rank is left as it was. A return's
+ * blocked end turns on a track of its own beside the rows (`trackPlan`).
  */
 function turnRows(edges: FlowEdge[], placed: Map<string, Placed>, gaps: number): { row: Map<FlowEdge, number>; rows: number[] } {
   const row = new Map<FlowEdge, number>()
@@ -1096,6 +1097,79 @@ function turnRows(edges: FlowEdge[], placed: Map<string, Placed>, gaps: number):
     rows[g] = groups.length
   }
   return { row, rows }
+}
+
+/** From a band to the first track beside it, between two tracks, and from the last track to the forward edges. */
+const TRACK_PAD = 8
+const TRACK_STEP = 8
+/** A track before a rank stays above the arrowheads that land on it, and leaves room for its own. */
+const HEAD_CLEAR = 14
+
+/** Which side of its rank an edge end's track runs on: in the gutter before the rank, or the one after it. */
+type TrackSide = 'before' | 'after'
+
+/**
+ * Which side of its rank each end of an edge takes its track on: toward the
+ * edge's other end. Only returns take one yet; the other entries are here so
+ * every kind has one.
+ */
+const TRACK_SIDE: Record<EdgeKind, { from: TrackSide; to: TrackSide }> = {
+  next: { from: 'after', to: 'before' },
+  skip: { from: 'after', to: 'before' },
+  return: { from: 'before', to: 'after' },
+}
+
+/** Where each side's `i`th track runs along the flow, given the rank's band. */
+const TRACK_AT: Record<TrackSide, (band: Band, i: number) => number> = {
+  before: (band, i) => band.start - HEAD_CLEAR - i * TRACK_STEP,
+  after: (band, i) => band.end + TRACK_PAD + i * TRACK_STEP,
+}
+
+/**
+ * The tracks: lines across a gutter, one per edge end, beside a rank and clear
+ * of the forward edges' rows and labels in the middle of the gutter.
+ *
+ * A return leaves the side of its source that faces the lane and comes back
+ * into the same side of its target, and that side is only open on the node at
+ * the lane end of its rank. From any other node the run along the rank went
+ * under its neighbours: `fix -> review` on the site passed under the Merge box.
+ * So a blocked end steps into the gap beside its node and takes a track toward
+ * the return's other end: BEFORE its rank for a source, AFTER it for a target.
+ *
+ * `slot` is each end's place among the tracks on its side of its rank; `count`
+ * says how many tracks each side of each rank holds.
+ */
+function trackPlan(graph: FlowGraph, down: boolean): {
+  slot: Map<FlowEdge, { from?: number; to?: number }>
+  count: Record<TrackSide, Map<number, number>>
+} {
+  const open = new Set(graph.ranks.map(row => (down ? row[0] : row[row.length - 1])?.id))
+  const count: Record<TrackSide, Map<number, number>> = { before: new Map(), after: new Map() }
+  const take = (side: TrackSide, rank: number): number => {
+    const n = count[side].get(rank) ?? 0
+    count[side].set(rank, n + 1)
+    return n
+  }
+  /** Whether the end of an edge at node `id` takes a track. */
+  const needs: Record<EdgeKind, (id: string) => boolean> = {
+    next: () => false,
+    skip: () => false,
+    return: id => !open.has(id),
+  }
+  const slot = new Map<FlowEdge, { from?: number; to?: number }>()
+  for (const e of graph.edges) {
+    const kind = edgeKind(e)
+    const side = TRACK_SIDE[kind]
+    const from = needs[kind](e.from) ? take(side.from, e.fromRank) : undefined
+    const to = needs[kind](e.to) ? take(side.to, e.toRank) : undefined
+    if (from !== undefined || to !== undefined) slot.set(e, { from, to })
+  }
+  return { slot, count }
+}
+
+/** The room `n` tracks take in a gutter: `pad` from the band to the first, a step to each next, and air before the forward edges. */
+function zone(n: number, pad: number): number {
+  return n ? pad + (n - 1) * TRACK_STEP + TRACK_PAD : 0
 }
 
 /** An edge label: its clipped text, its centre, and its pill's width. */
@@ -1134,14 +1208,19 @@ interface FlowPlacement {
   bands: Band[]
   /** Where each forward edge turns, along the flow. */
   turns: Map<FlowEdge, number>
+  /** Where each edge end that takes a track runs across its gutter, along the flow. */
+  tracks: Map<FlowEdge, { from?: number; to?: number }>
   down: boolean
 }
 
+/** The room gutter `g` keeps for tracks: after the rank before it, and before the rank after it. */
+type Zones = (g: number) => { after: number; before: number }
+
 /**
- * Where every node goes. In a downward flow the rows are counted against a
- * first placement, then the gutters that need them grow. Gutters only move a
- * rank along the flow, never across it, so the spans the rows were sorted by
- * do not change.
+ * Where every node goes. The rows and the tracks are counted against a first
+ * placement, then the gutters that need them grow. Gutters only move a rank
+ * along the flow, never across it, so the spans the rows were sorted by do not
+ * change.
  */
 function layoutFlow(graph: FlowGraph, down: boolean): FlowPlacement {
   const gaps = Math.max(0, graph.ranks.length - 1)
@@ -1149,29 +1228,60 @@ function layoutFlow(graph: FlowGraph, down: boolean): FlowPlacement {
   const { row, rows } = down
     ? turnRows(graph.edges, place(graph.ranks, down, even).placed, gaps)
     : { row: new Map<FlowEdge, number>(), rows: [] }
+  const plan = trackPlan(graph, down)
+  const zones: Zones = g => ({
+    after: zone(plan.count.after.get(g) ?? 0, TRACK_PAD),
+    before: zone(plan.count.before.get(g + 1) ?? 0, HEAD_CLEAR),
+  })
   const gutters = even.map((size, g) => {
     const n = rows[g] ?? 0
-    return n ? Math.max(size, n * ROW_STEP + 2 * ROW_PAD) : size
+    const { after, before } = zones(g)
+    return (n ? Math.max(size, n * ROW_STEP + 2 * ROW_PAD) : size) + after + before
   })
   const at = place(graph.ranks, down, gutters)
-  return { ...at, turns: turnsAt(graph, row, at, down), down }
+  return { ...at, turns: turnsAt(graph, row, at, zones, down), tracks: tracksAt(plan.slot, at.bands), down }
 }
 
-/** Where each forward edge turns along the flow: in its row if it has one, otherwise halfway between its ports. */
-function turnsAt(graph: FlowGraph, row: Map<FlowEdge, number>, at: { placed: Map<string, Placed>; bands: Band[] }, down: boolean): Map<FlowEdge, number> {
+/**
+ * Where each forward edge turns along the flow. One with a row turns in it.
+ * Any other turns halfway between its ports, moved to the middle of the part
+ * of the gutter the tracks leave to it, which is where an edge always turned.
+ */
+function turnsAt(
+  graph: FlowGraph,
+  row: Map<FlowEdge, number>,
+  at: { placed: Map<string, Placed>; bands: Band[] },
+  zones: Zones,
+  down: boolean,
+): Map<FlowEdge, number> {
   const turns = new Map<FlowEdge, number>()
   for (const e of graph.edges.filter(e => edgeKind(e) !== 'return')) {
     const from = at.placed.get(e.from)
     const to = at.placed.get(e.to)
     if (!from || !to) continue
+    const { after, before } = zones(e.fromRank)
     const r = row.get(e)
     const along =
       r === undefined
-        ? middle(spanOf(from, down).end, spanOf(to, down).start)
-        : (at.bands[e.fromRank]?.end ?? 0) + ROW_PAD + (r + 0.5) * ROW_STEP
+        ? middle(spanOf(from, down).end, spanOf(to, down).start) + (after - before) / 2
+        : (at.bands[e.fromRank]?.end ?? 0) + after + ROW_PAD + (r + 0.5) * ROW_STEP
     turns.set(e, along)
   }
   return turns
+}
+
+/** Each track's place along the flow, beside its end's rank on the side `TRACK_SIDE` gives that kind of edge. */
+function tracksAt(slot: Map<FlowEdge, { from?: number; to?: number }>, bands: Band[]): Map<FlowEdge, { from?: number; to?: number }> {
+  const band = (rank: number): Band => bands[rank] ?? { start: 0, end: 0 }
+  const out = new Map<FlowEdge, { from?: number; to?: number }>()
+  for (const [e, s] of slot) {
+    const side = TRACK_SIDE[edgeKind(e)]
+    out.set(e, {
+      from: s.from === undefined ? undefined : TRACK_AT[side.from](band(e.fromRank), s.from),
+      to: s.to === undefined ? undefined : TRACK_AT[side.to](band(e.toRank), s.to),
+    })
+  }
+  return out
 }
 
 /** Which router draws an edge: the next rank over, past ranks it skips, or back as a return. */
@@ -1277,11 +1387,26 @@ function outerEdge(at: FlowPlacement, tags: Tag[], sign: number): number {
   return tags.reduce((m, t) => pick(m, tagReach(t, at.down, sign)), body)
 }
 
-/** One end of a return: where it meets its lane along the flow, and its corners, from the node out, once the lane is known. */
-function returnEnd(p: Placed, sign: number, down: boolean): { along: number; to: (lane: number) => Pt[] } {
+/**
+ * How one end of a return gets from its node to the lane, listed from the node
+ * outward: straight out of the side when nothing is in the way, otherwise into
+ * the gap beside the node, along it to the end's own track in the gutter, and
+ * out along that. `side` is the port, `gap` the middle of the gap across, and
+ * `track` where the run meets the lane along the flow.
+ */
+const ESCAPE: Record<'side' | 'gap', (side: Pt, gap: number, track: number, lane: number) => Pt[]> = {
+  side: (s, _gap, _track, lane) => [s, [s[0], lane]],
+  gap: (s, gap, track, lane) => [s, [s[0], gap], [track, gap], [track, lane]],
+}
+
+/** One end of a return: where it meets its lane along the flow, and its corners once the lane is known. */
+function returnEnd(p: Placed, track: number | undefined, sign: number, down: boolean): { along: number; to: (lane: number) => Pt[] } {
   const s = spanOf(p, down)
-  const port: Pt = [middle(s.start, s.end), sign < 0 ? s.lo : s.hi]
-  return { along: port[0], to: lane => [port, [port[0], lane]] }
+  const side = sign < 0 ? s.lo : s.hi
+  const port: Pt = [middle(s.start, s.end), side]
+  const way = track === undefined ? 'side' : 'gap'
+  const along = track ?? port[0]
+  return { along, to: lane => ESCAPE[way](port, side + (sign * GAP) / 2, along, lane) }
 }
 
 /**
@@ -1301,11 +1426,10 @@ function returnEnd(p: Placed, sign: number, down: boolean): { along: number; to:
  */
 function backEdges(graph: FlowGraph, at: FlowPlacement, routes: Route[], tags: Tag[]): void {
   const sign = at.down ? -1 : 1
-  const ends = placedEdges(graph, at, 'return').map(({ e, from, to }) => ({
-    e,
-    out: returnEnd(from, sign, at.down),
-    back: returnEnd(to, sign, at.down),
-  }))
+  const ends = placedEdges(graph, at, 'return').map(({ e, from, to }) => {
+    const track = at.tracks.get(e)
+    return { e, out: returnEnd(from, track?.from, sign, at.down), back: returnEnd(to, track?.to, sign, at.down) }
+  })
   const lanes = stackRuns(
     ends.map(r => runOf(r.e.label, r.out.along, r.back.along, at.down)),
     outerEdge(at, tags, sign),
