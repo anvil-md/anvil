@@ -79,6 +79,36 @@ _ token   | secret   | API key
 _ brief   | longtext | Anything else we should know
 _ nda     | bool     | We need an NDA first`
 
+const INPUT_CHECKS = `# Every check runs before the block can stamp: on
+# the human's device, and again on the server.
+# Swap seats to min=500 max=1 and the parser drops
+# both bounds with a warning. A submit button that
+# never arms leaves the agent waiting on an answer
+# nobody can give.
+
+@input id=invoice submit="Send the invoice"
+? Who do I bill?
+: The VAT number goes straight into the accounts system, so it is checked here first.
+_ vat*   | text   | VAT number      | SE556677889901 | pattern=SE\\d{12} | error=SE and twelve digits, no spaces
+_ email* | email  | Billing email   | ap@acme.se
+_ seats* | number | Seats           | 25             | min=1 | max=500
+_ start  | date   | Contract starts |                | min=2026-12-01 | max=2027-03-31
+_ terms* | bool   | I accept the payment terms`
+
+const CHOICE_QUERY = `# A host fills these rows at answer time, from a
+# read-only function it owns. This tab is not a
+# host, so it draws the written rows and names the
+# function. Delete them and the parser warns: on a
+# host without calendar.free, that is a question
+# with no answers. Arguments are key=value words;
+# try adding minutes=30.
+
+@choice id=slot query="calendar.free date=2026-11-20"
+? When on Friday?
+: Both calendars are free at these times.
+- morning   | Friday morning
+- afternoon | Friday afternoon`
+
 const NOTE = `@note tone=warn
 > Staging shares the production database.
 > Migrations you run there are real, and there is no snapshot.
@@ -139,6 +169,42 @@ const EPIC = `@card id=ANV-100 type=epic as=14:02
 - [ ] ANV-121 | Load test at 10x
 - [~] ANV-117 | Dead-letter queue
 - [x] ANV-115 | Retry scheduler`
+
+const CHART = `# The rows are the data, so the range has to hold
+# every one of them. Add min=4 to the first block:
+# W21 is 3.2, and the parser refuses to clip it.
+# Edit a was= on the tiles and the change follows,
+# because there is no delta= to type.
+
+@chart id=signups render=bar unit=k as=14:02
+? Signups by week
+: Week 22 is the launch.
+- W21 | 3.2
+- W22 | 4.8 | launch
+- W23 | 4.1
+- W24 | 4.4
+
+@chart id=outreach render=stat better=up as=14:02
+? Outreach today
+- Read   | 40 | was=34
+- Leads  | 12 | was=9
+- Failed | 2  | was=0 | better=down`
+
+const FLOW = `# The arrow decides what a row is: with one it is
+# an edge, without one it declares a node. Delete
+# the four declarations and it still draws, because
+# an edge may name a node nobody declared. On a wide
+# screen, try dir=right.
+
+@flow id=deploy dir=down as=14:02
+? Deploy pipeline
+- [x] build  | Build      | 2m 10s
+- [x] test   | Test       | 412 passed
+- [!] canary | Canary     | p95 over budget
+- [ ] prod   | Production | shape=round
+- build -> test -> canary
+- canary -> prod  | healthy
+- canary -> build | rebuild`
 
 const LAYOUT = `# Drag the window narrower. Nothing here has a breakpoint:
 # cols= is a MAXIMUM, and the collapse is computed against the
@@ -211,12 +277,16 @@ const LIFECYCLE = `# THE CLICK IS APPROVAL, NOT DELIVERY.
 
 export const PRESETS: Preset[] = [
 	{ id: 'choice', label: '@choice', source: CHOICE },
+	{ id: 'choice-query', label: '@choice query=', source: CHOICE_QUERY },
 	{ id: 'gallery', label: '@gallery render=swatch', source: GALLERY },
 	{ id: 'scale', label: '@scale', source: SCALE },
 	{ id: 'input', label: '@input', source: INPUT },
+	{ id: 'input-checks', label: '@input pattern=', source: INPUT_CHECKS },
 	{ id: 'note', label: '@note tone=warn', source: NOTE },
 	{ id: 'card', label: '@card', source: CARD },
 	{ id: 'epic', label: '@card type=epic + @board', source: EPIC },
+	{ id: 'chart', label: '@chart', source: CHART },
+	{ id: 'flow', label: '@flow', source: FLOW },
 	{ id: 'message', label: '@message', source: MESSAGE },
 	{ id: 'lifecycle', label: 'draft → sent', source: LIFECYCLE },
 	{ id: 'layout', label: '@grid + @stack', source: LAYOUT },

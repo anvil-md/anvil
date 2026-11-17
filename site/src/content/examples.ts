@@ -78,6 +78,17 @@ export const GROUPS: ExampleGroup[] = [
 - team  | Team  | Pro plus SSO`,
 			},
 			{
+				id: 'choice-query',
+				title: '@choice query=',
+				spec: '4.1.2',
+				note: "Friday's free slots are only known at answer time, and an agent that types them into the fence is guessing. The host fills the rows from a read-only function it owns, and the model never sees the call. The stamp keeps every row that was offered, because `calendar.free` asked again tomorrow returns tomorrow's slots. This page is not a host, so it shows the written rows, as any host without the function would.",
+				source: `@choice id=slot query="calendar.free date=2026-11-20"
+? When on Friday?
+: Both calendars are free at these times.
+- morning   | Friday morning
+- afternoon | Friday afternoon`,
+			},
+			{
 				id: 'gallery-swatch',
 				title: '@gallery render=swatch',
 				spec: '4.2',
@@ -88,6 +99,18 @@ export const GROUPS: ExampleGroup[] = [
 - deep | Deep water    | cold, gridded | swatch=#0b2540,#1d7a8c,#e8f1f2
 - volt | Volt          | loud, black   | swatch=#0a0a0a,#e6ff00,#8a8a8a
 - moss | Moss          | quiet, matte  | swatch=#1f2a1c,#7f9971,#e7e3d6`,
+			},
+			{
+				id: 'gallery-alt',
+				title: 'Swatches with alt=',
+				spec: '9.13',
+				note: 'Without `alt=`, a screen reader hears the label and nothing else, because three colour chips read aloud are three silences. That holds until the colours are the answer: "Volt" says nothing about acid yellow. A row\'s `alt=` replaces its name with words, so the human who cannot see the chips chooses between the same palettes as everybody else.',
+				wide: true,
+				source: `@gallery id=theme render=swatch
+? Which theme for the dashboard?
+- ink  | Ink and paper | swatch=#111111,#f5f2ea,#c8452d | alt=Ink and paper: near-black on cream, a red accent
+- deep | Deep water    | swatch=#0b2540,#1d7a8c,#e8f1f2 | alt=Deep water: navy and teal on ice white
+- volt | Volt          | swatch=#0a0a0a,#e6ff00,#8a8a8a | alt=Volt: black, acid yellow and grey`,
 			},
 			{
 				id: 'input',
@@ -103,6 +126,21 @@ _ seats   | number   | How many seats  | 25
 _ token   | secret   | API key
 _ brief   | longtext | Anything else we should know
 _ nda     | bool     | We need an NDA first`,
+			},
+			{
+				id: 'input-checks',
+				title: 'Field checks',
+				spec: '4.3.1',
+				note: 'A wrong VAT number caught in the field costs the human one keystroke. Caught after the stamp, it costs the agent a turn and a second question. The required switch is the consent box, the only reason a required `bool` exists. A check nothing can satisfy, like `min=5 max=2`, is dropped with a warning, because a submit button that never arms leaves the agent waiting on an answer nobody can give.',
+				wide: true,
+				source: `@input id=invoice submit="Send the invoice"
+? Who do I bill?
+: The VAT number goes straight into the accounts system, so it is checked here first.
+_ vat*   | text   | VAT number      | SE556677889901 | pattern=SE\\d{12} | error=SE and twelve digits, no spaces
+_ email* | email  | Billing email   | ap@acme.se
+_ seats* | number | Seats           | 25             | min=1 | max=500
+_ start  | date   | Contract starts |                | min=2026-12-01 | max=2027-03-31
+_ terms* | bool   | I accept the payment terms`,
 			},
 			{
 				id: 'scale',
@@ -130,6 +168,17 @@ _ nda     | bool     | We need an NDA first`,
 
 @note tone=info
 > And the quiet one, for the things that are not questions at all.`,
+			},
+			{
+				id: 'note-live',
+				title: '@note live=',
+				spec: '9.13',
+				note: 'Blocks never change once drawn, but a transcript keeps adding them, and a screen reader user hears none of it unless something says so. The finished migration is `polite`, read out once the screen reader is done with what it was saying. The danger note has no `live=` and arrives `assertive` anyway, because "production is down" found by scrolling is found too late. Everything else arrives quietly: a transcript that announces every block is one a screen reader user mutes.',
+				source: `@note tone=info live=polite
+> The migration finished: 41,200 rows moved, no errors.
+
+@note tone=danger
+> Production is returning 502s. I have stopped the rollout.`,
 			},
 		],
 	},
@@ -215,7 +264,7 @@ _ nda     | bool     | We need an NDA first`,
 				id: 'card-lead-face',
 				title: 'The same card, with a host face',
 				spec: '4.12.5',
-				note: 'Identical source, drawn by a host that registered a face for `lead`. The face owns the body; the ref, type, title and snapshot footer stay the language\'s. A face that dropped a chip would get a warning naming it.',
+				note: "Identical source, drawn by a host that registered a face for `lead`. The face owns the body; the ref, type, title and snapshot footer stay the language's. A face that dropped a chip would get a warning naming it.",
 				host: true,
 				source: `@card id=demo.bakery type=lead as=09:00
 ? @demo.bakery
@@ -248,7 +297,7 @@ _ nda     | bool     | We need an NDA first`,
 				id: 'message-chrome',
 				title: 'Channels',
 				spec: '4.15.4',
-				note: 'Three chromes cover every channel worth drawing: an envelope, a bubble, a channel post. Anything unrecognised renders as a plain memo with a warning rather than borrowing somebody else\'s bubble.',
+				note: "Three chromes cover every channel worth drawing: an envelope, a bubble, a channel post. Anything unrecognised renders as a plain memo with a warning rather than borrowing somebody else's bubble.",
 				source: `@message channel=whatsapp to="+66945556292" sent=14:07
 > retry ladder is live. 2 of 7 subtasks done.
 
@@ -342,6 +391,35 @@ _ nda     | bool     | We need an NDA first`,
 - activated | 4.1
 - churn     | -2.8 | good
 - revenue   | -0.4`,
+			},
+			{
+				id: 'chart-alt',
+				title: 'alt= and desc=',
+				spec: '9.13',
+				note: 'Most blocks need neither: the prompt is the accessible name and the subtext the description. A chart is where that runs out. Its point is the shape, and "Signups" read aloud names the block without saying what it shows. `alt=` hands the screen reader the sentence the columns say to everybody else.',
+				wide: true,
+				source: `@chart id=signups-h1 render=column alt="Signups doubled since March" desc="Monthly signups, January to June" as=14:02
+? Signups
+- Jan | 310
+- Feb | 295
+- Mar | 320
+- Apr | 410
+- May | 530
+- Jun | 640`,
+			},
+			{
+				id: 'chart-decorative',
+				title: 'decorative',
+				spec: '9.13',
+				note: 'The tile already says 31 ms, from 12 a week ago. The spark is the same week as a shape, and `decorative` takes it out of the accessibility tree, so a screen reader user does not sit through seven more numbers to make a point already made. It is refused on anything that asks: a question hidden from a screen reader is one only sighted people can answer, while the agent waits on everybody.',
+				wide: true,
+				source: `@grid cols=2 min=16rem
+@chart id=p95-today render=stat unit=ms better=down as=14:02
+? p95 latency
+- Today | 31 | was=12
+@chart id=p95-week render=spark values=12,14,11,19,24,22,31 unit=ms decorative
+? The week in between
+@end`,
 			},
 			{
 				id: 'flow',
@@ -505,4 +583,4 @@ _ email | emial | a field type nobody has heard of`,
 	},
 ]
 
-export const EXAMPLES: Example[] = GROUPS.flatMap(g => g.examples)
+export const EXAMPLES: Example[] = GROUPS.flatMap((g) => g.examples)
