@@ -845,6 +845,9 @@ const ROW_H = 17
 const GUTTER_MIN = 46
 const GAP = 16
 const LANE = 26
+/** An edge label's pill: its height, and the least room it leaves to a box. */
+const TAG_H = 16
+const TAG_CLEAR = 8
 
 /** The widest edge label, in pixels, once clipping has had its say. */
 function widestLabel(edges: FlowEdge[]): number {
@@ -999,7 +1002,7 @@ function edgeLabel(text: string, x: number, y: number): string {
   if (!text) return ''
   const t = clip(text, EDGE_MAX_CHARS)
   const w = t.length * CHAR_PX + 10
-  return `<g class="anvil-flow-tag"><rect x="${(x - w / 2).toFixed(1)}" y="${(y - 8).toFixed(1)}" width="${w.toFixed(1)}" height="16" rx="4"></rect><text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" dominant-baseline="central">${esc(t)}</text></g>`
+  return `<g class="anvil-flow-tag"><rect x="${(x - w / 2).toFixed(1)}" y="${(y - TAG_H / 2).toFixed(1)}" width="${w.toFixed(1)}" height="${TAG_H}" rx="4"></rect><text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" dominant-baseline="central">${esc(t)}</text></g>`
 }
 
 export function renderFlow(b: AnvilBlock): string {
@@ -1020,11 +1023,17 @@ export function renderFlow(b: AnvilBlock): string {
   // The lane carries the return's own label, and that label is centred ON the
   // lane -- so the box has to clear half of it or the text is sliced off at the
   // edge. `re-request` rendered as `equest` before this was accounted for.
+  //
+  // The same half reaches the other way, toward the body, ALONG THE AXIS IT
+  // CROSSES: a label's width beside the vertical lane of a downward flow, its
+  // height under the horizontal lane of a rightward one. A fixed 26 put a
+  // downward "fix and rebuild" across the Test box.
   const hasBack = graph.edges.some(e => e.back)
   const backLabel = widestLabel(graph.edges.filter(e => e.back))
-  const lane = down ? -LANE : h + LANE
+  const laneGap = Math.max(LANE, (down ? backLabel : TAG_H) / 2 + TAG_CLEAR)
+  const lane = down ? -laneGap : h + laneGap
   const pad = 8
-  const clearance = LANE + backLabel / 2 + pad
+  const clearance = (down ? laneGap : LANE) + backLabel / 2 + pad
   const minX = down && hasBack ? -clearance : -pad
   const minY = -pad
   const maxY = !down && hasBack ? h + clearance : h + pad

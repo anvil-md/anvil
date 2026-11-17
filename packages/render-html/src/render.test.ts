@@ -19,6 +19,51 @@ function declarations(css: string, selector: string): Record<string, string> {
   )
 }
 
+interface Box {
+  x: number
+  y: number
+  w: number
+  h: number
+  text?: string
+}
+
+/** Every node outline and every edge label in a rendered flow, as boxes in the svg's own units. */
+function flowBoxes(html: string): { nodes: Box[]; labels: Box[]; view: Box } {
+  const num = (m: RegExpMatchArray, i: number): number => Number(m[i])
+  const nodes: Box[] = [
+    ...html.matchAll(/<rect class="anvil-flow-box" x="([-\d.]+)" y="([-\d.]+)" width="([\d.]+)" height="([\d.]+)"/g),
+  ].map(m => ({ x: num(m, 1), y: num(m, 2), w: num(m, 3), h: num(m, 4) }))
+  for (const m of html.matchAll(/<polygon class="anvil-flow-box" points="([^"]+)"/g)) {
+    const pts = (m[1] as string).split(' ').map(p => p.split(',').map(Number) as [number, number])
+    const xs = pts.map(p => p[0])
+    const ys = pts.map(p => p[1])
+    nodes.push({ x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) })
+  }
+  const labels = [
+    ...html.matchAll(
+      /<g class="anvil-flow-tag"><rect x="([-\d.]+)" y="([-\d.]+)" width="([\d.]+)" height="([\d.]+)"[^>]*><\/rect><text[^>]*>([^<]*)<\/text>/g,
+    ),
+  ].map(m => ({ x: num(m, 1), y: num(m, 2), w: num(m, 3), h: num(m, 4), text: m[5] }))
+  const v = /anvil-flow-svg" viewBox="([-\d.]+) ([-\d.]+) ([\d.]+) ([\d.]+)"/.exec(html)
+  const view = v ? { x: num(v, 1), y: num(v, 2), w: num(v, 3), h: num(v, 4) } : { x: 0, y: 0, w: 0, h: 0 }
+  return { nodes, labels, view }
+}
+
+function overlap(a: Box, b: Box): boolean {
+  return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+}
+
+/** Each pair of label boxes that touch, and each label that lies on a node, by name. */
+function collisions(html: string): string[] {
+  const { nodes, labels } = flowBoxes(html)
+  const out: string[] = []
+  labels.forEach((l, i) => {
+    for (const o of labels.slice(i + 1)) if (overlap(l, o)) out.push(`"${l.text}" covers "${o.text}"`)
+    for (const n of nodes) if (overlap(l, n)) out.push(`"${l.text}" covers the node at ${n.x},${n.y}`)
+  })
+  return out
+}
+
 const CHOICE = `@choice id=deploy-target
 ? Where should I ship this?
 : Staging is wiped nightly.
@@ -769,6 +814,26 @@ describe('flow', () => {
 
   test('an empty flow is an empty flow', () => {
     expect(renderAnvilFence('@flow id=f', true)).toContain('No steps.')
+  })
+
+  test('a downward back edge keeps its label off the nodes, however wide it is', () => {
+    // The lane sat a fixed 26 units left of the body with its label centred on
+    // it, so any label wider than 52 reached back into the boxes: "fix and
+    // rebuild" lay across Test.
+    for (const label of ['x', 'retry', 'fix and rebuild', 'a twenty char label!']) {
+      const html = renderAnvilFence(
+        `@flow id=d dir=down\n- build | Build\n- test | Test\n- canary | Canary\n- build -> test -> canary\n- canary -> build | ${label}`,
+        true,
+      )
+      expect(collisions(html)).toEqual([])
+      // ...and the viewBox still holds the whole label, the failure the lane
+      // offset was first written for (`re-request` drew as `equest`).
+      const { labels, view } = flowBoxes(html)
+      for (const l of labels) {
+        expect(l.x).toBeGreaterThanOrEqual(view.x)
+        expect(l.x + l.w).toBeLessThanOrEqual(view.x + view.w)
+      }
+    }
   })
 })
 
