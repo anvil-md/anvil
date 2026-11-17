@@ -1,4 +1,7 @@
 import { describe, expect, test } from 'bun:test'
+import { CORPUS } from '@anvil-md/conformance'
+import { EXAMPLES } from '../../../site/src/content/examples'
+import { DEFAULT_SOURCE, PRESETS } from '../../../site/src/scripts/playground'
 import { type CardFace, renderAnvilFence } from './render'
 
 function stylesheet(): Promise<string> {
@@ -240,6 +243,37 @@ const FIXTURES = [
   BOARD,
   GRID,
 ]
+
+/** The ```anvil fences in a Markdown document that hold a @flow. */
+function flowFences(markdown: string): string[] {
+  return [...markdown.matchAll(/^```anvil\n([\s\S]*?)^```$/gm)].map(m => m[1] as string).filter(f => /^@flow\b/m.test(f))
+}
+
+/**
+ * Every @flow a reader of this project meets: the SPEC.md and README.md fences,
+ * the conformance corpus, the site's examples and its playground presets. A
+ * routing rule checked on one hand-made case was how `fix -> review` reached
+ * the live site running under the Merge box.
+ */
+const SHIPPED_FLOWS: { name: string; source: string }[] = [
+  ...(await Promise.all(
+    ['SPEC.md', 'README.md'].map(async doc =>
+      flowFences(await Bun.file(new URL(`../../../${doc}`, import.meta.url)).text()).map((source, i) => ({ name: `${doc} flow ${i + 1}`, source })),
+    ),
+  )).flat(),
+  ...CORPUS.cases.filter(c => /^@flow\b/m.test(c.source)).map(c => ({ name: `corpus ${c.id}`, source: c.source })),
+  ...EXAMPLES.filter(e => /^@flow\b/m.test(e.source)).map(e => ({ name: `example ${e.id}`, source: e.source })),
+  ...[...PRESETS, { id: 'default', source: DEFAULT_SOURCE }]
+    .filter(p => /^@flow\b/m.test(p.source))
+    .map(p => ({ name: `playground ${p.id}`, source: p.source })),
+]
+
+/** The same flows the other way round: `dir=down` becomes the default `right`, and the default becomes `down`. */
+function turned(source: string): string {
+  return source.replace(/^@flow\b.*$/gm, line =>
+    /\bdir=down\b/.test(line) ? line.replace(/\s*\bdir=down\b/, '') : `${line.replace(/\s*\bdir=\w+/, '')} dir=down`,
+  )
+}
 
 describe('renderAnvilFence', () => {
   test('emits a block per parsed block and marks streaming', () => {
@@ -1040,6 +1074,19 @@ describe('flow', () => {
     }
   })
 
+  test('an edge that skips a rank goes round it, and its label stays off every node', () => {
+    // `a -> c` turned halfway between its ports, which is the middle of the
+    // rank it skips: the line ran through Beta step and the label lay under it.
+    for (const dir of ['down', 'right']) {
+      const html = renderAnvilFence(
+        `@flow id=s dir=${dir}\n- a | Alpha step\n- b | Beta step\n- c | Gamma\n- a -> b\n- b -> c\n- a -> c | skips beta`,
+        true,
+      )
+      expect(wiresThroughNodes(html)).toEqual([])
+      expect(flowFaults(html)).toEqual([])
+    }
+  })
+
   test('every return runs in a lane of its own, and their labels never meet', () => {
     // One lane for every return: `c -> b` and `d -> a` drew on one line, and
     // both labels sat at the same midpoint, halfway between b and c.
@@ -1048,6 +1095,45 @@ describe('flow', () => {
       expect(sharedLanes(html)).toEqual([])
       expect(flowFaults(html)).toEqual([])
     }
+  })
+
+  test('every flow the project ships draws without a fault, both ways round', () => {
+    expect(SHIPPED_FLOWS.length).toBeGreaterThan(10)
+    const faults = SHIPPED_FLOWS.flatMap(({ name, source }) =>
+      [source, turned(source)].flatMap((flow, i) =>
+        flowFaults(renderAnvilFence(flow, true)).map(f => `${name}${i ? ', turned' : ''}: ${f}`),
+      ),
+    )
+    expect(faults).toEqual([])
+  })
+
+  test('random downward flows draw without a fault', () => {
+    // The shipped flows are a dozen hand-made graphs. Random ones are where an
+    // edge that skips a rank was caught turning inside its own rank, through
+    // the tip of a wide diamond, after the hand-made cases had all passed.
+    // Rightward flows join this test once edges between neighbouring ranks
+    // stop doing the same thing
+    // (bug-flow-right-edge-turns-inside-its-rank-when-a-node-is-narrower).
+    let seed = 7
+    const rnd = (): number => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff
+      return seed / 0x7fffffff
+    }
+    const pick = (n: number): number => Math.floor(rnd() * n)
+    const faults: string[] = []
+    for (let k = 0; k < 300; k++) {
+      const n = 3 + pick(6)
+      const rows = Array.from({ length: n }, (_, i) => i)
+        .filter(() => rnd() < 0.5)
+        .map(i => `- n${i} | Node ${'x'.repeat(pick(12))}${rnd() < 0.3 ? ' | a note' : ''}${rnd() < 0.2 ? ' | shape=diamond' : ''}`)
+      for (let j = n + pick(n); j > 0; j--) {
+        const [a, b] = [pick(n), pick(n)]
+        if (a !== b) rows.push(`- n${a} -> n${b}${rnd() < 0.5 ? ` | e${j}${'-'.repeat(pick(14))}` : ''}`)
+      }
+      const flow = `@flow id=r dir=down\n${rows.join('\n')}`
+      faults.push(...flowFaults(renderAnvilFence(flow, true)).map(f => `${f} in\n${flow}`))
+    }
+    expect(faults).toEqual([])
   })
 })
 

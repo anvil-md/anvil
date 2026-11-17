@@ -1072,8 +1072,8 @@ const ROW_PAD = 6
  *
  * A gutter with one row or none turns where it always did. A rightward flow
  * needs none of this: its labels stack down the gutter at least a node's
- * height apart. An edge that skips a rank is left as it was. A return's
- * blocked end turns on a track of its own beside the rows (`trackPlan`).
+ * height apart. An edge that skips a rank, or a return, turns on a track of
+ * its own beside the rows (`trackPlan`).
  */
 function turnRows(edges: FlowEdge[], placed: Map<string, Placed>, gaps: number): { row: Map<FlowEdge, number>; rows: number[] } {
   const row = new Map<FlowEdge, number>()
@@ -1110,8 +1110,8 @@ type TrackSide = 'before' | 'after'
 
 /**
  * Which side of its rank each end of an edge takes its track on: toward the
- * edge's other end. Only returns take one yet; the other entries are here so
- * every kind has one.
+ * edge's other end. An edge between neighbouring ranks never takes one; its
+ * entry is here so every kind has one.
  */
 const TRACK_SIDE: Record<EdgeKind, { from: TrackSide; to: TrackSide }> = {
   next: { from: 'after', to: 'before' },
@@ -1128,6 +1128,14 @@ const TRACK_AT: Record<TrackSide, (band: Band, i: number) => number> = {
 /**
  * The tracks: lines across a gutter, one per edge end, beside a rank and clear
  * of the forward edges' rows and labels in the middle of the gutter.
+ *
+ * Two kinds of edge end leave the middle of the gutter to the forward edges.
+ *
+ * An edge that skips a rank turned halfway between its ports, which is the
+ * middle of the rank it skips: `a -> c` ran through Beta step and its label
+ * lay under it. It now takes a track AFTER its source's rank out to a channel
+ * past the ranks it skips, and one BEFORE its target's rank back in. A shared
+ * row or the gutter's middle line put it on top of other edges' turns.
  *
  * A return leaves the side of its source that faces the lane and comes back
  * into the same side of its target, and that side is only open on the node at
@@ -1153,7 +1161,7 @@ function trackPlan(graph: FlowGraph, down: boolean): {
   /** Whether the end of an edge at node `id` takes a track. */
   const needs: Record<EdgeKind, (id: string) => boolean> = {
     next: () => false,
-    skip: () => false,
+    skip: () => true,
     return: id => !open.has(id),
   }
   const slot = new Map<FlowEdge, { from?: number; to?: number }>()
@@ -1206,7 +1214,7 @@ interface FlowPlacement {
   w: number
   h: number
   bands: Band[]
-  /** Where each forward edge turns, along the flow. */
+  /** Where each edge between neighbouring ranks turns, along the flow. */
   turns: Map<FlowEdge, number>
   /** Where each edge end that takes a track runs across its gutter, along the flow. */
   tracks: Map<FlowEdge, { from?: number; to?: number }>
@@ -1243,9 +1251,10 @@ function layoutFlow(graph: FlowGraph, down: boolean): FlowPlacement {
 }
 
 /**
- * Where each forward edge turns along the flow. One with a row turns in it.
- * Any other turns halfway between its ports, moved to the middle of the part
- * of the gutter the tracks leave to it, which is where an edge always turned.
+ * Where each edge between neighbouring ranks turns along the flow. One with a
+ * row turns in it. Any other turns halfway between its ports, moved to the
+ * middle of the part of the gutter the tracks leave to it, which is where an
+ * edge always turned.
  */
 function turnsAt(
   graph: FlowGraph,
@@ -1255,7 +1264,7 @@ function turnsAt(
   down: boolean,
 ): Map<FlowEdge, number> {
   const turns = new Map<FlowEdge, number>()
-  for (const e of graph.edges.filter(e => edgeKind(e) !== 'return')) {
+  for (const e of graph.edges.filter(e => edgeKind(e) === 'next')) {
     const from = at.placed.get(e.from)
     const to = at.placed.get(e.to)
     if (!from || !to) continue
@@ -1318,13 +1327,13 @@ function forwardPorts(from: Placed, to: Placed, down: boolean): [Pt, Pt] {
 }
 
 /**
- * The forward edges: out of the box, across the gutter at the edge's turn,
- * into the next box. A label sits on the gutter crossing, which is the
- * midpoint of the middle segment whichever way the flow runs, at the edge's
- * own row where a downward gutter has rows.
+ * The edges between neighbouring ranks: out of the box, across the gutter at
+ * the edge's turn, into the next box. A label sits on the gutter crossing,
+ * which is the midpoint of the middle segment whichever way the flow runs, at
+ * the edge's own row where a downward gutter has rows.
  */
 function forwardEdges(graph: FlowGraph, at: FlowPlacement, routes: Route[], tags: Tag[]): void {
-  for (const { e, from, to } of [...placedEdges(graph, at, 'next'), ...placedEdges(graph, at, 'skip')]) {
+  for (const { e, from, to } of placedEdges(graph, at, 'next')) {
     const [p, q] = forwardPorts(from, to, at.down)
     const turn = at.turns.get(e) ?? middle(p[0], q[0])
     routes.push({ e, points: [p, [turn, p[1]], [turn, q[1]], q] })
@@ -1334,9 +1343,10 @@ function forwardEdges(graph: FlowGraph, at: FlowPlacement, routes: Route[], tags
 }
 
 /**
- * A run outside the body, along the flow: a return's lane. `lo` and `hi` are
- * its extent along the flow with its label included; `half` is how far the
- * label reaches across from the line, toward the body and away from it.
+ * A run outside the body, along the flow: a return's lane, or the channel an
+ * edge takes past the ranks it skips. `lo` and `hi` are its extent along the
+ * flow with its label included; `half` is how far the label reaches across
+ * from the line, toward the body and away from it.
  */
 interface Run {
   lo: number
@@ -1385,6 +1395,38 @@ function outerEdge(at: FlowPlacement, tags: Tag[], sign: number): number {
   const body = sign > 0 ? (at.down ? at.w : at.h) : 0
   const pick = sign > 0 ? Math.max : Math.min
   return tags.reduce((m, t) => pick(m, tagReach(t, at.down, sign)), body)
+}
+
+/**
+ * The edges that skip a rank.
+ *
+ * Ranks are longest-path, so `a -> b -> c` plus `a -> c` puts `a -> c` across
+ * two gutters, and turning it halfway between its ports put the turn, the line
+ * and the label in the middle of the Beta step it skipped. Now it leaves on
+ * its track after its source's rank, runs past the ranks it skips in a channel
+ * beyond the FAR side of the body -- the near side is the returns' -- and
+ * comes back on its track before its target's rank. Its label sits on the
+ * channel, beside the ranks it skips. The forward labels are already in `tags`
+ * and may reach past the outermost box, so the channels start beyond them.
+ */
+function skipEdges(graph: FlowGraph, at: FlowPlacement, routes: Route[], tags: Tag[]): void {
+  const far = at.down ? 1 : -1
+  const legs = placedEdges(graph, at, 'skip').map(({ e, from, to }) => {
+    const [p, q] = forwardPorts(from, to, at.down)
+    const track = at.tracks.get(e)
+    return { e, p, q, out: track?.from ?? p[0], back: track?.to ?? q[0] }
+  })
+  const channels = stackRuns(
+    legs.map(l => runOf(l.e.label, l.out, l.back, at.down)),
+    outerEdge(at, tags, far),
+    far,
+  )
+  legs.forEach(({ e, p, q, out, back }, i) => {
+    const c = channels[i] ?? 0
+    routes.push({ e, points: [p, [out, p[1]], [out, c], [back, c], [back, q[1]], q] })
+    const t = tagAt(e.label, [middle(out, back), c], at.down)
+    if (t) tags.push(t)
+  })
 }
 
 /**
@@ -1486,11 +1528,12 @@ export function renderFlow(b: AnvilBlock): string {
     return `<path class="${cls}" d="${svgPath(points, down)}" fill="none"${head}></path>`
   }
 
-  // Forward edges, then the returns, whose lanes start beyond the labels the
-  // forward edges put down.
+  // Forward edges, then the ones that skip ranks, then the returns: each
+  // router places its runs beyond the labels the ones before it put down.
   const routes: Route[] = []
   const tags: Tag[] = []
   forwardEdges(graph, at, routes, tags)
+  skipEdges(graph, at, routes, tags)
   backEdges(graph, at, routes, tags)
   const view = drawnBounds(at, tags, routes)
   const [minX, minY, viewW, viewH] = [view.x, view.y, view.w, view.h]
