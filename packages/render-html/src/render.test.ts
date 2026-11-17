@@ -1,6 +1,24 @@
 import { describe, expect, test } from 'bun:test'
 import { type CardFace, renderAnvilFence } from './render'
 
+function stylesheet(): Promise<string> {
+  return Bun.file(new URL('../anvil.css', import.meta.url)).text()
+}
+
+/** The declarations of the one top-level rule whose selector is exactly `selector`. */
+function declarations(css: string, selector: string): Record<string, string> {
+  const flat = css.replace(/\/\*[\s\S]*?\*\//g, '')
+  const at = flat.indexOf(`\n${selector} {`)
+  if (at < 0) return {}
+  const body = flat.slice(flat.indexOf('{', at) + 1, flat.indexOf('}', at))
+  return Object.fromEntries(
+    body
+      .split(';')
+      .map(d => [d.slice(0, d.indexOf(':')).trim(), d.slice(d.indexOf(':') + 1).trim()])
+      .filter(([k]) => k),
+  )
+}
+
 const CHOICE = `@choice id=deploy-target
 ? Where should I ship this?
 : Staging is wiped nightly.
@@ -639,6 +657,45 @@ describe('chart', () => {
 
   test('an empty chart is an empty chart, not a frame with a shape in it', () => {
     expect(renderAnvilFence('@chart id=c', true)).toContain('No data.')
+  })
+
+  test('the last point is a round dot that stays inside the frame at any width', async () => {
+    // It was a <circle r=2.5> in the line's own viewBox, which is stretched with
+    // preserveAspectRatio="none" so the line fills any width. That stretch is not
+    // uniform: at 1000px by 3.5rem the dot drew 50px wide and 2.8px tall, and
+    // half of it hung past the right edge of the frame.
+    const css = await stylesheet()
+    const spark = declarations(css, '.anvil-spark')
+    const dot = declarations(css, '.anvil-spark-last')
+    const size = Number.parseFloat(spark['--anvil-spark-dot'] ?? '')
+    const inset = Number.parseFloat(spark.padding ?? '')
+
+    const rows = [3, 5, 4, 8, 6, 9].map((v, i) => `- d${i} | ${v}`).join('\n')
+    for (const mode of ['line', 'spark']) {
+      const html = renderAnvilFence(`@chart id=c render=${mode}\n${rows}`, true)
+      const svg = /<svg class="anvil-spark-svg"[\s\S]*?<\/svg>/.exec(html)?.[0] ?? ''
+      expect(svg).not.toContain('<circle')
+      expect(dot.width).toBe('var(--anvil-spark-dot)')
+      expect(dot.height).toBe('var(--anvil-spark-dot)')
+      expect(size).toBeGreaterThan(0)
+      const at = /<i class="anvil-spark-last" style="left:([\d.]+)%;top:([\d.]+)%"><\/i>/.exec(html)
+      expect(at).not.toBeNull()
+      const [left, top] = [Number(at?.[1]), Number(at?.[2])]
+      // The highest value is also the last, so the dot sits in the top-right corner.
+      expect([left, top]).toEqual([100, 0])
+      for (const [w, h] of [
+        [320, 26],
+        [1240, 56],
+        [4000, 56],
+      ] as const) {
+        const x = inset + ((w - 2 * inset) * left) / 100 - size / 2
+        const y = inset + ((h - 2 * inset) * top) / 100 - size / 2
+        expect(x).toBeGreaterThanOrEqual(0)
+        expect(y).toBeGreaterThanOrEqual(0)
+        expect(x + size).toBeLessThanOrEqual(w)
+        expect(y + size).toBeLessThanOrEqual(h)
+      }
+    }
   })
 })
 

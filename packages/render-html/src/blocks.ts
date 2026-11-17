@@ -703,11 +703,20 @@ function polyline(data: AnvilDatum[], domain: AnvilDomain, goal: number | null, 
     goal === null
       ? ''
       : `<line class="anvil-spark-goal" x1="0" x2="100" y1="${ys(goal).toFixed(2)}" y2="${ys(goal).toFixed(2)}" vector-effect="non-scaling-stroke"></line>`
-  const last = n ? `<circle class="anvil-spark-last" cx="${xs(n - 1).toFixed(2)}" cy="${ys((data[n - 1] as AnvilDatum).value).toFixed(2)}" r="2.5"></circle>` : ''
 
-  return `<svg class="anvil-spark-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-    ${fill}${rule}<polyline class="anvil-spark-line" points="${pts}" vector-effect="non-scaling-stroke"></polyline>${last}
-  </svg>`
+  // The last point is drawn OUTSIDE the svg, as a box positioned in percent of
+  // the same plot. A <circle> in here was stretched with everything else: at
+  // 1000px by 3.5rem it drew 50px wide and 2.8px tall, a dash whose right half
+  // hung past the frame. vector-effect cannot save it, because only a stroke
+  // has a non-scaling form; a shape's own geometry always scales.
+  const last = data[n - 1]
+  const dot = last
+    ? `<i class="anvil-spark-last" style="left:${xs(n - 1).toFixed(2)}%;top:${ys(last.value).toFixed(2)}%"></i>`
+    : ''
+
+  return `<div class="anvil-spark-plot" aria-hidden="true"><svg class="anvil-spark-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+    ${fill}${rule}<polyline class="anvil-spark-line" points="${pts}" vector-effect="non-scaling-stroke"></polyline>
+  </svg>${dot}</div>`
 }
 
 /** First, last and the two extremes. The four numbers a trend is actually read for. */

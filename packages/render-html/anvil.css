@@ -1184,14 +1184,25 @@
   margin: 0 0 -1px;
 }
 
+/* The padding is half the last-point dot, so a last point in the top, bottom or
+   right-hand corner of the plot still lands inside this box rather than half
+   outside it. Change one number, change the other. */
 .anvil-spark {
+  --anvil-spark-dot: 7px;
+  box-sizing: border-box;
   height: 3.5rem;
+  padding: 3.5px;
 }
 
 .anvil-spark-tiny {
   flex: 1;
   height: 1.6rem;
   min-width: 0;
+}
+
+.anvil-spark-plot {
+  position: relative;
+  height: 100%;
 }
 
 .anvil-spark-line-row {
@@ -1227,12 +1238,18 @@
 }
 
 /* The last point, because "where did it end up" is what a trend is read for.
-   Non-scaling would distort it, so it is a circle in the squashed box and the
-   radius is small enough that the distortion does not read as an error. */
+   A box in CSS pixels on top of the svg, never a shape inside it: the svg is
+   stretched to fill the width, and a circle in it drew as a 50px dash. The
+   ring in the page colour lifts it off the line it sits on. */
 .anvil-spark-last {
-  fill: var(--anvil-primary);
-  stroke: var(--anvil-bg);
-  stroke-width: 1;
+  position: absolute;
+  box-sizing: border-box;
+  width: var(--anvil-spark-dot);
+  height: var(--anvil-spark-dot);
+  margin: calc(var(--anvil-spark-dot) / -2) 0 0 calc(var(--anvil-spark-dot) / -2);
+  border: 1px solid var(--anvil-bg);
+  border-radius: 50%;
+  background: var(--anvil-primary);
 }
 
 .anvil-chart-stats {
