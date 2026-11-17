@@ -881,8 +881,7 @@ const TAG_CLEAR = 8
 
 /** The widest edge label, in pixels, once clipping has had its say. */
 function widestLabel(edges: FlowEdge[]): number {
-  const chars = edges.reduce((m, e) => Math.max(m, clip(e.label, EDGE_MAX_CHARS).length), 0)
-  return chars ? chars * CHAR_PX + 10 : 0
+  return edges.reduce((m, e) => Math.max(m, tagWidth(e.label)), 0)
 }
 
 /**
@@ -913,6 +912,12 @@ interface Placed {
   h: number
 }
 
+/** Where one rank's band begins and ends along the flow. */
+interface Band {
+  start: number
+  end: number
+}
+
 function nodeWidth(n: AnvilNode): number {
   const chars = Math.max(clip(n.label, NODE_MAX_CHARS).length, clip(n.note, NODE_MAX_CHARS).length)
   const base = Math.max(NODE_MIN_W, chars * CHAR_PX + PAD_X * 2)
@@ -931,14 +936,15 @@ function nodeHeight(n: AnvilNode): number {
  * layout twice. Two copies of this arithmetic would drift the first time
  * somebody fixed a spacing bug in one of them.
  *
- * `gutters[r]` is the gap after rank `r`, and `starts[r]` is where that gap
- * begins along the flow, so a gutter can be sized to what has to cross it.
+ * `gutters[r]` is the gap after rank `r`, and `bands[r]` is where rank `r`
+ * begins and ends along the flow, so gutter `r` runs from `bands[r].end` to
+ * `bands[r + 1].start` and can be sized to what has to cross it.
  */
 function place(
   ranks: AnvilNode[][],
   down: boolean,
   gutters: number[],
-): { placed: Map<string, Placed>; w: number; h: number; starts: number[] } {
+): { placed: Map<string, Placed>; w: number; h: number; bands: Band[] } {
   const bands = ranks.map(row => Math.max(0, ...row.map(n => (down ? nodeHeight(n) : nodeWidth(n)))))
   const runs = ranks.map(row =>
     row.reduce((sum, n) => sum + (down ? nodeWidth(n) : nodeHeight(n)) + GAP, -GAP),
@@ -946,7 +952,7 @@ function place(
   const longest = Math.max(0, ...runs)
 
   const placed = new Map<string, Placed>()
-  const starts: number[] = []
+  const out: Band[] = []
   let along = 0
   ranks.forEach((row, r) => {
     const band = bands[r] as number
@@ -967,16 +973,15 @@ function place(
       })
       across += acrossSize + GAP
     }
-    along += band
-    starts.push(along)
-    along += gutters[r] ?? 0
+    out.push({ start: along, end: along + band })
+    along += band + (gutters[r] ?? 0)
   })
 
   return {
     placed,
     w: down ? longest : along,
     h: down ? along : longest,
-    starts,
+    bands: out,
   }
 }
 
@@ -1002,21 +1007,51 @@ function nodeText(p: Placed): string {
   return `${title}<text class="anvil-flow-label" x="${cx}" y="${p.y + p.h / 2 - 6}" text-anchor="middle" dominant-baseline="central">${esc(label)}</text><text class="anvil-flow-note" x="${cx}" y="${p.y + p.h / 2 + 9}" text-anchor="middle" dominant-baseline="central">${esc(clip(p.node.note, NODE_MAX_CHARS))}</text>`
 }
 
-/** Where an edge leaves and enters a box, given the flow direction. */
-function ports(from: Placed, to: Placed, down: boolean): { x1: number; y1: number; x2: number; y2: number } {
-  return down
-    ? { x1: from.x + from.w / 2, y1: from.y + from.h, x2: to.x + to.w / 2, y2: to.y }
-    : { x1: from.x + from.w, y1: from.y + from.h / 2, x2: to.x, y2: to.y + to.h / 2 }
+/**
+ * A point in flow terms: how far ALONG the ranks, and how far ACROSS them. A
+ * downward flow runs along y and a rightward one along x. Every route is
+ * worked out in these terms and turned into svg once, in `svgXY`, for the
+ * reason `place` swaps its axes: two copies of the routing would drift.
+ */
+type Pt = readonly [along: number, across: number]
+
+function svgXY(p: Pt, down: boolean): [number, number] {
+  return down ? [p[1], p[0]] : [p[0], p[1]]
+}
+
+/** A placed box in flow terms: where it begins and ends along the flow, and across it. */
+interface Span {
+  start: number
+  end: number
+  lo: number
+  hi: number
+}
+
+function spanOf(p: Placed, down: boolean): Span {
+  return down ? { start: p.y, end: p.y + p.h, lo: p.x, hi: p.x + p.w } : { start: p.x, end: p.x + p.w, lo: p.y, hi: p.y + p.h }
+}
+
+function middle(a: number, b: number): number {
+  return (a + b) / 2
 }
 
 /**
- * An orthogonal connector: out of the box, across the gutter, into the next
- * box. Three segments, never a curve, because a right angle survives being
- * scaled down to a chat column and a bezier turns into a smudge.
+ * An orthogonal route as an svg path. Every leg is an H or a V, never a curve,
+ * because a right angle survives being scaled down to a chat column and a
+ * bezier turns into a smudge. A leg that goes nowhere is left out, so the
+ * arrowhead always takes its angle from a leg that has one.
  */
-function connector(x1: number, y1: number, x2: number, y2: number, down: boolean, turn?: number): string {
-  const mid = turn ?? (down ? (y1 + y2) / 2 : (x1 + x2) / 2)
-  return down ? `M ${x1} ${y1} V ${mid} H ${x2} V ${y2}` : `M ${x1} ${y1} H ${mid} V ${y2} H ${x2}`
+function svgPath(points: Pt[], down: boolean): string {
+  const [first = [0, 0], ...rest] = points.map(p => svgXY(p, down))
+  let [x, y] = first
+  let d = `M ${x} ${y}`
+  for (const [nx, ny] of rest) {
+    if (nx === x && ny === y) continue
+    d += nx === x ? ` V ${ny}` : ny === y ? ` H ${nx}` : ` L ${nx} ${ny}`
+    x = nx
+    y = ny
+  }
+  return d
 }
 
 /** One label row in a downward gutter: the pill and a little air, and the margin above and below the rows. */
@@ -1050,7 +1085,7 @@ function turnRows(edges: FlowEdge[], placed: Map<string, Placed>, gaps: number):
     group.reduce((m, e) => Math.max(m, Math.abs(centre(e.to) - centre(e.from))), 0)
 
   for (let g = 0; g < gaps; g++) {
-    const here = edges.filter(e => !e.back && e.fromRank === g && e.toRank === g + 1)
+    const here = edges.filter(e => edgeKind(e) === 'next' && e.fromRank === g)
     const plain = here.filter(e => !e.label)
     const groups = [...(plain.length ? [plain] : []), ...here.filter(e => e.label).map(e => [e])]
     if (groups.length < 2) continue
@@ -1063,21 +1098,6 @@ function turnRows(edges: FlowEdge[], placed: Map<string, Placed>, gaps: number):
   return { row, rows }
 }
 
-/**
- * A back edge, routed round the outside in its own lane.
- *
- * Cycles are legitimate -- a retry ladder is a cycle, and so is every state
- * machine worth drawing -- so they are neither dropped nor allowed to break the
- * ranking. They leave the far side of the source, run along a lane outside the
- * body, and come back into the near side of the target, dashed, so the return
- * reads as a return.
- */
-function backConnector(from: Placed, to: Placed, lane: number, down: boolean): string {
-  return down
-    ? `M ${from.x} ${from.y + from.h / 2} H ${lane} V ${to.y + to.h / 2} H ${to.x}`
-    : `M ${from.x + from.w / 2} ${from.y + from.h} V ${lane} H ${to.x + to.w / 2} V ${to.y + to.h}`
-}
-
 /** An edge label: its clipped text, its centre, and its pill's width. */
 interface Tag {
   text: string
@@ -1086,10 +1106,19 @@ interface Tag {
   w: number
 }
 
-function tagAt(label: string, x: number, y: number): Tag | null {
+function tagWidth(label: string): number {
+  return label ? clip(label, EDGE_MAX_CHARS).length * CHAR_PX + 10 : 0
+}
+
+function tagAt(label: string, at: Pt, down: boolean): Tag | null {
   if (!label) return null
-  const text = clip(label, EDGE_MAX_CHARS)
-  return { text, x, y, w: text.length * CHAR_PX + 10 }
+  const [x, y] = svgXY(at, down)
+  return { text: clip(label, EDGE_MAX_CHARS), x, y, w: tagWidth(label) }
+}
+
+/** How far a label reaches across the flow on the `sign` side of its centre. */
+function tagReach(t: Tag, down: boolean, sign: number): number {
+  return down ? t.x + (sign * t.w) / 2 : t.y + (sign * TAG_H) / 2
 }
 
 function edgeLabel(t: Tag): string {
@@ -1102,9 +1131,9 @@ interface FlowPlacement {
   placed: Map<string, Placed>
   w: number
   h: number
-  /** Where each gutter begins along the flow. */
-  starts: number[]
-  turns: ReturnType<typeof turnRows>
+  bands: Band[]
+  /** Where each forward edge turns, along the flow. */
+  turns: Map<FlowEdge, number>
   down: boolean
 }
 
@@ -1117,82 +1146,202 @@ interface FlowPlacement {
 function layoutFlow(graph: FlowGraph, down: boolean): FlowPlacement {
   const gaps = Math.max(0, graph.ranks.length - 1)
   const even = Array.from({ length: gaps }, () => gutterFor(graph.edges, down))
-  const turns: ReturnType<typeof turnRows> = down
+  const { row, rows } = down
     ? turnRows(graph.edges, place(graph.ranks, down, even).placed, gaps)
-    : { row: new Map(), rows: [] }
-  const gutters = even.map((g, i) => {
-    const rows = turns.rows[i] ?? 0
-    return rows ? Math.max(g, rows * ROW_STEP + 2 * ROW_PAD) : g
+    : { row: new Map<FlowEdge, number>(), rows: [] }
+  const gutters = even.map((size, g) => {
+    const n = rows[g] ?? 0
+    return n ? Math.max(size, n * ROW_STEP + 2 * ROW_PAD) : size
   })
-  return { ...place(graph.ranks, down, gutters), turns, down }
+  const at = place(graph.ranks, down, gutters)
+  return { ...at, turns: turnsAt(graph, row, at, down), down }
 }
 
-/** The forward edges (`back` false) or the returns (`back` true) that have both ends placed. */
-function placedEdges(graph: FlowGraph, at: FlowPlacement, back: boolean): { e: FlowEdge; from: Placed; to: Placed }[] {
+/** Where each forward edge turns along the flow: in its row if it has one, otherwise halfway between its ports. */
+function turnsAt(graph: FlowGraph, row: Map<FlowEdge, number>, at: { placed: Map<string, Placed>; bands: Band[] }, down: boolean): Map<FlowEdge, number> {
+  const turns = new Map<FlowEdge, number>()
+  for (const e of graph.edges.filter(e => edgeKind(e) !== 'return')) {
+    const from = at.placed.get(e.from)
+    const to = at.placed.get(e.to)
+    if (!from || !to) continue
+    const r = row.get(e)
+    const along =
+      r === undefined
+        ? middle(spanOf(from, down).end, spanOf(to, down).start)
+        : (at.bands[e.fromRank]?.end ?? 0) + ROW_PAD + (r + 0.5) * ROW_STEP
+    turns.set(e, along)
+  }
+  return turns
+}
+
+/** Which router draws an edge: the next rank over, past ranks it skips, or back as a return. */
+type EdgeKind = 'next' | 'skip' | 'return'
+
+function edgeKind(e: FlowEdge): EdgeKind {
+  if (e.back) return 'return'
+  return e.toRank - e.fromRank > 1 ? 'skip' : 'next'
+}
+
+/** The edges of one kind that have both ends placed. */
+function placedEdges(graph: FlowGraph, at: FlowPlacement, kind: EdgeKind): { e: FlowEdge; from: Placed; to: Placed }[] {
   return graph.edges.flatMap(e => {
     const from = at.placed.get(e.from)
     const to = at.placed.get(e.to)
-    return e.back === back && from && to ? [{ e, from, to }] : []
+    return edgeKind(e) === kind && from && to ? [{ e, from, to }] : []
   })
 }
 
-type Wire = (e: FlowEdge, d: string) => string
+/** An edge and the corners its path turns at, in flow terms. */
+interface Route {
+  e: FlowEdge
+  points: Pt[]
+}
+
+/** Where a forward edge leaves its source and enters its target: the far side, then the near side, each at its middle across. */
+function forwardPorts(from: Placed, to: Placed, down: boolean): [Pt, Pt] {
+  const a = spanOf(from, down)
+  const b = spanOf(to, down)
+  return [
+    [a.end, middle(a.lo, a.hi)],
+    [b.start, middle(b.lo, b.hi)],
+  ]
+}
 
 /**
- * The forward edges and their labels. A label sits on the gutter crossing,
- * which is the midpoint of the middle segment whichever way the flow runs, at
- * the edge's own row where a downward gutter has rows.
+ * The forward edges: out of the box, across the gutter at the edge's turn,
+ * into the next box. A label sits on the gutter crossing, which is the
+ * midpoint of the middle segment whichever way the flow runs, at the edge's
+ * own row where a downward gutter has rows.
  */
-function forwardEdges(graph: FlowGraph, at: FlowPlacement, wire: Wire, paths: string[], tags: Tag[]): void {
-  for (const { e, from, to } of placedEdges(graph, at, false)) {
-    const { x1, y1, x2, y2 } = ports(from, to, at.down)
-    const row = at.turns.row.get(e)
-    const turn = row === undefined ? undefined : (at.starts[e.fromRank] ?? 0) + ROW_PAD + (row + 0.5) * ROW_STEP
-    paths.push(wire(e, connector(x1, y1, x2, y2, at.down, turn)))
-    const t = tagAt(e.label, (x1 + x2) / 2, turn ?? (y1 + y2) / 2)
+function forwardEdges(graph: FlowGraph, at: FlowPlacement, routes: Route[], tags: Tag[]): void {
+  for (const { e, from, to } of [...placedEdges(graph, at, 'next'), ...placedEdges(graph, at, 'skip')]) {
+    const [p, q] = forwardPorts(from, to, at.down)
+    const turn = at.turns.get(e) ?? middle(p[0], q[0])
+    routes.push({ e, points: [p, [turn, p[1]], [turn, q[1]], q] })
+    const t = tagAt(e.label, [turn, middle(p[1], q[1])], at.down)
     if (t) tags.push(t)
   }
 }
 
 /**
- * Back edges need a lane OUTSIDE the body to run in: left of a downward flow,
- * below a rightward one. Returns the lane.
- *
- * The lane carries the return's own label, centred ON the lane, and half of it
- * reaches back toward the body ALONG THE AXIS IT CROSSES: its width beside the
- * vertical lane of a downward flow, its height under the horizontal lane of a
- * rightward one. A fixed 26 put a downward "fix and rebuild" across the Test
- * box. The body here includes the forward labels already in `tags`, which may
- * reach past the outermost box.
+ * A run outside the body, along the flow: a return's lane. `lo` and `hi` are
+ * its extent along the flow with its label included; `half` is how far the
+ * label reaches across from the line, toward the body and away from it.
  */
-function backEdges(graph: FlowGraph, at: FlowPlacement, wire: Wire, paths: string[], tags: Tag[]): number {
-  const down = at.down
-  const backLabel = widestLabel(graph.edges.filter(e => e.back))
-  const laneGap = Math.max(LANE, (down ? backLabel : TAG_H) / 2 + TAG_CLEAR)
-  const lane = down
-    ? tags.reduce((m, t) => Math.min(m, t.x - t.w / 2), 0) - laneGap
-    : tags.reduce((m, t) => Math.max(m, t.y + TAG_H / 2), at.h) + laneGap
-  for (const { e, from, to } of placedEdges(graph, at, true)) {
-    paths.push(wire(e, backConnector(from, to, lane, down)))
-    const along = down ? (from.y + to.y) / 2 + from.h / 2 : (from.x + to.x) / 2 + from.w / 2
-    const t = tagAt(e.label, down ? lane : along, down ? along : lane)
-    if (t) tags.push(t)
+interface Run {
+  lo: number
+  hi: number
+  half: number
+}
+
+/**
+ * A run from `a` to `b` along the flow with `label` centred on it. The label
+ * is a pill on its side, so beside a downward run it reaches its width across
+ * and its height along, and under a rightward one the other way round.
+ */
+function runOf(label: string, a: number, b: number, down: boolean): Run {
+  const w = tagWidth(label)
+  const reach = w ? (down ? TAG_H : w) / 2 : 0
+  return { lo: Math.min(a, b, middle(a, b) - reach), hi: Math.max(a, b, middle(a, b) + reach), half: w ? (down ? w : TAG_H) / 2 : 0 }
+}
+
+/**
+ * Where each run goes across the flow, stepping out from `edge` on the `sign`
+ * side of the body.
+ *
+ * Every return once ran in ONE lane, so `c -> b` and `d -> a` drew on the same
+ * line and both labels sat at the same midpoint. Now each run steps past every
+ * run already placed that it overlaps along the flow, far enough that neither
+ * label reaches the other's line. Shortest first, so a short return nests
+ * inside a long one and their lanes do not cross. Runs that never overlap
+ * share a line, because nothing can mistake one for the other.
+ */
+function stackRuns(runs: Run[], edge: number, sign: number): number[] {
+  const order = runs.map((r, i) => ({ r, i })).sort((a, b) => a.r.hi - a.r.lo - (b.r.hi - b.r.lo) || a.r.lo - b.r.lo)
+  const out = runs.map(() => edge)
+  const done: { r: Run; off: number }[] = []
+  for (const { r, i } of order) {
+    const off = done
+      .filter(d => d.r.lo <= r.hi && r.lo <= d.r.hi)
+      .reduce((m, d) => Math.max(m, d.off + Math.max(LANE, d.r.half + r.half + TAG_CLEAR)), Math.max(LANE, r.half + TAG_CLEAR))
+    done.push({ r, off })
+    out[i] = edge + sign * off
   }
-  return lane
+  return out
+}
+
+/** The outermost thing drawn so far on the `sign` side of the flow, across it: a box edge, or a label that reaches past one. */
+function outerEdge(at: FlowPlacement, tags: Tag[], sign: number): number {
+  const body = sign > 0 ? (at.down ? at.w : at.h) : 0
+  const pick = sign > 0 ? Math.max : Math.min
+  return tags.reduce((m, t) => pick(m, tagReach(t, at.down, sign)), body)
+}
+
+/** One end of a return: where it meets its lane along the flow, and its corners, from the node out, once the lane is known. */
+function returnEnd(p: Placed, sign: number, down: boolean): { along: number; to: (lane: number) => Pt[] } {
+  const s = spanOf(p, down)
+  const port: Pt = [middle(s.start, s.end), sign < 0 ? s.lo : s.hi]
+  return { along: port[0], to: lane => [port, [port[0], lane]] }
+}
+
+/**
+ * Back edges, each in a lane OUTSIDE the body: left of a downward flow, below
+ * a rightward one.
+ *
+ * Cycles are legitimate -- a retry ladder is a cycle, and so is every state
+ * machine worth drawing -- so they are neither dropped nor allowed to break the
+ * ranking. A return leaves the lane side of its source, runs along its lane,
+ * and comes back into the lane side of its target, dashed, so it reads as a
+ * return. Its label is centred ON its lane, and half of it reaches back toward
+ * the body ALONG THE AXIS IT CROSSES: its width beside the vertical lane of a
+ * downward flow, its height under the horizontal lane of a rightward one. A
+ * fixed 26 put a downward "fix and rebuild" across the Test box. The labels
+ * already in `tags` may reach past the outermost box, so the lanes start
+ * beyond them.
+ */
+function backEdges(graph: FlowGraph, at: FlowPlacement, routes: Route[], tags: Tag[]): void {
+  const sign = at.down ? -1 : 1
+  const ends = placedEdges(graph, at, 'return').map(({ e, from, to }) => ({
+    e,
+    out: returnEnd(from, sign, at.down),
+    back: returnEnd(to, sign, at.down),
+  }))
+  const lanes = stackRuns(
+    ends.map(r => runOf(r.e.label, r.out.along, r.back.along, at.down)),
+    outerEdge(at, tags, sign),
+    sign,
+  )
+  ends.forEach(({ e, out, back }, i) => {
+    const lane = lanes[i] ?? 0
+    routes.push({ e, points: [...out.to(lane), ...back.to(lane).reverse()] })
+    const t = tagAt(e.label, [middle(out.along, back.along), lane], at.down)
+    if (t) tags.push(t)
+  })
 }
 
 /**
  * The viewBox is whatever was drawn, plus a margin: every box, every label,
- * and the lane. Computed from the drawing rather than predicted, because a
- * prediction is what sliced `re-request` to `equest`.
+ * and every corner of every route, lanes and channels included. Computed from
+ * the drawing rather than predicted, because a prediction is what sliced
+ * `re-request` to `equest`.
  */
-function drawnBounds(at: FlowPlacement, tags: Tag[], lane: number | null): { x: number; y: number; w: number; h: number } {
+function drawnBounds(at: FlowPlacement, tags: Tag[], routes: Route[]): { x: number; y: number; w: number; h: number } {
   const pad = 8
-  const x = tags.reduce((m, t) => Math.min(m, t.x - t.w / 2), at.down && lane !== null ? lane : 0) - pad
-  const y = tags.reduce((m, t) => Math.min(m, t.y - TAG_H / 2), 0) - pad
-  const right = tags.reduce((m, t) => Math.max(m, t.x + t.w / 2), at.w) + pad
-  const bottom = tags.reduce((m, t) => Math.max(m, t.y + TAG_H / 2), !at.down && lane !== null ? lane : at.h) + pad
-  return { x, y, w: right - x, h: bottom - y }
+  const box = { x0: 0, y0: 0, x1: at.w, y1: at.h }
+  const take = (x0: number, y0: number, x1: number, y1: number): void => {
+    box.x0 = Math.min(box.x0, x0)
+    box.y0 = Math.min(box.y0, y0)
+    box.x1 = Math.max(box.x1, x1)
+    box.y1 = Math.max(box.y1, y1)
+  }
+  for (const t of tags) take(t.x - t.w / 2, t.y - TAG_H / 2, t.x + t.w / 2, t.y + TAG_H / 2)
+  for (const r of routes) {
+    for (const p of r.points) {
+      const [x, y] = svgXY(p, at.down)
+      take(x, y, x, y)
+    }
+  }
+  return { x: box.x0 - pad, y: box.y0 - pad, w: box.x1 - box.x0 + 2 * pad, h: box.y1 - box.y0 + 2 * pad }
 }
 
 export function renderFlow(b: AnvilBlock): string {
@@ -1207,22 +1356,24 @@ export function renderFlow(b: AnvilBlock): string {
   // would both point at whichever rendered first, and the second would inherit
   // the first's colour.
   const arrow = `anvil-arrow-${slugId(b.id)}`
-  const wire: Wire = (e, d) => {
+  const wire = ({ e, points }: Route): string => {
     const cls = `anvil-flow-edge${e.back ? ' anvil-flow-back' : ''}${e.undirected ? ' anvil-flow-plain' : ''}`
     const head = e.undirected ? '' : ` marker-end="url(#${arrow})"`
-    return `<path class="${cls}" d="${d}" fill="none"${head}></path>`
+    return `<path class="${cls}" d="${svgPath(points, down)}" fill="none"${head}></path>`
   }
 
-  const paths: string[] = []
+  // Forward edges, then the returns, whose lanes start beyond the labels the
+  // forward edges put down.
+  const routes: Route[] = []
   const tags: Tag[] = []
-  forwardEdges(graph, at, wire, paths, tags)
-  const lane = graph.edges.some(e => e.back) ? backEdges(graph, at, wire, paths, tags) : null
-  const view = drawnBounds(at, tags, lane)
+  forwardEdges(graph, at, routes, tags)
+  backEdges(graph, at, routes, tags)
+  const view = drawnBounds(at, tags, routes)
   const [minX, minY, viewW, viewH] = [view.x, view.y, view.w, view.h]
 
   // Every wire first, every label after, so no line is ever painted across a
   // label that an earlier edge put down.
-  const wires = `${paths.join('')}${tags.map(edgeLabel).join('')}`
+  const wires = `${routes.map(wire).join('')}${tags.map(edgeLabel).join('')}`
 
   const boxes = graph.nodes
     .map(n => {

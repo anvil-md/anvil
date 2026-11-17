@@ -70,6 +70,97 @@ function collisions(html: string): string[] {
   return out
 }
 
+type Pt = [number, number]
+
+/** How each path command moves the pen. The renderer writes M, H and V; L is here so a diagonal is still read. */
+const PEN: Record<string, { args: number; to: (at: Pt, a: number[]) => Pt }> = {
+  M: { args: 2, to: (_, a) => [a[0] as number, a[1] as number] },
+  L: { args: 2, to: (_, a) => [a[0] as number, a[1] as number] },
+  H: { args: 1, to: (at, a) => [a[0] as number, at[1]] },
+  V: { args: 1, to: (at, a) => [at[0], a[0] as number] },
+}
+
+/** Every edge in a rendered flow, as the corners its path turns at, in the svg's own units. */
+function flowWires(html: string): { back: boolean; points: Pt[] }[] {
+  return [...html.matchAll(/<path class="anvil-flow-edge([^"]*)" d="([^"]+)"/g)].map(m => {
+    const tokens = (m[2] as string).trim().split(/\s+/)
+    const points: Pt[] = []
+    let at: Pt = [0, 0]
+    for (let i = 0; i < tokens.length; ) {
+      const pen = PEN[tokens[i++] as string]
+      if (!pen) break
+      at = pen.to(at, tokens.slice(i, i + pen.args).map(Number))
+      i += pen.args
+      points.push(at)
+    }
+    return { back: (m[1] as string).includes('anvil-flow-back'), points }
+  })
+}
+
+/** Each straight leg of a wire, as a box with no width or no height. */
+function legs(points: Pt[]): Box[] {
+  return points.slice(1).map((b, i) => {
+    const a = points[i] as Pt
+    return { x: Math.min(a[0], b[0]), y: Math.min(a[1], b[1]), w: Math.abs(a[0] - b[0]), h: Math.abs(a[1] - b[1]) }
+  })
+}
+
+/**
+ * Each wire leg that runs through the inside of a node. A wire's own ends sit
+ * on a box's edge, which is not inside it: `fix -> review` ran under the Merge
+ * box, and `a -> c` ran straight through the Beta step it skipped.
+ */
+function wiresThroughNodes(html: string): string[] {
+  const { nodes } = flowBoxes(html)
+  const inside = (l: Box, n: Box): boolean =>
+    l.x < n.x + n.w - 0.5 && l.x + l.w > n.x + 0.5 && l.y < n.y + n.h - 0.5 && l.y + l.h > n.y + 0.5
+  return flowWires(html).flatMap((w, i) =>
+    legs(w.points).flatMap((l, k) => nodes.filter(n => inside(l, n)).map(n => `wire ${i} leg ${k} runs through the node at ${n.x},${n.y}`)),
+  )
+}
+
+/**
+ * Each pair of returns that overlap along the flow and run their lanes on one
+ * line. A return's lane is its outermost leg along the flow: the leftmost
+ * vertical of a downward flow, the lowest horizontal of a rightward one. Every
+ * return once used the same lane, so `c -> b` and `d -> a` drew one line and
+ * stacked their labels.
+ */
+function sharedLanes(html: string): string[] {
+  const down = html.includes('data-dir="down"')
+  const lanes = flowWires(html)
+    .filter(w => w.back)
+    .map(w => {
+      const along = legs(w.points).filter(l => (down ? l.w === 0 : l.h === 0))
+      const out = along.reduce((m, l) => ((down ? l.x < m.x : l.y > m.y) ? l : m), along[0] as Box)
+      return down ? { at: out.x, lo: out.y, hi: out.y + out.h } : { at: out.y, lo: out.x, hi: out.x + out.w }
+    })
+  return lanes.flatMap((a, i) =>
+    lanes
+      .slice(i + 1)
+      .filter(b => Math.abs(a.at - b.at) < 1 && a.lo <= b.hi && b.lo <= a.hi)
+      .map(() => `two returns share the lane at ${a.at}`),
+  )
+}
+
+/** Each wire corner the viewBox cuts off: a lane drawn outside the frame is a return nobody sees. */
+function wiresCut(html: string): string[] {
+  const { view } = flowBoxes(html)
+  return flowWires(html).flatMap((w, i) =>
+    w.points
+      .filter(([x, y]) => x < view.x || y < view.y || x > view.x + view.w || y > view.y + view.h)
+      .map(([x, y]) => `wire ${i} reaches ${x},${y}, outside the frame`),
+  )
+}
+
+/** Everything a drawn flow must never do, for each flow in the html. Empty means it reads. */
+function flowFaults(html: string): string[] {
+  return html
+    .split('<div class="anvil-flow"')
+    .slice(1)
+    .flatMap(flow => [...collisions(flow), ...wiresThroughNodes(flow), ...sharedLanes(flow), ...wiresCut(flow)])
+}
+
 const CHOICE = `@choice id=deploy-target
 ? Where should I ship this?
 : Staging is wiped nightly.
@@ -914,6 +1005,16 @@ describe('flow', () => {
 - d -> e
 - e -> a | round again`
       expect(collisions(renderAnvilFence(fan, true))).toEqual([])
+    }
+  })
+
+  test('every return runs in a lane of its own, and their labels never meet', () => {
+    // One lane for every return: `c -> b` and `d -> a` drew on one line, and
+    // both labels sat at the same midpoint, halfway between b and c.
+    for (const dir of ['down', 'right']) {
+      const html = renderAnvilFence(`@flow id=l dir=${dir}\n- a -> b -> c -> d\n- c -> b | back one\n- d -> a | back three`, true)
+      expect(sharedLanes(html)).toEqual([])
+      expect(flowFaults(html)).toEqual([])
     }
   })
 })
