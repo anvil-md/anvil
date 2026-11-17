@@ -210,9 +210,22 @@ function checkAttrs(f: AnvilField): string {
   return out.join('')
 }
 
-function textControl(type: string, f: AnvilField): string {
+function textControl(type: string, f: AnvilField, id: string): string {
   const ph = f.placeholder ? ` placeholder="${esc(f.placeholder)}"` : ''
-  return `<input class="anvil-input" type="${type}" disabled${ph}${checkAttrs(f)}>`
+  return `<input class="anvil-input" id="${id}" type="${type}" disabled${ph}${checkAttrs(f)}>`
+}
+
+/**
+ * Agent text as one segment of a DOM id, losslessly.
+ *
+ * slugId is lossy, which a marker can live with and a label cannot: `a.b` and
+ * `a-b` would share a field id, and so would block `x` with field `y-z` and
+ * block `x-y` with field `z`. A label bound to the wrong control reads the
+ * wrong name aloud. Everything outside [A-Za-z0-9-] becomes `_<hex>_` (an
+ * underscore included), so `.` never appears in a segment and can join them.
+ */
+function idPart(s: string): string {
+  return Array.from(s, c => (/[A-Za-z0-9-]/.test(c) ? c : `_${(c.codePointAt(0) ?? 0).toString(16)}_`)).join('')
 }
 
 /**
@@ -220,37 +233,54 @@ function textControl(type: string, f: AnvilField): string {
  * type except `number` to a plain text input, so `secret` -- the one type whose
  * whole purpose is masking -- rendered its value in the clear, and `date`/`url`
  * silently lost their native controls.
+ *
+ * Every control carries the id its label points at. `bool` draws a span, which
+ * a `for=` cannot reach, so it is a switch named by the label's own id. It was
+ * `aria-hidden`, which took the field out of the accessibility tree entirely.
  */
-const CONTROLS: Record<FieldType, (f: AnvilField) => string> = {
-  text: f => textControl('text', f),
-  number: f => textControl('number', f),
-  secret: f => textControl('password', f),
-  url: f => textControl('url', f),
-  date: f => textControl('date', f),
-  path: f => textControl('text', f),
-  email: f => textControl('email', f),
-  longtext: f => {
+const CONTROLS: Record<FieldType, (f: AnvilField, id: string) => string> = {
+  text: (f, id) => textControl('text', f, id),
+  number: (f, id) => textControl('number', f, id),
+  secret: (f, id) => textControl('password', f, id),
+  url: (f, id) => textControl('url', f, id),
+  date: (f, id) => textControl('date', f, id),
+  path: (f, id) => textControl('text', f, id),
+  email: (f, id) => textControl('email', f, id),
+  longtext: (f, id) => {
     const ph = f.placeholder ? ` placeholder="${esc(f.placeholder)}"` : ''
-    return `<textarea class="anvil-input" rows="3" disabled${ph}${checkAttrs(f)}></textarea>`
+    return `<textarea class="anvil-input" id="${id}" rows="3" disabled${ph}${checkAttrs(f)}></textarea>`
   },
-  bool: () => '<span class="anvil-switch" aria-hidden="true"></span>',
+  bool: (_f, id) =>
+    `<span class="anvil-switch" id="${id}" role="switch" aria-checked="false" aria-disabled="true" aria-labelledby="${id}.label"></span>`,
 }
+
+/** Types whose control is not a form element, so the control names itself by the label's id instead. */
+const NAMED_BY_LABEL_ID = new Set<FieldType>(['bool'])
 
 const MONO_FIELDS = new Set<FieldType>(['path', 'url', 'secret', 'email'])
 
 export function renderInput(b: AnvilBlock): string {
   if (!b.fields.length) return '<p class="anvil-empty">No fields.</p>'
+  // The block id keeps two blocks' `email` fields apart on one page. A name
+  // written twice in one block is a malformed fence, but its second control
+  // still needs an id of its own, so repeats take their row index as well.
+  const block = idPart(b.id || b.kind)
+  const seen = new Set<string>()
   const rows = b.fields
-    .map(f => {
+    .map((f, i) => {
+      const name = idPart(f.name)
+      const id = `anvil-field-${block}.${name}${seen.has(name) ? `.${i}` : ''}`
+      seen.add(name)
+      const type: FieldType = Object.hasOwn(CONTROLS, f.type) ? f.type : 'text'
+      const bind = NAMED_BY_LABEL_ID.has(type) ? ` id="${id}.label"` : ` for="${id}"`
       const opt = f.required ? '' : '<span class="anvil-optional">optional</span>'
-      const control = (CONTROLS[f.type] ?? CONTROLS.text)(f)
       const mono = MONO_FIELDS.has(f.type) ? ' anvil-field-mono' : ''
       // Present and hidden: a hydrating host unhides it when checkField fails.
       // Leaving it out would parse `error=` and never draw it (§11).
       const error = f.checks.error ? `<small class="anvil-field-error" hidden>${esc(f.checks.error)}</small>` : ''
       return `<div class="anvil-field${mono}">
-        <label class="anvil-field-label">${esc(f.label)}${opt}</label>
-        ${control}${error}
+        <label class="anvil-field-label"${bind}>${esc(f.label)}${opt}</label>
+        ${CONTROLS[type](f, id)}${error}
       </div>`
     })
     .join('')

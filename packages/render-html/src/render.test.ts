@@ -178,6 +178,43 @@ describe('renderAnvilFence', () => {
     expect(html).toContain('anvil-switch')
   })
 
+  test('every field control is named by its own label, and every id on the page is unique', () => {
+    // The <label> sat beside its control with no for= and no wrapping, so a
+    // screen reader reached each input with no name, and the bool switch was
+    // aria-hidden, out of the accessibility tree altogether.
+    const attrs = (s: string): Record<string, string> =>
+      Object.fromEntries([...s.matchAll(/([\w-]+)="([^"]*)"/g)].map(m => [m[1] as string, m[2] as string]))
+    const page = [
+      '@input id=a\n_ email* | email | Work email\n_ nda | bool | NDA first\n_ notes | longtext | Notes',
+      // Same field name, different block.
+      '@input id=b\n_ email | email | Home email',
+      // Pairs a lossy slug would merge: x + y-z against x-y + z, and a.b against a-b.
+      '@input id=x\n_ y-z | text | One',
+      '@input id=x-y\n_ z | text | Two',
+      '@input id=a.b\n_ q | text | Three',
+      '@input id=a-b\n_ q | text | Four',
+      // A name used twice in one block still gets two ids.
+      '@input id=d\n_ q | text | Five\n_ q | text | Six',
+    ]
+      .map(src => renderAnvilFence(src, true))
+      .join('')
+
+    const fields = page.split(/<div class="anvil-field(?: anvil-field-mono)?">/).slice(1)
+    expect(fields.length).toBe(10)
+    for (const f of fields) {
+      const label = /<label class="anvil-field-label"([^>]*)>([^<]*)/.exec(f)
+      const control = /<(?:input|textarea) ([^>]*)>|<span class="anvil-switch"([^>]*)>/.exec(f)
+      const l = attrs(label?.[1] ?? '')
+      const c = attrs(control?.[1] ?? control?.[2] ?? '')
+      const bound = (l.for !== undefined && l.for === c.id) || (l.id !== undefined && c['aria-labelledby'] === l.id)
+      expect({ label: label?.[2], bound }).toEqual({ label: label?.[2], bound: true })
+      expect(c['aria-hidden']).toBeUndefined()
+    }
+    const ids = [...page.matchAll(/\sid="([^"]+)"/g)].map(m => m[1])
+    expect(ids.length).toBeGreaterThanOrEqual(10)
+    expect(ids.filter((id, i) => ids.indexOf(id) !== i)).toEqual([])
+  })
+
   test('single-select never gets a submit button; multi always does', () => {
     expect(renderAnvilFence('@choice id=x\n? Q\n- a | A', true)).not.toContain('anvil-submit')
     expect(renderAnvilFence('@gallery id=g\n? Q\n- a | A', true)).not.toContain('anvil-submit')
