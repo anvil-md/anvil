@@ -900,12 +900,15 @@ function nodeHeight(n: AnvilNode): number {
  * `dir` is applied by SWAPPING the axes at the end rather than by writing the
  * layout twice. Two copies of this arithmetic would drift the first time
  * somebody fixed a spacing bug in one of them.
+ *
+ * `gutters[r]` is the gap after rank `r`, and `starts[r]` is where that gap
+ * begins along the flow, so a gutter can be sized to what has to cross it.
  */
 function place(
   ranks: AnvilNode[][],
   down: boolean,
-  gutter: number,
-): { placed: Map<string, Placed>; w: number; h: number } {
+  gutters: number[],
+): { placed: Map<string, Placed>; w: number; h: number; starts: number[] } {
   const bands = ranks.map(row => Math.max(0, ...row.map(n => (down ? nodeHeight(n) : nodeWidth(n)))))
   const runs = ranks.map(row =>
     row.reduce((sum, n) => sum + (down ? nodeWidth(n) : nodeHeight(n)) + GAP, -GAP),
@@ -913,6 +916,7 @@ function place(
   const longest = Math.max(0, ...runs)
 
   const placed = new Map<string, Placed>()
+  const starts: number[] = []
   let along = 0
   ranks.forEach((row, r) => {
     const band = bands[r] as number
@@ -933,14 +937,16 @@ function place(
       })
       across += acrossSize + GAP
     }
-    along += band + gutter
+    along += band
+    starts.push(along)
+    along += gutters[r] ?? 0
   })
 
-  const total = along - gutter
   return {
     placed,
-    w: down ? longest : total,
-    h: down ? total : longest,
+    w: down ? longest : along,
+    h: down ? along : longest,
+    starts,
   }
 }
 
@@ -978,9 +984,53 @@ function ports(from: Placed, to: Placed, down: boolean): { x1: number; y1: numbe
  * box. Three segments, never a curve, because a right angle survives being
  * scaled down to a chat column and a bezier turns into a smudge.
  */
-function connector(x1: number, y1: number, x2: number, y2: number, down: boolean): string {
-  const mid = down ? (y1 + y2) / 2 : (x1 + x2) / 2
+function connector(x1: number, y1: number, x2: number, y2: number, down: boolean, turn?: number): string {
+  const mid = turn ?? (down ? (y1 + y2) / 2 : (x1 + x2) / 2)
   return down ? `M ${x1} ${y1} V ${mid} H ${x2} V ${y2}` : `M ${x1} ${y1} H ${mid} V ${y2} H ${x2}`
+}
+
+/** One label row in a downward gutter: the pill and a little air, and the margin above and below the rows. */
+const ROW_STEP = TAG_H + 4
+const ROW_PAD = 6
+
+/**
+ * Which row of its gutter each downward edge turns in, and how many rows each
+ * gutter needs.
+ *
+ * A downward edge crosses its gutter sideways and its label sits where it
+ * turns. Every edge out of one node used to turn at the same height, so their
+ * labels shared one line, centred half the target spacing apart, and "yes" sat
+ * under "changes requested". Now each labelled edge between adjacent ranks
+ * turns in a row of its own and the unlabelled ones share one, as they always
+ * did. Rows go farthest-reaching first, so a fan opens without crossing
+ * itself.
+ *
+ * A gutter with one row or none turns where it always did. A rightward flow
+ * needs none of this: its labels stack down the gutter at least a node's
+ * height apart. An edge that skips a rank is left as it was.
+ */
+function turnRows(edges: FlowEdge[], placed: Map<string, Placed>, gaps: number): { row: Map<FlowEdge, number>; rows: number[] } {
+  const row = new Map<FlowEdge, number>()
+  const rows = Array.from({ length: gaps }, () => 0)
+  const centre = (id: string): number => {
+    const p = placed.get(id)
+    return p ? p.x + p.w / 2 : 0
+  }
+  const reach = (group: FlowEdge[]): number =>
+    group.reduce((m, e) => Math.max(m, Math.abs(centre(e.to) - centre(e.from))), 0)
+
+  for (let g = 0; g < gaps; g++) {
+    const here = edges.filter(e => !e.back && e.fromRank === g && e.toRank === g + 1)
+    const plain = here.filter(e => !e.label)
+    const groups = [...(plain.length ? [plain] : []), ...here.filter(e => e.label).map(e => [e])]
+    if (groups.length < 2) continue
+    groups.sort((a, b) => reach(b) - reach(a))
+    groups.forEach((group, i) => {
+      for (const e of group) row.set(e, i)
+    })
+    rows[g] = groups.length
+  }
+  return { row, rows }
 }
 
 /**
@@ -998,11 +1048,22 @@ function backConnector(from: Placed, to: Placed, lane: number, down: boolean): s
     : `M ${from.x + from.w / 2} ${from.y + from.h} V ${lane} H ${to.x + to.w / 2} V ${to.y + to.h}`
 }
 
-function edgeLabel(text: string, x: number, y: number): string {
-  if (!text) return ''
-  const t = clip(text, EDGE_MAX_CHARS)
-  const w = t.length * CHAR_PX + 10
-  return `<g class="anvil-flow-tag"><rect x="${(x - w / 2).toFixed(1)}" y="${(y - TAG_H / 2).toFixed(1)}" width="${w.toFixed(1)}" height="${TAG_H}" rx="4"></rect><text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" dominant-baseline="central">${esc(t)}</text></g>`
+/** An edge label: its clipped text, its centre, and its pill's width. */
+interface Tag {
+  text: string
+  x: number
+  y: number
+  w: number
+}
+
+function tagAt(label: string, x: number, y: number): Tag | null {
+  if (!label) return null
+  const text = clip(label, EDGE_MAX_CHARS)
+  return { text, x, y, w: text.length * CHAR_PX + 10 }
+}
+
+function edgeLabel(t: Tag): string {
+  return `<g class="anvil-flow-tag"><rect x="${(t.x - t.w / 2).toFixed(1)}" y="${(t.y - TAG_H / 2).toFixed(1)}" width="${t.w.toFixed(1)}" height="${TAG_H}" rx="4"></rect><text x="${t.x.toFixed(1)}" y="${t.y.toFixed(1)}" text-anchor="middle" dominant-baseline="central">${esc(t.text)}</text></g>`
 }
 
 export function renderFlow(b: AnvilBlock): string {
@@ -1010,52 +1071,85 @@ export function renderFlow(b: AnvilBlock): string {
   if (!graph.nodes.length) return '<p class="anvil-empty">No steps.</p>'
 
   const down = attrString(b, 'dir', 'right').toLowerCase() === 'down'
-  const { placed, w, h } = place(graph.ranks, down, gutterFor(graph.edges, down))
+  const gaps = Math.max(0, graph.ranks.length - 1)
+  const even = Array.from({ length: gaps }, () => gutterFor(graph.edges, down))
+  // Rows are counted against a first placement, then the gutters that need
+  // them grow. Gutters only move a rank along the flow, never across it, so
+  // the spans the rows were sorted by do not change.
+  const turns: ReturnType<typeof turnRows> = down
+    ? turnRows(graph.edges, place(graph.ranks, down, even).placed, gaps)
+    : { row: new Map(), rows: [] }
+  const gutters = even.map((g, i) => {
+    const rows = turns.rows[i] ?? 0
+    return rows ? Math.max(g, rows * ROW_STEP + 2 * ROW_PAD) : g
+  })
+  const { placed, w, h, starts } = place(graph.ranks, down, gutters)
 
   // A unique marker id per block: two flows on one page sharing `#anvil-arrow`
   // would both point at whichever rendered first, and the second would inherit
   // the first's colour.
   const arrow = `anvil-arrow-${slugId(b.id)}`
+  const wire = (e: FlowEdge, d: string): string => {
+    const cls = `anvil-flow-edge${e.back ? ' anvil-flow-back' : ''}${e.undirected ? ' anvil-flow-plain' : ''}`
+    const head = e.undirected ? '' : ` marker-end="url(#${arrow})"`
+    return `<path class="${cls}" d="${d}" fill="none"${head}></path>`
+  }
 
-  // Back edges need a lane OUTSIDE the body to run in, so the viewBox grows on
-  // exactly one side: left of a rightward flow, below a downward one.
+  const paths: string[] = []
+  const tags: Tag[] = []
+  for (const e of graph.edges) {
+    const from = placed.get(e.from)
+    const to = placed.get(e.to)
+    if (e.back || !from || !to) continue
+    const { x1, y1, x2, y2 } = ports(from, to, down)
+    const row = turns.row.get(e)
+    const turn = row === undefined ? undefined : (starts[e.fromRank] ?? 0) + ROW_PAD + (row + 0.5) * ROW_STEP
+    paths.push(wire(e, connector(x1, y1, x2, y2, down, turn)))
+    // The label sits on the gutter crossing, which is the midpoint of the
+    // middle segment whichever way the flow runs.
+    const t = tagAt(e.label, (x1 + x2) / 2, turn ?? (y1 + y2) / 2)
+    if (t) tags.push(t)
+  }
+
+  // Back edges need a lane OUTSIDE the body to run in: left of a downward
+  // flow, below a rightward one.
   //
-  // The lane carries the return's own label, and that label is centred ON the
-  // lane -- so the box has to clear half of it or the text is sliced off at the
-  // edge. `re-request` rendered as `equest` before this was accounted for.
-  //
-  // The same half reaches the other way, toward the body, ALONG THE AXIS IT
-  // CROSSES: a label's width beside the vertical lane of a downward flow, its
-  // height under the horizontal lane of a rightward one. A fixed 26 put a
-  // downward "fix and rebuild" across the Test box.
-  const hasBack = graph.edges.some(e => e.back)
+  // The lane carries the return's own label, centred ON the lane, and half of
+  // it reaches back toward the body ALONG THE AXIS IT CROSSES: its width beside
+  // the vertical lane of a downward flow, its height under the horizontal lane
+  // of a rightward one. A fixed 26 put a downward "fix and rebuild" across the
+  // Test box. The body here includes the forward labels, which may reach past
+  // the outermost box.
   const backLabel = widestLabel(graph.edges.filter(e => e.back))
   const laneGap = Math.max(LANE, (down ? backLabel : TAG_H) / 2 + TAG_CLEAR)
-  const lane = down ? -laneGap : h + laneGap
+  const lane = down
+    ? tags.reduce((m, t) => Math.min(m, t.x - t.w / 2), 0) - laneGap
+    : tags.reduce((m, t) => Math.max(m, t.y + TAG_H / 2), h) + laneGap
+  for (const e of graph.edges) {
+    const from = placed.get(e.from)
+    const to = placed.get(e.to)
+    if (!e.back || !from || !to) continue
+    paths.push(wire(e, backConnector(from, to, lane, down)))
+    const along = down ? (from.y + to.y) / 2 + from.h / 2 : (from.x + to.x) / 2 + from.w / 2
+    const t = tagAt(e.label, down ? lane : along, down ? along : lane)
+    if (t) tags.push(t)
+  }
+
+  // The viewBox is whatever was drawn, plus a margin: every box, every label,
+  // and the lane. Computed from the drawing rather than predicted, because a
+  // prediction is what sliced `re-request` to `equest`.
+  const hasBack = graph.edges.some(e => e.back)
   const pad = 8
-  const clearance = (down ? laneGap : LANE) + backLabel / 2 + pad
-  const minX = down && hasBack ? -clearance : -pad
-  const minY = -pad
-  const maxY = !down && hasBack ? h + clearance : h + pad
-  const viewW = w + pad - minX
+  const minX = tags.reduce((m, t) => Math.min(m, t.x - t.w / 2), down && hasBack ? lane : 0) - pad
+  const maxX = tags.reduce((m, t) => Math.max(m, t.x + t.w / 2), w) + pad
+  const minY = tags.reduce((m, t) => Math.min(m, t.y - TAG_H / 2), 0) - pad
+  const maxY = tags.reduce((m, t) => Math.max(m, t.y + TAG_H / 2), !down && hasBack ? lane : h) + pad
+  const viewW = maxX - minX
   const viewH = maxY - minY
 
-  const wires = graph.edges
-    .map((e: FlowEdge) => {
-      const from = placed.get(e.from)
-      const to = placed.get(e.to)
-      if (!from || !to) return ''
-      const cls = `anvil-flow-edge${e.back ? ' anvil-flow-back' : ''}${e.undirected ? ' anvil-flow-plain' : ''}`
-      const head = e.undirected ? '' : ` marker-end="url(#${arrow})"`
-      if (e.back) {
-        return `<path class="${cls}" d="${backConnector(from, to, lane, down)}" fill="none"${head}></path>${edgeLabel(e.label, down ? lane : (from.x + to.x) / 2 + from.w / 2, down ? (from.y + to.y) / 2 + from.h / 2 : lane)}`
-      }
-      const { x1, y1, x2, y2 } = ports(from, to, down)
-      // The label sits on the gutter crossing, which is the midpoint of the
-      // middle segment whichever way the flow runs.
-      return `<path class="${cls}" d="${connector(x1, y1, x2, y2, down)}" fill="none"${head}></path>${edgeLabel(e.label, (x1 + x2) / 2, (y1 + y2) / 2)}`
-    })
-    .join('')
+  // Every wire first, every label after, so no line is ever painted across a
+  // label that an earlier edge put down.
+  const wires = `${paths.join('')}${tags.map(edgeLabel).join('')}`
 
   const boxes = graph.nodes
     .map(n => {

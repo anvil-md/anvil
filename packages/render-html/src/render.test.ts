@@ -53,13 +53,19 @@ function overlap(a: Box, b: Box): boolean {
   return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
 }
 
-/** Each pair of label boxes that touch, and each label that lies on a node, by name. */
+/**
+ * Each pair of label boxes that touch, each label that lies on a node, and each
+ * label the viewBox slices, by name. Empty means every label can be read.
+ */
 function collisions(html: string): string[] {
-  const { nodes, labels } = flowBoxes(html)
+  const { nodes, labels, view } = flowBoxes(html)
   const out: string[] = []
   labels.forEach((l, i) => {
     for (const o of labels.slice(i + 1)) if (overlap(l, o)) out.push(`"${l.text}" covers "${o.text}"`)
     for (const n of nodes) if (overlap(l, n)) out.push(`"${l.text}" covers the node at ${n.x},${n.y}`)
+    // `re-request` once drew as `equest`: a label the frame cuts is a label lost.
+    const inside = l.x >= view.x && l.y >= view.y && l.x + l.w <= view.x + view.w && l.y + l.h <= view.y + view.h
+    if (!inside) out.push(`"${l.text}" is cut by the frame`)
   })
   return out
 }
@@ -826,13 +832,35 @@ describe('flow', () => {
         true,
       )
       expect(collisions(html)).toEqual([])
-      // ...and the viewBox still holds the whole label, the failure the lane
-      // offset was first written for (`re-request` drew as `equest`).
-      const { labels, view } = flowBoxes(html)
-      for (const l of labels) {
-        expect(l.x).toBeGreaterThanOrEqual(view.x)
-        expect(l.x + l.w).toBeLessThanOrEqual(view.x + view.w)
-      }
+    }
+  })
+
+  test('labels on edges out of one node never cover each other or a node', () => {
+    // The site's flow-decision example: "yes" sat under "changes requested".
+    // In a downward flow every edge out of a node turned at the same height and
+    // each label was centred where its edge turned, half the target spacing
+    // apart -- 42 units here, for labels up to 152 wide.
+    const review = `@flow id=review dir=down
+- [x] open   | PR opened  | shape=round
+- [~] review | Approved?  | shape=diamond
+- [ ] merge  | Merge      | squash
+- [ ] fix    | Push fixes
+- open -> review
+- review -> merge | yes
+- review -> fix   | changes requested
+- fix -> review   | re-request`
+    expect(collisions(renderAnvilFence(review, true))).toEqual([])
+
+    for (const dir of ['down', 'right']) {
+      const fan = `@flow id=fan dir=${dir}
+- a -> b | the first way out
+- a -> c | a second way
+- a -> d | third
+- b -> e | on
+- c -> e | onward, eventually
+- d -> e
+- e -> a | round again`
+      expect(collisions(renderAnvilFence(fan, true))).toEqual([])
     }
   })
 })
