@@ -1,6 +1,6 @@
 {
   "name": "@anvil-md/react",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "description": "ANVIL blocks as a React component, plus a react-markdown code renderer.",
   "type": "module",
   "license": "MIT",
@@ -11,13 +11,40 @@
   },
   "homepage": "https://anvil-md.frst.dev",
   "bugs": "https://github.com/anvil-md/anvil/issues",
-  "keywords": ["anvil", "dsl", "markdown", "llm", "agent", "react", "react-markdown"],
-  "main": "./src/index.tsx",
-  "module": "./src/index.tsx",
-  "types": "./src/index.tsx",
-  "exports": { ".": "./src/index.tsx" },
-  "files": ["src", "README.md"],
+  "keywords": [
+    "anvil",
+    "dsl",
+    "markdown",
+    "llm",
+    "agent",
+    "react",
+    "react-markdown"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "!src/**/*.test.ts",
+    "!src/**/*.test.tsx",
+    "README.md"
+  ],
   "sideEffects": false,
-  "dependencies": { "@anvil-md/render-html": "workspace:*" },
-  "peerDependencies": { "react": ">=18" }
+  "dependencies": {
+    "@anvil-md/render-html": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
 }

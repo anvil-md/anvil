@@ -1,6 +1,6 @@
 {
   "name": "@anvil-md/render-html",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "description": "Render an ANVIL fence to an HTML string. Framework-agnostic, display only.",
   "type": "module",
   "license": "MIT",
@@ -11,20 +11,47 @@
   },
   "homepage": "https://anvil-md.frst.dev",
   "bugs": "https://github.com/anvil-md/anvil/issues",
-  "keywords": ["anvil", "dsl", "renderer", "html", "markdown", "llm", "agent", "chat", "ui"],
-  "main": "./src/index.ts",
-  "module": "./src/index.ts",
-  "types": "./src/index.ts",
+  "keywords": [
+    "anvil",
+    "dsl",
+    "renderer",
+    "html",
+    "markdown",
+    "llm",
+    "agent",
+    "chat",
+    "ui"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
     "./anvil.css": "./anvil.css"
   },
-  "files": ["src", "anvil.css", "README.md"],
-  "sideEffects": ["*.css"],
+  "files": [
+    "dist",
+    "src",
+    "!src/**/*.test.ts",
+    "!src/**/*.test.tsx",
+    "anvil.css",
+    "README.md"
+  ],
+  "sideEffects": [
+    "*.css"
+  ],
   "dependencies": {
     "@anvil-md/parser": "workspace:*"
   },
   "scripts": {
-    "test": "bun test"
+    "test": "bun test",
+    "prepack": "bun ../../scripts/build-packages.ts render-html"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

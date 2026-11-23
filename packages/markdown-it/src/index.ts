@@ -13,11 +13,19 @@ interface FenceToken {
 	content?: string
 }
 
-/** The slice of markdown-it we touch. Structurally typed to avoid a dependency. */
+/**
+ * The slice of markdown-it we touch. Structurally typed to avoid a dependency.
+ *
+ * `fence` is a METHOD signature on purpose. As a function-typed property it is
+ * checked contravariantly, markdown-it's `Token[]` does not fit our narrower
+ * `FenceToken[]`, and `new MarkdownIt().use(anvilMarkdownIt())` -- the usage in
+ * our own README -- failed to typecheck for every TypeScript user of the real
+ * `@types/markdown-it`. scripts/pack-smoke.ts checks that line now.
+ */
 interface MarkdownItLike {
 	renderer: {
 		rules: Record<string, unknown> & {
-			fence?: (tokens: FenceToken[], idx: number, ...rest: unknown[]) => string
+			fence?(tokens: FenceToken[], idx: number, ...rest: unknown[]): string
 		}
 	}
 }

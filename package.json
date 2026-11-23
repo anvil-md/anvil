@@ -11,6 +11,8 @@
     "lint": "bun packages/lint/src/cli.ts SPEC.md README.md",
     "conformance": "bun test packages/conformance",
     "spec": "bun run scripts/split-spec.ts",
+    "build": "bun scripts/build-packages.ts",
+    "pack:smoke": "bun scripts/pack-smoke.ts",
     "site:dev": "cd site && bun run dev",
     "site:build": "cd site && bun run build"
   },

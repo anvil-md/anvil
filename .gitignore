@@ -9,3 +9,10 @@ dist/
 .build/
 .swiftpm/
 Package.resolved
+
+# scripts/build-packages.ts temp tsconfigs
+.tsbuild/
+# scripts/pack-smoke.ts tarballs + scratch app
+.pack/
+# copied from the root LICENSE by scripts/build-packages.ts
+packages/*/LICENSE
