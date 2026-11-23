@@ -8,8 +8,10 @@
  * no component lifecycle. Use it from React, Vue, Svelte, a static site
  * generator, or a plain server response.
  *
- * The trade is that this package is display-only. When you implement stamping,
- * this file is the part you replace; @anvil-md/parser is not.
+ * Display only by default: every control carries `disabled`. A host that runs
+ * stamping passes `stamping` (ask.ts), and the same call draws each block open,
+ * pending or stamped. The stamp itself stays on the host's server (§7.1 law II);
+ * this file only draws the state it is handed.
  */
 import {
   type AnvilBlock,

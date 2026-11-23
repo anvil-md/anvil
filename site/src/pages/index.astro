@@ -338,8 +338,8 @@ I picked Staging.
 					</tr>
 					<tr>
 						<td class="font-mono text-ink">@anvil-md/render-html</td>
-						<td>Fence to HTML string, plus a themeable baseline stylesheet.</td>
-						<td class="font-mono text-xs text-ink-faint">DISPLAY ONLY</td>
+						<td>Fence to HTML string, a themeable baseline stylesheet, and the stamping states.</td>
+						<td class="font-mono text-xs text-ink-faint">STABLE</td>
 					</tr>
 				</tbody>
 			</table>
@@ -350,10 +350,12 @@ I picked Staging.
 
 			<div class="doc-prose mt-6 max-w-2xl">
 				<p>
-					<strong>Display only</strong> means the emitted controls carry <code>disabled</code>:
-					this draws a block, it does not run one. Stamping needs server-held state, idempotency
-					and a permission model, none of which belong in a rendering package. Sections 6 and 7 of
-					the specification are the contract if you are building it.
+					<strong>Display only by default.</strong> Every control carries <code>disabled</code>
+					until the host passes each block's state. Then the same call draws a block open, pending
+					or stamped, and a delegated hydrator turns clicks into answers. The stamp itself needs
+					server-held state, idempotency and a permission model, so it lives on your server,
+					checked with <code>stampAnswer</code> from the parser. Sections 6 and 7 of the
+					specification are the contract.
 				</p>
 			</div>
 		</section>

@@ -84,7 +84,7 @@ block visibly provisional and never answerable.
 | Package | What it is | State |
 |---|---|---|
 | [`@anvil-md/parser`](./packages/parser) | Document model + parser. Zero dependencies, no DOM. | Stable |
-| [`@anvil-md/render-html`](./packages/render-html) | Fence -> HTML string, plus a baseline stylesheet. | Display only |
+| [`@anvil-md/render-html`](./packages/render-html) | Fence -> HTML string, a baseline stylesheet, and the stamping states + hydrator. | Stable |
 | [`@anvil-md/lint`](./packages/lint) | `anvil-lint`: the checks a total parser cannot make. | Stable |
 | [`@anvil-md/conformance`](./packages/conformance) | The corpus. One JSON file, any language. | Stable |
 
@@ -111,12 +111,18 @@ and take a `closed` option; pass it from whatever your host knows.
 
 If you get to choose your markdown parser, choose marked.
 
-**Display only** means the emitted controls carry `disabled`: this renders a
-block, it does not run one. Stamping -- the answer half in [§6](./SPEC.md#6-the-stamp)
-and [§7](./SPEC.md#7-stamp-lifecycle) of the spec -- is not implemented in the
-TypeScript packages. The Swift package (`packages/swift`, AnvilKit) has it: the
-§6.2 serializer, a reader for stamps in a transcript, and the first-wins ledger.
-Those two sections are the contract if you want to build it here.
+**Display only by default.** Every emitted control carries `disabled` until the
+host says otherwise. A host that runs stamping, the answer half in
+[§6](./SPEC.md#6-the-stamp) and [§7](./SPEC.md#7-stamp-lifecycle), passes each
+block's state to `renderAnvilFence` and attaches the delegated hydrator from
+`@anvil-md/render-html/hydrate`. The same call then draws a block open, pending
+or stamped. On the server, `stampAnswer` from `@anvil-md/parser` checks the
+answer against the block and writes the §6.2 tag. Keeping the stamp, idempotency
+and the permission gate are the host's job; the
+[render-html README](./packages/render-html/README.md) shows the wiring.
+Stamping covers `@choice`, `@gallery`, `@input` and `@scale`. The Swift package
+(`packages/swift`, AnvilKit) has its own serializer, transcript reader and
+first-wins ledger.
 
 ## The blocks
 
@@ -246,8 +252,10 @@ Four things this gets right, because they are easy to get wrong:
 
 ## Status
 
-v1 of the spec. The parser and renderer are implemented and tested; stamping is
-specified and not built.
+v1 of the spec. The parser and renderer are implemented and tested. Stamping is
+built for `@choice` `@gallery` `@input` `@scale`: the parser checks an answer and
+writes the tag, and the renderer draws open, pending and stamped blocks. Keeping
+the stamp is the host's job.
 
 | | |
 |---|---|

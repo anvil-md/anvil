@@ -2,9 +2,9 @@
  * Per-kind body renderers. Each takes a parsed block and returns an HTML
  * fragment; the shell in render.ts supplies the frame, prompt and footer.
  *
- * DISPLAY ONLY. Buttons, inputs and sliders render at full fidelity but carry
- * `disabled` -- this package draws a block, it does not run one. Stamping (the
- * answer half of the spec) is not implemented here.
+ * Buttons, inputs and sliders render at full fidelity and carry `disabled`
+ * unless the `Ask` they are handed says the block is open for this viewer
+ * (`inert` in ask.ts). No renderer here decides that for itself.
  *
  * SECURITY: `swatch`, `font` and `img` come from agent-authored text and land
  * in style/src attributes, where escaping alone is not enough. They are
