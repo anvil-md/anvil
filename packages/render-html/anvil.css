@@ -1878,3 +1878,102 @@
     min-height: 38px;
   }
 }
+
+/* ── stamping: open, pending, stamped (§7) ────────────────────────────────
+ *
+ * Only a block the host marked `data-anvil-interactive` looks pressable. A
+ * display-only block keeps the rules above: not dimmed, no pointer, no hover,
+ * because a block that invites a click it will ignore is the broken widget
+ * §8.2.1 warns about.
+ */
+
+.anvil-block[data-anvil-interactive] :is(.anvil-row, .anvil-card, .anvil-submit, .anvil-switch) {
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    background-color 0.12s;
+}
+
+.anvil-block[data-anvil-interactive] :is(.anvil-row, .anvil-card, .anvil-submit):hover {
+  border-color: color-mix(in srgb, var(--anvil-primary) 55%, transparent);
+}
+
+.anvil-block[data-anvil-interactive] :is(.anvil-row, .anvil-card, .anvil-submit, .anvil-switch, .anvil-input):focus-visible {
+  outline: 2px solid var(--anvil-primary);
+  outline-offset: 1px;
+}
+
+/* Toggled (select=many, before submit) and picked (pending or stamped) read
+ * the same: a filled tint and a solid edge. The agent's `recommended` row is
+ * border-only on purpose, so the two can never be confused. The tint is layered
+ * over the surface rather than mixed into it (see the colour-mixing note). */
+.anvil-doc :is(.anvil-row, .anvil-card):is([aria-pressed='true'], [data-picked]) {
+  border-color: var(--anvil-primary);
+  background:
+    linear-gradient(color-mix(in srgb, var(--anvil-primary) 12%, transparent), color-mix(in srgb, var(--anvil-primary) 12%, transparent)),
+    var(--anvil-surface);
+}
+
+.anvil-doc :is([aria-pressed='true'], [data-picked]) .anvil-mark {
+  border-color: var(--anvil-primary);
+  background: var(--anvil-primary);
+}
+
+/* Law IV: the rejected rows stay, because they are what the human chose
+ * between. They recede so the answer reads at a glance. */
+.anvil-block[data-stamp-state='stamped'] :is(.anvil-row, .anvil-card):not([data-picked]) {
+  opacity: 0.55;
+}
+
+.anvil-switch::after {
+  transition: left 0.12s;
+}
+
+.anvil-switch[aria-checked='true'] {
+  background: var(--anvil-primary);
+}
+
+.anvil-switch[aria-checked='true']::after {
+  left: 15px;
+}
+
+/* A real range input lies over the track while open: invisible, full width,
+ * and taller than the 3px line so a finger can find it. */
+.anvil-range {
+  position: absolute;
+  inset: -14px 0;
+  width: 100%;
+  height: calc(100% + 28px);
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.anvil-range:focus-visible + .anvil-knob {
+  outline: 2px solid var(--anvil-primary);
+  outline-offset: 2px;
+}
+
+.anvil-stamp-error {
+  margin: 0.6rem 0 0;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--anvil-danger) 45%, transparent);
+  border-radius: var(--anvil-radius-sm);
+  background: color-mix(in srgb, var(--anvil-danger) 8%, transparent);
+  color: var(--anvil-danger);
+  font-size: 0.82em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anvil-block[data-anvil-interactive] :is(.anvil-row, .anvil-card, .anvil-submit, .anvil-switch),
+  .anvil-switch::after {
+    transition: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .anvil-range {
+    inset: -20px 0;
+    height: calc(100% + 40px);
+  }
+}

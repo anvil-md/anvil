@@ -35,7 +35,8 @@ interface Spec {
 export const PACKAGES: Record<string, Spec> = {
   parser: { entries: { index: 'src/index.ts' }, target: 'node' },
   conformance: { entries: { index: 'src/index.ts' }, target: 'node' },
-  'render-html': { entries: { index: 'src/index.ts' }, target: 'node' },
+  // The hydrator is its own entry: a server rendering strings never loads DOM code.
+  'render-html': { entries: { index: 'src/index.ts', hydrate: 'src/hydrate.ts' }, target: 'node' },
   lint: { entries: { index: 'src/index.ts', cli: 'src/cli.ts' }, target: 'bun' },
   a2ui: { entries: { index: 'src/index.ts' }, target: 'node' },
   marked: { entries: { index: 'src/index.ts' }, target: 'node' },

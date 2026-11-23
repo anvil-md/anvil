@@ -82,6 +82,7 @@ await Bun.write(
 import assert from 'node:assert/strict'
 import { parseAnvil, stampAnswer, stampXml } from '@anvil-md/parser'
 import { renderAnvilFence } from '@anvil-md/render-html'
+import { attachAnvil } from '@anvil-md/render-html/hydrate'
 import { anvilMarked } from '@anvil-md/marked'
 import { anvilMarkdownIt } from '@anvil-md/markdown-it'
 import { anvilRemark } from '@anvil-md/remark'
@@ -100,6 +101,9 @@ assert.equal(doc.blocks[0].kind, 'choice')
 const stamped = stampAnswer(doc.blocks[0], { kind: 'pick', values: ['pg'] })
 assert.ok(stamped.ok && stampXml(stamped.stamp).includes('value="pg"'))
 assert.match(renderAnvilFence(fence, true), /anvil-block/)
+const open = renderAnvilFence(fence, true, { stamping: { resolve: () => ({ state: 'open' }), canStamp: true } })
+assert.match(open, /data-anvil-interactive/)
+assert.equal(typeof attachAnvil, 'function')
 const md = '\`\`\`anvil\\n' + fence + '\\n\`\`\`\\n'
 assert.match(await new Marked(anvilMarked()).parse(md), /anvil-block/)
 assert.match(new MarkdownIt().use(anvilMarkdownIt()).render(md), /anvil-block/)

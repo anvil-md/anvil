@@ -1,6 +1,6 @@
 {
   "name": "@anvil-md/parser",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Parser for ANVIL, a tiny DSL that turns a fenced code block into an interactive UI block. Zero dependencies, total by contract.",
   "type": "module",
   "license": "MIT",

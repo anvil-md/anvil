@@ -1,6 +1,6 @@
 {
   "name": "@anvil-md/react",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "ANVIL blocks as a React component, plus a react-markdown code renderer.",
   "type": "module",
   "license": "MIT",

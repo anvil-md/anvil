@@ -1,6 +1,6 @@
 {
   "name": "@anvil-md/remark",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Remark plugin that renders ANVIL fences. Covers react-markdown, MDX, Astro and the unified ecosystem.",
   "type": "module",
   "license": "MIT",

@@ -56,9 +56,10 @@ import {
   submitBar,
   warnings,
 } from './blocks'
+import { type Ask, type AnvilStamping, askFor, stateAttrs } from './ask'
 import { type IconName, icon, resolveIcon } from './icons'
 
-type BodyRenderer = (block: AnvilBlock) => string
+type BodyRenderer = (block: AnvilBlock, ask?: Ask) => string
 
 /** What a host face is handed besides the block. */
 export interface CardFaceContext {
@@ -77,10 +78,15 @@ export interface CardFaceContext {
  */
 export type CardFace = (block: AnvilBlock, ctx: CardFaceContext) => string
 
-/** Everything a host may register. Faces today; the shape leaves room. */
+/** Everything a host may register. */
 export interface AnvilHost {
   /** `@card type=<key>` -> the face drawn for it. Keys match case-insensitively. */
   faces?: Record<string, CardFace>
+  /**
+   * The host runs stamping (§7) and tells the renderer each block's state.
+   * Absent: display only, every control `disabled`, exactly as before.
+   */
+  stamping?: AnvilStamping
 }
 
 /** Strategy map, not a switch chain: a new kind is one entry plus one renderer. */
@@ -152,8 +158,9 @@ function blockIcon(block: AnvilBlock): IconName {
 
 /* ── the ordinary ASK frame ──────────────────────────────────────────────── */
 
-function shell(block: AnvilBlock, partial: boolean): string {
-  const body = (BODIES[block.kind] ?? renderNote)(block)
+function shell(block: AnvilBlock, partial: boolean, host?: AnvilHost): string {
+  const ask = askFor(block, partial, host?.stamping)
+  const body = (BODIES[block.kind] ?? renderNote)(block, ask)
 
   // A note is chrome-less: it is prose, not a question. It also renders its own
   // warnings, since it has no frame to hang them off.
@@ -163,8 +170,10 @@ function shell(block: AnvilBlock, partial: boolean): string {
     ? `<div class="anvil-prompt"><span class="anvil-icon">${icon(blockIcon(block))}</span>${esc(block.prompt)}</div>`
     : ''
   const sub = block.subtext ? `<div class="anvil-subtext">${esc(block.subtext)}</div>` : ''
-  const state = partial ? 'streaming' : 'preview'
+  const state = partial ? 'streaming' : ask.foot || 'preview'
   const a11y = a11yAttrs(block)
+  // §7.2: a refused answer goes back to open, with the reason where the human is looking.
+  const error = ask.error ? `<p class="anvil-stamp-error" role="alert">${esc(ask.error)}</p>` : ''
 
   // This package draws; it never calls a host function. So a live block shows
   // its written fallback and says where the real rows come from, rather than
@@ -176,9 +185,9 @@ function shell(block: AnvilBlock, partial: boolean): string {
 
   // Order matters: warnings explain the body, so they belong ABOVE the action
   // rather than orphaned underneath it.
-  return `<section class="anvil-block" data-anvil-id="${esc(block.id)}" data-anvil-kind="${esc(block.kind)}"${source ? ` data-live="${esc(source.fn)}"` : ''}${a11y.attrs}>
-    ${head}${sub}${a11y.sr}${live}${body}${warnings(block)}${submitBar(block)}
-    <footer class="anvil-foot"><span>${state}</span></footer>
+  return `<section class="anvil-block" data-anvil-id="${esc(block.id)}" data-anvil-kind="${esc(block.kind)}"${source ? ` data-live="${esc(source.fn)}"` : ''}${stateAttrs(block, ask)}${a11y.attrs}>
+    ${head}${sub}${a11y.sr}${live}${body}${warnings(block)}${error}${submitBar(block, ask)}
+    <footer class="anvil-foot"><span>${esc(state)}</span></footer>
   </section>`
 }
 

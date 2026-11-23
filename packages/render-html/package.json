@@ -1,7 +1,7 @@
 {
   "name": "@anvil-md/render-html",
-  "version": "0.4.0",
-  "description": "Render an ANVIL fence to an HTML string. Framework-agnostic, display only.",
+  "version": "0.5.0",
+  "description": "Render an ANVIL fence to an HTML string, open, pending or stamped, plus a delegated DOM hydrator that turns clicks into answers. Framework-agnostic.",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -30,6 +30,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./hydrate": {
+      "types": "./dist/hydrate.d.ts",
+      "import": "./dist/hydrate.js",
+      "default": "./dist/hydrate.js"
     },
     "./anvil.css": "./anvil.css"
   },

@@ -52,6 +52,7 @@ import {
   taskProgress,
   withUnit,
 } from '@anvil-md/parser'
+import { type Ask, type AskMode, dialNotch, fieldValue, inert, isPicked, notchPct } from './ask'
 import { type IconName, icon, resolveIcon } from './icons'
 
 /**
@@ -125,7 +126,18 @@ function recAttr(on: boolean): string {
   return on ? ' data-recommended="yes"' : ''
 }
 
-export function renderChoice(b: AnvilBlock): string {
+/**
+ * What a pickable row carries for the hydrator and the record: its value, and
+ * whether it was picked. `aria-pressed` only on `select=many`, where a row IS a
+ * toggle; on `select=one` the click is the answer, so a row is never "on".
+ */
+function pickAttrs(ask: Ask | undefined, value: string, multi: boolean): string {
+  const on = isPicked(ask, value)
+  const pressed = multi && ask && ask.mode !== 'display' ? ` aria-pressed="${on}"` : ''
+  return ` data-anvil-value="${esc(value)}"${on ? ' data-picked="yes"' : ''}${pressed}${inert(ask)}`
+}
+
+export function renderChoice(b: AnvilBlock, ask?: Ask): string {
   if (!b.options.length) return '<p class="anvil-empty">No options.</p>'
   const multi = isMulti(b)
   const rec = recommended(b)
@@ -133,7 +145,7 @@ export function renderChoice(b: AnvilBlock): string {
     .map((o, i) => {
       const danger = o.danger ? ' anvil-row-danger' : ''
       const mine = o.value === rec
-      return `<button type="button" class="anvil-row${danger}"${recAttr(mine)}${rowLabel(o)} disabled>
+      return `<button type="button" class="anvil-row${danger}"${recAttr(mine)}${rowLabel(o)}${pickAttrs(ask, o.value, multi)}>
         <span class="anvil-key">${multi ? MARK : esc(String(i + 1))}</span>
         <span class="anvil-row-main"><span class="anvil-label">${esc(o.label)}</span>${optionMeta(o)}${mine ? REC_TAG : ''}</span>
       </button>`
@@ -172,15 +184,16 @@ function cardFace(b: AnvilBlock, o: AnvilOption): string {
   return (FACES[galleryRender(b)] ?? FACES.card)(o)
 }
 
-export function renderGallery(b: AnvilBlock): string {
+export function renderGallery(b: AnvilBlock, ask?: Ask): string {
   if (!b.options.length) return '<p class="anvil-empty">No cards.</p>'
   const mode = galleryRender(b)
   const rec = recommended(b)
+  const multi = isMulti(b)
   const cards = b.options
     .map((o, i) => {
       const face = cardFace(b, o)
       const mine = o.value === rec
-      return `<button type="button" class="anvil-card"${recAttr(mine)} disabled>
+      return `<button type="button" class="anvil-card"${recAttr(mine)}${pickAttrs(ask, o.value, multi)}>
         ${face}
         <span class="anvil-card-foot">
           <span class="anvil-key">${esc(String(i + 1))}</span>
@@ -210,9 +223,15 @@ function checkAttrs(f: AnvilField): string {
   return out.join('')
 }
 
-function textControl(type: string, f: AnvilField, id: string): string {
+/** `name=` for the hydrator, the answered value for the record, and live only while open. */
+function fieldAttrs(f: AnvilField, ask: Ask | undefined): string {
+  const v = fieldValue(ask, f.name)
+  return ` name="${esc(f.name)}"${v === undefined ? '' : ` value="${esc(v)}"`}${inert(ask)}`
+}
+
+function textControl(type: string, f: AnvilField, id: string, ask?: Ask): string {
   const ph = f.placeholder ? ` placeholder="${esc(f.placeholder)}"` : ''
-  return `<input class="anvil-input" id="${id}" type="${type}" disabled${ph}${checkAttrs(f)}>`
+  return `<input class="anvil-input" id="${id}" type="${type}"${fieldAttrs(f, ask)}${ph}${checkAttrs(f)}>`
 }
 
 /**
@@ -238,20 +257,26 @@ function idPart(s: string): string {
  * a `for=` cannot reach, so it is a switch named by the label's own id. It was
  * `aria-hidden`, which took the field out of the accessibility tree entirely.
  */
-const CONTROLS: Record<FieldType, (f: AnvilField, id: string) => string> = {
-  text: (f, id) => textControl('text', f, id),
-  number: (f, id) => textControl('number', f, id),
-  secret: (f, id) => textControl('password', f, id),
-  url: (f, id) => textControl('url', f, id),
-  date: (f, id) => textControl('date', f, id),
-  path: (f, id) => textControl('text', f, id),
-  email: (f, id) => textControl('email', f, id),
-  longtext: (f, id) => {
+const CONTROLS: Record<FieldType, (f: AnvilField, id: string, ask?: Ask) => string> = {
+  text: (f, id, ask) => textControl('text', f, id, ask),
+  number: (f, id, ask) => textControl('number', f, id, ask),
+  secret: (f, id, ask) => textControl('password', f, id, ask),
+  url: (f, id, ask) => textControl('url', f, id, ask),
+  date: (f, id, ask) => textControl('date', f, id, ask),
+  path: (f, id, ask) => textControl('text', f, id, ask),
+  email: (f, id, ask) => textControl('email', f, id, ask),
+  longtext: (f, id, ask) => {
     const ph = f.placeholder ? ` placeholder="${esc(f.placeholder)}"` : ''
-    return `<textarea class="anvil-input" id="${id}" rows="3" disabled${ph}${checkAttrs(f)}></textarea>`
+    const v = fieldValue(ask, f.name) ?? ''
+    return `<textarea class="anvil-input" id="${id}" rows="3" name="${esc(f.name)}"${inert(ask)}${ph}${checkAttrs(f)}>${esc(v)}</textarea>`
   },
-  bool: (_f, id) =>
-    `<span class="anvil-switch" id="${id}" role="switch" aria-checked="false" aria-disabled="true" aria-labelledby="${id}.label"></span>`,
+  // A span, so `disabled` means nothing to it: live is `tabindex="0"` and no
+  // aria-disabled, and the hydrator flips aria-checked.
+  bool: (f, id, ask) => {
+    const on = fieldValue(ask, f.name) === 'true'
+    const live = ask?.mode === 'open' ? ' tabindex="0"' : ' aria-disabled="true"'
+    return `<span class="anvil-switch" id="${id}" role="switch" data-anvil-field="${esc(f.name)}" aria-checked="${on}"${live} aria-labelledby="${id}.label"></span>`
+  },
 }
 
 /** Types whose control is not a form element, so the control names itself by the label's id instead. */
@@ -259,7 +284,7 @@ const NAMED_BY_LABEL_ID = new Set<FieldType>(['bool'])
 
 const MONO_FIELDS = new Set<FieldType>(['path', 'url', 'secret', 'email'])
 
-export function renderInput(b: AnvilBlock): string {
+export function renderInput(b: AnvilBlock, ask?: Ask): string {
   if (!b.fields.length) return '<p class="anvil-empty">No fields.</p>'
   // The block id keeps two blocks' `email` fields apart on one page. A name
   // written twice in one block is a malformed fence, but its second control
@@ -280,14 +305,14 @@ export function renderInput(b: AnvilBlock): string {
       const error = f.checks.error ? `<small class="anvil-field-error" hidden>${esc(f.checks.error)}</small>` : ''
       return `<div class="anvil-field${mono}">
         <label class="anvil-field-label"${bind}>${esc(f.label)}${opt}</label>
-        ${CONTROLS[type](f, id)}${error}
+        ${CONTROLS[type](f, id, ask)}${error}
       </div>`
     })
     .join('')
   return `<div class="anvil-fields">${rows}</div>`
 }
 
-export function renderScale(b: AnvilBlock): string {
+export function renderScale(b: AnvilBlock, ask?: Ask): string {
   if (!b.dials.length) return '<p class="anvil-empty">No dials.</p>'
   // The parser already resolved `steps` and wrote it back, so this reads the
   // same number the dial values were clamped against. Re-deriving it here with
@@ -296,11 +321,17 @@ export function renderScale(b: AnvilBlock): string {
   const steps = Math.min(11, Math.max(2, attrNumber(b, 'steps', 5)))
   const rows = b.dials
     .map(d => {
-      const raw = ((d.value - 1) / Math.max(1, steps - 1)) * 100
-      const pct = Math.min(100, Math.max(0, raw))
+      const notch = dialNotch(ask, d.name, d.value)
+      // While open, a real range input lies over the track: arrows, drag and a
+      // screen reader all get a native control (§9.6, §9.11), and the knob is
+      // still the thing a sighted reader sees.
+      const range =
+        ask?.mode === 'open'
+          ? `<input class="anvil-range" type="range" name="${esc(d.name)}" min="1" max="${steps}" step="1" value="${notch}" aria-label="${esc(`${d.left} to ${d.right}`)}">`
+          : ''
       return `<div class="anvil-dial">
         <span class="anvil-pole">${esc(d.left)}</span>
-        <span class="anvil-track"><i class="anvil-knob" style="left:${pct.toFixed(1)}%"></i></span>
+        <span class="anvil-track">${range}<i class="anvil-knob" style="left:${notchPct(notch, steps)}%"></i></span>
         <span class="anvil-pole anvil-pole-right">${esc(d.right)}</span>
       </div>`
     })
@@ -1693,9 +1724,21 @@ const SUBMIT_LABEL: Partial<Record<AnvilKind, string>> = {
   message: 'Send',
 }
 
-export function submitBar(b: AnvilBlock): string {
+/**
+ * The button keeps its place in every state, because §9.2 forbids a block
+ * changing height on stamp: once answered it says so and stays put.
+ */
+const SUBMIT_STATE: Record<AskMode, (label: string) => string> = {
+  display: label => label,
+  open: label => label,
+  pending: () => 'Sending',
+  stamped: () => 'Answered',
+}
+
+export function submitBar(b: AnvilBlock, ask?: Ask): string {
   if (!(NEEDS_SUBMIT[b.kind] ?? (() => false))(b)) return ''
-  const label = attrString(b, 'submit', SUBMIT_LABEL[b.kind] ?? 'Confirm')
+  const label = SUBMIT_STATE[ask?.mode ?? 'display'](attrString(b, 'submit', SUBMIT_LABEL[b.kind] ?? 'Confirm'))
   const danger = b.attrs.danger ? ' anvil-submit-danger' : ''
-  return `<div class="anvil-actions"><button type="button" class="anvil-submit${danger}" disabled>${esc(label)}</button></div>`
+  const hook = ask?.mode === 'open' ? ' data-anvil-submit' : ''
+  return `<div class="anvil-actions"><button type="button" class="anvil-submit${danger}"${hook}${inert(ask)}>${esc(label)}</button></div>`
 }

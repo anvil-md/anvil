@@ -42,20 +42,51 @@ no framework coupling and no component lifecycle.
 Use it from React, Vue, Svelte, a static site generator, or a plain server
 response.
 
-## Display only
+## Display only, unless you run stamping
 
-**The emitted controls carry `disabled`.** This package draws a block; it does
-not run one. Stamping -- the answer half of the spec -- is not implemented here.
+**By default the emitted controls carry `disabled`.** The package draws a block;
+it does not run one. Disabled controls are styled to look normal rather than
+dimmed, so a rendered block reads as the real thing rather than as a broken form.
 
-That is a real limitation, not a temporary omission in disguise: implementing
-stamping correctly needs server-held state, idempotency and a permission model,
-which do not belong in a rendering package.
+A host that runs stamping passes each block's state, and the same call draws it
+open, pending or stamped:
+
+```ts
+import { renderAnvilFence } from '@anvil-md/render-html'
+import { attachAnvil } from '@anvil-md/render-html/hydrate'
+
+const html = renderAnvilFence(fenceBody, closed, {
+  stamping: {
+    resolve: id => states.get(id), // undefined = not known yet: drawn inert (§7.6)
+    canStamp: viewer.mayAnswer,     // false = disabled, plus `waitingOn` (§8.2.1)
+    waitingOn: 'waiting on an org admin',
+  },
+})
+
+// Once, on the element your markdown renders into. Delegated, so re-renders are free.
+attachAnvil(transcriptEl, {
+  onAnswer: (blockId, answer) => server.stamp(blockId, answer),
+})
+```
+
+| State | Draws |
+|---|---|
+| `undefined` | inert: visible, not clickable, no spinner |
+| `{ state: 'open' }` | live controls; `error` adds an alert above the button |
+| `{ state: 'pending', answer }` | everything disabled, the chosen row marked |
+| `{ state: 'stamped', stamp }` | the record: the pick, every rejected row, who and when |
+
+**The stamp itself still does not live here.** Law II puts it on your server,
+keyed by block id; idempotency (§7.3), expiry (§7.5) and the permission gate
+(§8.2) live there with it. Check every answer with `stampAnswer` from
+`@anvil-md/parser` on the server, never on trust (§8.1), and wrap the stamp as
+untrusted data when you hand it to the model.
 [§6](https://github.com/anvil-md/anvil/blob/main/SPEC.md#6-the-stamp) and
-[§7](https://github.com/anvil-md/anvil/blob/main/SPEC.md#7-stamp-lifecycle) of
-the spec are the contract if you are building it.
+[§7](https://github.com/anvil-md/anvil/blob/main/SPEC.md#7-stamp-lifecycle) are
+the contract.
 
-Disabled controls are styled to look normal rather than dimmed, so a rendered
-block reads as the real thing rather than as a broken form.
+Stamping covers `@choice`, `@gallery`, `@input` and `@scale`. `@card ask=` and
+`@message ask=` still draw display-only.
 
 ## Blocks covered
 
@@ -157,6 +188,10 @@ function renderAnvilFence(source: string, closed: boolean, host?: AnvilHost): st
 function esc(s: string): string
 function icon(name: IconName): string
 function resolveIcon(requested: unknown, fallback: IconName): IconName
+function answerOf(stamp: AnvilStamp): AnvilAnswer          // a stamp read back into its answer
+
+// @anvil-md/render-html/hydrate
+function attachAnvil(root: HTMLElement, h: { onAnswer(blockId, answer, block): void }): () => void
 ```
 
 ## Licence
