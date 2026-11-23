@@ -1,6 +1,6 @@
 {
   "name": "@anvil-md/render-html",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Render an ANVIL fence to an HTML string, open, pending or stamped, plus a delegated DOM hydrator that turns clicks into answers. Framework-agnostic.",
   "type": "module",
   "license": "MIT",

@@ -58,6 +58,8 @@ await Bun.write(
         'react-dom': '^19',
         marked: '^16',
         'markdown-it': '^14',
+        remark: '^15',
+        'remark-html': '^16',
         typescript: '^5.7',
         '@types/node': '^22',
         '@types/react': '^19',
@@ -92,6 +94,8 @@ import { toA2UI } from '@anvil-md/a2ui'
 import { cases } from '@anvil-md/conformance'
 import { Marked } from 'marked'
 import MarkdownIt from 'markdown-it'
+import { remark } from 'remark'
+import html from 'remark-html'
 import { createElement } from 'react'
 import { renderToString } from 'react-dom/server'
 
@@ -107,7 +111,8 @@ assert.equal(typeof attachAnvil, 'function')
 const md = '\`\`\`anvil\\n' + fence + '\\n\`\`\`\\n'
 assert.match(await new Marked(anvilMarked()).parse(md), /anvil-block/)
 assert.match(new MarkdownIt().use(anvilMarkdownIt()).render(md), /anvil-block/)
-assert.equal(typeof anvilRemark(), 'function')
+// Through remark itself: a typeof check here shipped 0.5.0 with a plugin that threw on .use().
+assert.match(String(await remark().use(anvilRemark()).use(html, { sanitize: false }).process(md)), /anvil-block/)
 assert.match(renderToString(createElement(Anvil, { source: fence })), /anvil-block/)
 assert.ok(lint(fence).ok)
 assert.ok(toA2UI(fence).surfaces.length > 0)

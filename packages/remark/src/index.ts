@@ -17,6 +17,10 @@
  *
  * EXPERIMENTAL: exercised against remark-html only. If you wire it into a
  * different pipeline and it misbehaves, that is a real bug, not misuse.
+ *
+ * `anvilRemark(opts)` returns a unified ATTACHER, which returns the transformer.
+ * 0.5.0 returned the transformer itself, so `.use()` ran it at freeze time with
+ * no tree and threw before the first document was parsed.
  */
 import { type AnvilHost, renderAnvilFence } from '@anvil-md/render-html'
 
@@ -69,5 +73,8 @@ export function anvilRemark(opts: AnvilRemarkOptions = {}) {
 		}
 	}
 
-	return (tree: Node): void => walk(tree)
+	const transform = (tree: Node): void => walk(tree)
+	return function attacher(): typeof transform {
+		return transform
+	}
 }

@@ -1,6 +1,6 @@
 {
   "name": "@anvil-md/a2ui",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Export ANVIL blocks to A2UI v1.0 surfaces, and turn A2UI actions back into frozen ANVIL stamps.",
   "type": "module",
   "license": "MIT",

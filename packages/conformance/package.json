@@ -1,6 +1,6 @@
 {
   "name": "@anvil-md/conformance",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "The ANVIL conformance corpus: a language-level test suite any implementation can run, in any language. One JSON file of cases plus a runner for the reference implementation.",
   "type": "module",
   "license": "MIT",
